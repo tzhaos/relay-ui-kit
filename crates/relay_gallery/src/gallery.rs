@@ -1,4 +1,4 @@
-//! App-shaped gallery scenes for Relay UI kit components.
+//! App-shaped gallery scenes for Relay UI components.
 //!
 //! Each scene presents components in the kind of surface where Relay will use
 //! them, instead of packing every primitive into one long showcase page.
@@ -7,7 +7,8 @@ use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
     Styled, Window, div, px,
 };
-use relay_ui_kit::{ActiveTheme, ScrollSurface, SplitPaneState, TextInputState, space};
+use relay_ui_components::SplitPaneState;
+use relay_ui_primitives::{ActiveTheme, ScrollSurface, TextInputState, space};
 
 mod command_scene;
 mod foundations_scene;

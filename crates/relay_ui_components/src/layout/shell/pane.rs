@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, space};
+use relay_ui_primitives::theme::{ActiveTheme, space};
 
 /// Fixed or flexible pane sizing used by [`Pane`].
 #[derive(Debug, Clone, Copy, PartialEq)]

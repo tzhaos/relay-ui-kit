@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, space};
+use relay_ui_primitives::theme::{ActiveTheme, space};
 
 /// Toolbar above a terminal surface: tabs on the left, actions on the right.
 #[derive(IntoElement)]

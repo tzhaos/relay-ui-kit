@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, mono_family, space};
+use relay_ui_primitives::theme::{ActiveTheme, Theme, mono_family, space};
 
 /// A terminal frame that hosts a real terminal/PTY projection.
 #[derive(IntoElement)]
@@ -74,7 +74,7 @@ impl RenderOnce for TerminalSurface {
     }
 }
 
-fn empty_terminal_state(theme: crate::Theme, connected: bool) -> gpui::Div {
+fn empty_terminal_state(theme: Theme, connected: bool) -> gpui::Div {
     let title = if connected {
         "No terminal output"
     } else {

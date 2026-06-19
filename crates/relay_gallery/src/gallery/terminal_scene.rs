@@ -1,5 +1,6 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div};
-use relay_ui_kit::{Button, Composer, IconButton, IconName, TextArea, TextInputAction, Theme};
+use relay_ui_primitives::{Button, IconButton, IconName, TextArea, TextInputAction, Theme};
+use relay_workbench_ui::Composer;
 
 use super::{
     GalleryScenesApp, GalleryState,

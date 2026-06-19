@@ -1,9 +1,10 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
-use relay_ui_kit::{
-    Badge, DiffView, FileKind, FileView, IconButton, IconName, Pane, PaneSurface, PaneWidth,
-    PanelHeader, StatusDot, Tab, Tabs, TerminalSessionRow, TextInput, TextInputAction, Theme, Tone,
-    TreeRow,
+use relay_ui_components::{Pane, PaneSurface, PaneWidth, Tab, Tabs};
+use relay_ui_primitives::{
+    Badge, IconButton, IconName, PanelHeader, StatusDot, TextInput, TextInputAction, Theme, Tone,
+    TreeRow, radius,
 };
+use relay_workbench_ui::{DiffView, FileKind, FileView, TerminalSessionRow};
 
 use super::{
     WorkbenchApp, WorkbenchState,
@@ -151,7 +152,7 @@ fn files_tab(
 fn diff_tab() -> impl IntoElement {
     div().flex_1().min_h_0().p_2().child(
         FileView::new(
-            "crates/relay_ui_kit/src/shell/split_pane.rs",
+            "crates/relay_ui_components/src/layout/shell/split_pane/mod.rs",
             FileKind::Diff,
             DiffView::from_text_diff(DIFF_OLD, DIFF_NEW),
         )
@@ -208,7 +209,7 @@ fn review_tab(
         .child(
             div()
                 .p_2()
-                .rounded(px(relay_ui_kit::radius::MD))
+                .rounded(px(radius::MD))
                 .bg(theme.panel)
                 .border_1()
                 .border_color(theme.border)

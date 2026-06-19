@@ -1,4 +1,4 @@
-//! Orca-direction workbench sample assembled from `relay_ui_kit`.
+//! Orca-direction workbench sample assembled from the Relay UI crates.
 
 mod center;
 mod context;
@@ -6,10 +6,8 @@ mod data;
 mod rail;
 
 use gpui::{AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
-use relay_ui_kit::{
-    ActiveTheme, AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem, TextInputState, Tone,
-    icon::IconName, theme::space,
-};
+use relay_ui_components::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
+use relay_ui_primitives::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
 
 use center::center_pane;
 use context::right_context;

@@ -1,4 +1,4 @@
-use crate::icon::IconName;
+use relay_ui_primitives::icon::IconName;
 
 /// A selectable Git branch row in [`super::BranchSelector`].
 pub struct BranchOption {

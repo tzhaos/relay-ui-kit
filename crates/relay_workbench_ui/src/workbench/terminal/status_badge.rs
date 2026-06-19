@@ -1,6 +1,6 @@
 use gpui::{App, IntoElement, RenderOnce, Window};
 
-use crate::{display::Badge, tone::Tone};
+use relay_ui_primitives::{display::Badge, tone::Tone};
 
 /// Small status badge for terminal/session state.
 #[derive(IntoElement)]

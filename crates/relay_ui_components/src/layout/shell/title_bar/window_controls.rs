@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px, rgb,
 };
 
-use crate::theme::{ActiveTheme, Theme, ui_family};
+use relay_ui_primitives::theme::{ActiveTheme, Theme, ui_family};
 
 fn windows_close_hover() -> Hsla {
     rgb(0xe81120).into()

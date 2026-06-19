@@ -3,7 +3,7 @@ use gpui::{
     Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
+use relay_ui_primitives::theme::{ActiveTheme, radius};
 
 /// A prompt/composer shell for terminal and agent launch flows.
 #[derive(IntoElement)]

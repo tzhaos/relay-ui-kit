@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{App, ElementId, IntoElement, RenderOnce, Window};
 
-use crate::components::overlay::{Menu, MenuItem};
+use relay_ui_primitives::components::overlay::{Menu, MenuItem};
 
 use super::types::BranchActionKind;
 

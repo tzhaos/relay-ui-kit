@@ -1,10 +1,12 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
-use relay_ui_kit::{
-    AgentQuickLaunch, Button, FileKind, FileView, IconButton, IconName, LauncherItem,
-    LauncherItemKind, LauncherMenu, MarkdownView, Pane, PaneSurface, PaneWidth, PanelHeader,
-    Segment, SegmentedControl, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
-    TerminalTranscript, Theme,
-    theme::{self},
+use relay_ui_components::{Pane, PaneSurface, PaneWidth};
+use relay_ui_primitives::{
+    Button, IconButton, IconName, PanelHeader, Segment, SegmentedControl, Theme, theme,
+};
+use relay_workbench_ui::{
+    AgentQuickLaunch, FileKind, FileView, LauncherItem, LauncherItemKind, LauncherMenu,
+    MarkdownView, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
+    TerminalTranscript,
 };
 
 use super::{

@@ -1,4 +1,5 @@
 use gpui::Hsla;
+use relay_ui_primitives::Theme;
 
 /// Visual treatment for one terminal output row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,7 +13,7 @@ pub enum TerminalLineStyle {
 }
 
 impl TerminalLineStyle {
-    pub(crate) fn color(self, theme: &crate::Theme) -> Hsla {
+    pub(crate) fn color(self, theme: &Theme) -> Hsla {
         match self {
             TerminalLineStyle::Prompt | TerminalLineStyle::Muted => theme.terminal_dim,
             TerminalLineStyle::Input | TerminalLineStyle::Output => theme.terminal_text,

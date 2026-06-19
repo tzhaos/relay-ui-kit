@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::ActiveTheme;
+use relay_ui_primitives::theme::ActiveTheme;
 
 use super::{SplitAxis, drag::DraggedSplitPane};
 

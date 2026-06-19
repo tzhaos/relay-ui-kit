@@ -1,5 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
-use relay_ui_kit::{
+use relay_ui_primitives::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow,
     SettingsSection, Skeleton, Slider, TextInputAction, Theme, ThemePreviewCard, ThemePreviewKind,

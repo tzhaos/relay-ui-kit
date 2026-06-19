@@ -1,7 +1,6 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
-use relay_ui_kit::{
-    CodeView, DiffView, FileKind, FileView, MarkdownView, Segment, SegmentedControl,
-};
+use relay_ui_primitives::{Segment, SegmentedControl};
+use relay_workbench_ui::{CodeView, DiffView, FileKind, FileView, MarkdownView};
 
 use super::{GalleryScenesApp, GalleryState};
 
@@ -63,7 +62,7 @@ pub(super) fn viewer_sample(
                 .when(active == "diff", |this| {
                     this.child(
                         FileView::new(
-                            "crates/relay_ui_kit/src/viewer/diff_view.rs",
+                            "crates/relay_workbench_ui/src/workbench/viewer/diff_view.rs",
                             FileKind::Diff,
                             DiffView::from_text_diff(DIFF_OLD, DIFF_NEW),
                         )

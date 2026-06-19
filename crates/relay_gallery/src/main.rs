@@ -1,10 +1,9 @@
-//! Relay UI kit gallery.
+//! Relay UI gallery.
 //!
-//! A standalone, fully-interactive showcase app that proves the `relay_ui_kit`
-//! components render and behave at Orca quality in GPUI, with no dependency on
-//! the real workbench domain. The gallery is a studio that launches several
-//! small app-shaped scenes so components appear in the kind of surface where
-//! Relay will use them:
+//! A standalone, fully-interactive showcase app that proves the Relay UI crates
+//! render and behave at Orca quality in GPUI. The gallery is a studio that
+//! launches several small app-shaped scenes so components appear in the kind of
+//! surface where Relay will use them:
 //!
 //! - **Workbench** — the Orca three-column shell (left rail / center terminal /
 //!   right context). Click tasks to activate them, switch Files/Diff/Review and
@@ -31,9 +30,8 @@ use gpui::{
     StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
-use relay_ui_kit::{
-    ActiveTheme, IconName, KitAssets, NavRow, TitleBar, WorkspaceBreadcrumb, theme,
-};
+use relay_ui_components::{TitleBar, WorkspaceBreadcrumb};
+use relay_ui_primitives::{ActiveTheme, IconName, KitAssets, NavRow, space, theme};
 
 /// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +117,7 @@ impl GalleryApp {
     fn catalog(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
         div()
-            .w(px(relay_ui_kit::space::RAIL_WIDTH))
+            .w(px(space::RAIL_WIDTH))
             .flex_shrink_0()
             .h_full()
             .px_3()

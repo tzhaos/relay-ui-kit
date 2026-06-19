@@ -11,7 +11,7 @@ mod handle;
 mod handlers;
 mod state;
 
-use crate::theme::{ActiveTheme, space};
+use relay_ui_primitives::theme::{ActiveTheme, space};
 
 use drag::{DraggedSplitPane, split_size_from_drag};
 use geometry::{should_emit_resize, snap_split_size};

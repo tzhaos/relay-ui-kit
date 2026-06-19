@@ -2,7 +2,7 @@ use gpui::{
     App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::ActiveTheme;
+use relay_ui_primitives::theme::{ActiveTheme, Theme};
 
 use super::TerminalLine;
 
@@ -53,14 +53,14 @@ impl RenderOnce for TerminalTranscript {
     }
 }
 
-fn terminal_line(theme: crate::Theme, line: TerminalLine) -> gpui::Div {
+fn terminal_line(theme: Theme, line: TerminalLine) -> gpui::Div {
     div()
         .min_h(px(18.0))
         .text_color(line.style.color(&theme))
         .child(line.text)
 }
 
-fn prompt_line(theme: crate::Theme, prompt: String, cursor: bool) -> gpui::Div {
+fn prompt_line(theme: Theme, prompt: String, cursor: bool) -> gpui::Div {
     div()
         .min_h(px(18.0))
         .flex()

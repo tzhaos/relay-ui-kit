@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_ui_primitives::{
     Badge,
     icon::{Icon, IconName, IconSize},
     theme::{ActiveTheme, radius, space},

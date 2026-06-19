@@ -2,7 +2,7 @@ use gpui::{
     App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
     theme::{ActiveTheme, space},
 };

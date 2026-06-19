@@ -2,11 +2,11 @@ use gpui::{
     Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div,
     prelude::FluentBuilder, px,
 };
-use relay_ui_kit::{
-    ActiveTheme, BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector, Icon,
-    IconButton, IconName, IconSize, StatusDot, TextInput, TextInputAction, TextInputState, Tone,
-    overlay, space,
+use relay_ui_primitives::{
+    ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputAction,
+    TextInputState, Theme, Tone, overlay, radius, space,
 };
+use relay_workbench_ui::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
 
 use super::GalleryScenesApp;
 
@@ -30,7 +30,7 @@ pub(super) fn section(
         .child(
             div()
                 .p_3()
-                .rounded(px(relay_ui_kit::radius::LG))
+                .rounded(px(radius::LG))
                 .bg(theme.panel)
                 .border_1()
                 .border_color(theme.border)
@@ -205,7 +205,7 @@ fn branch_actions_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     })
 }
 
-pub(super) fn dot_label(theme: relay_ui_kit::Theme, tone: Tone, label: &str) -> impl IntoElement {
+pub(super) fn dot_label(theme: Theme, tone: Tone, label: &str) -> impl IntoElement {
     div()
         .flex()
         .items_center()
@@ -219,13 +219,13 @@ pub(super) fn dot_label(theme: relay_ui_kit::Theme, tone: Tone, label: &str) -> 
         )
 }
 
-pub(super) fn icon_sample(theme: relay_ui_kit::Theme, name: IconName) -> impl IntoElement {
+pub(super) fn icon_sample(theme: Theme, name: IconName) -> impl IntoElement {
     div()
         .size(px(32.0))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(relay_ui_kit::radius::MD))
+        .rounded(px(radius::MD))
         .bg(theme.panel_alt)
         .border_1()
         .border_color(theme.border)

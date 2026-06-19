@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, space};
+use relay_ui_primitives::theme::{ActiveTheme, space};
 
 /// A titled section with an optional trailing action and content slot.
 #[derive(IntoElement)]

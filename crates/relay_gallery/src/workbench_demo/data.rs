@@ -1,4 +1,5 @@
-use relay_ui_kit::{IconName, TerminalLine, TerminalLineStyle, Tone};
+use relay_ui_primitives::{IconName, Tone};
+use relay_workbench_ui::{TerminalLine, TerminalLineStyle};
 
 use super::WorkbenchState;
 
@@ -112,7 +113,7 @@ pub(super) const DEMO_FILES: [DemoFile; 13] = [
     DemoFile {
         depth: 1,
         icon: IconName::Folder,
-        name: "relay_ui_kit",
+        name: "relay_ui_primitives",
         expandable: true,
     },
     DemoFile {
@@ -205,7 +206,7 @@ pub(super) fn session_lines(session: &DemoSession) -> Vec<TerminalLine> {
         "codex" => vec![
             TerminalLine::new("relay@workspace").style(TerminalLineStyle::Prompt),
             TerminalLine::new("$ codex").style(TerminalLineStyle::Input),
-            TerminalLine::new("Reviewing crates/relay_ui_kit shell and terminal components.")
+            TerminalLine::new("Reviewing Relay UI shell and terminal components.")
                 .style(TerminalLineStyle::Output),
             TerminalLine::new("UI actions are routed through the workbench command layer.")
                 .style(TerminalLineStyle::Success),
@@ -218,7 +219,7 @@ pub(super) fn session_lines(session: &DemoSession) -> Vec<TerminalLine> {
         ],
         _ => vec![
             TerminalLine::new("relay@workspace").style(TerminalLineStyle::Prompt),
-            TerminalLine::new("$ cargo test -p relay_ui_kit").style(TerminalLineStyle::Input),
+            TerminalLine::new("$ cargo test --workspace").style(TerminalLineStyle::Input),
             TerminalLine::new("21 tests passed").style(TerminalLineStyle::Success),
             TerminalLine::new("$ cargo build -p relay_gallery").style(TerminalLineStyle::Input),
         ],

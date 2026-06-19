@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder,
 };
 
-use crate::{display::Divider, theme::ActiveTheme};
+use relay_ui_primitives::{display::Divider, theme::ActiveTheme};
 
 /// Three-column workbench shell with optional title and status bars.
 #[derive(IntoElement)]

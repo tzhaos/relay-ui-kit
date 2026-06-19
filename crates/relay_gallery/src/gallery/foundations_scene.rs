@@ -1,9 +1,10 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
-use relay_ui_kit::{
+use relay_ui_components::{Tab, Tabs};
+use relay_ui_primitives::{
     Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, FilterBar,
     FilterChip, Icon, IconButton, IconName, Label, LabelSize, ListItem, NavRow, SectionedList,
-    SectionedListGroup, Segment, SegmentedControl, Stepper, Tab, Tabs, TaskRow, TaskRowData, Theme,
-    Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
+    SectionedListGroup, Segment, SegmentedControl, Stepper, TaskRow, TaskRowData, Theme, Tone,
+    ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::{
@@ -356,7 +357,7 @@ fn tree_rows_sample() -> impl IntoElement {
                 .depth(0),
         )
         .child(
-            TreeRow::new("tr-2", IconName::Folder, "relay_ui_kit")
+            TreeRow::new("tr-2", IconName::Folder, "relay_ui_primitives")
                 .expandable(false)
                 .depth(1),
         )

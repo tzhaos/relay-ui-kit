@@ -1,5 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
-use relay_ui_kit::{
+use relay_ui_primitives::{
     Button, CommandRow, ConfirmDialog, DropdownMenu, IconName, KeybindingActions, KeybindingRow,
     KeybindingTable, KeyboardShortcut, MenuItem, Popover, Theme, overlay,
 };

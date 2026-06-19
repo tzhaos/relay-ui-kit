@@ -3,7 +3,7 @@ use gpui::{
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_ui_primitives::{
     display::StatusDot,
     theme::{ActiveTheme, radius},
     tone::Tone,

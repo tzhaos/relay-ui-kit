@@ -5,7 +5,7 @@ use gpui::{
     Styled, Window, WindowControlArea, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius, space};
+use relay_ui_primitives::theme::{ActiveTheme, radius, space};
 
 pub use window_controls::WindowControls;
 

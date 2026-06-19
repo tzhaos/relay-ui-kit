@@ -4219,7 +4219,9 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui_platform",
- "relay_ui_kit",
+ "relay_ui_components",
+ "relay_ui_primitives",
+ "relay_workbench_ui",
 ]
 
 [[package]]
@@ -4228,16 +4230,6 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "relay_ui_primitives",
-]
-
-[[package]]
-name = "relay_ui_kit"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "relay_ui_components",
- "relay_ui_primitives",
- "relay_workbench_ui",
 ]
 
 [[package]]

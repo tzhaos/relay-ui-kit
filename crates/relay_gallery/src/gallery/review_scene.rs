@@ -1,5 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use relay_ui_kit::{Button, IconName, TaskRow, TaskRowData, Theme, Tone, TreeRow};
+use relay_ui_primitives::{Button, IconName, TaskRow, TaskRowData, Theme, Tone, TreeRow};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -68,7 +68,10 @@ fn file_tree_sample(
                 .flex_col()
                 .gap(px(1.0))
                 .child(TreeRow::new("review-crates", IconName::Folder, "crates").expandable(true))
-                .child(TreeRow::new("review-kit", IconName::Folder, "relay_ui_kit").depth(1))
+                .child(
+                    TreeRow::new("review-primitives", IconName::Folder, "relay_ui_primitives")
+                        .depth(1),
+                )
                 .child(
                     TreeRow::new("review-viewer", IconName::FileDiff, "viewer/diff_view.rs")
                         .depth(2)

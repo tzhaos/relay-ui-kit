@@ -2,9 +2,9 @@ use gpui::{
     App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
-    theme::{ActiveTheme, space},
+    theme::{ActiveTheme, Theme, space},
     tone::Tone,
 };
 
@@ -88,7 +88,7 @@ impl RenderOnce for StatusBar {
     }
 }
 
-fn status_group(theme: crate::Theme, items: Vec<StatusItem>) -> gpui::Div {
+fn status_group(theme: Theme, items: Vec<StatusItem>) -> gpui::Div {
     div()
         .min_w_0()
         .flex()
@@ -97,7 +97,7 @@ fn status_group(theme: crate::Theme, items: Vec<StatusItem>) -> gpui::Div {
         .children(items.into_iter().map(move |item| status_item(theme, item)))
 }
 
-fn status_item(theme: crate::Theme, item: StatusItem) -> gpui::Div {
+fn status_item(theme: Theme, item: StatusItem) -> gpui::Div {
     div()
         .min_w_0()
         .flex()

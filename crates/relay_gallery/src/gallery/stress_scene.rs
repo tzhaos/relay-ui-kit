@@ -1,8 +1,11 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
-use relay_ui_kit::{
-    Button, ButtonVariant, CodeView, FileKind, FileView, IconName, ScrollSurface, TaskRow,
-    TaskRowData, TerminalLine, TerminalLineStyle, TerminalSurface, TerminalTranscript, Theme, Tone,
-    TreeRow,
+use relay_ui_primitives::{
+    Button, ButtonVariant, IconName, ScrollSurface, TaskRow, TaskRowData, Theme, Tone, TreeRow,
+    radius,
+};
+use relay_workbench_ui::{
+    CodeView, FileKind, FileView, TerminalLine, TerminalLineStyle, TerminalSurface,
+    TerminalTranscript,
 };
 
 use super::{
@@ -59,7 +62,7 @@ pub(super) fn render(
                 .h(px(280.0))
                 .border_1()
                 .border_color(theme.border)
-                .rounded(px(relay_ui_kit::radius::LG))
+                .rounded(px(radius::LG))
                 .overflow_hidden()
                 .child(TerminalSurface::new(
                     "stress-terminal-surface",
@@ -94,7 +97,7 @@ fn scroll_surface_sample(theme: Theme) -> impl IntoElement {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .rounded(px(relay_ui_kit::radius::MD))
+                    .rounded(px(radius::MD))
                     .bg(if index % 2 == 0 {
                         theme.panel
                     } else {
@@ -160,7 +163,7 @@ fn long_file_tree() -> impl IntoElement {
             TreeRow::new(
                 "stress-tree-deep",
                 IconName::Folder,
-                "relay_ui_kit/src/terminal/session/history/very/deep/path",
+                "relay_workbench_ui/src/terminal/session/history/very/deep/path",
             )
             .depth(1),
         )

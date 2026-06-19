@@ -1,10 +1,16 @@
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use relay_ui_kit::{
-    AgentQuickLaunch, AppShell, Button, CommandPalette, CommandRow, IconName, KeyboardShortcut,
-    LauncherItem, LauncherItemKind, LauncherMenu, NavRow, Pane, PaneSurface, PaneWidth,
-    PanelHeader, SplitPane, StatusBar, StatusItem, TerminalLine, TerminalLineStyle,
-    TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
-    TerminalTranscript, TextInput, TextInputAction, TitleBar, Tone, TreeRow, WorkspaceBreadcrumb,
+use relay_ui_components::{
+    AppShell, Pane, PaneSurface, PaneWidth, SplitPane, StatusBar, StatusItem, TitleBar,
+    WorkspaceBreadcrumb,
+};
+use relay_ui_primitives::{
+    Button, CommandPalette, CommandRow, IconName, KeyboardShortcut, NavRow, PanelHeader, TextInput,
+    TextInputAction, Theme, Tone, TreeRow, radius,
+};
+use relay_workbench_ui::{
+    AgentQuickLaunch, LauncherItem, LauncherItemKind, LauncherMenu, TerminalLine,
+    TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab,
+    TerminalToolbar, TerminalTranscript,
 };
 
 use super::{GalleryScenesApp, GalleryState};
@@ -64,9 +70,9 @@ pub(super) fn shell_sample(
     div()
         .h(px(310.0))
         .overflow_hidden()
-        .rounded(px(relay_ui_kit::radius::LG))
+        .rounded(px(radius::LG))
         .border_1()
-        .border_color(relay_ui_kit::Theme::light().border)
+        .border_color(Theme::light().border)
         .child(
             AppShell::new(split)
                 .title_bar(
@@ -99,7 +105,7 @@ pub(super) fn shell_sample(
 pub(super) fn terminal_sample(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
-    theme: relay_ui_kit::Theme,
+    theme: Theme,
 ) -> impl IntoElement {
     let active = state.terminal_session;
     let set_session = |key: &'static str, host: &Entity<GalleryScenesApp>| {
@@ -115,7 +121,7 @@ pub(super) fn terminal_sample(
     div()
         .h(px(300.0))
         .overflow_hidden()
-        .rounded(px(relay_ui_kit::radius::LG))
+        .rounded(px(radius::LG))
         .border_1()
         .border_color(theme.border)
         .flex()
@@ -259,7 +265,7 @@ pub(super) fn command_sample(
         .footer(
             div()
                 .text_xs()
-                .text_color(relay_ui_kit::Theme::light().text_muted)
+                .text_color(Theme::light().text_muted)
                 .child(format!("Selected: {}", state.launcher_choice)),
         )
 }
@@ -267,7 +273,7 @@ pub(super) fn command_sample(
 pub(super) fn launcher_sample(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
-    theme: relay_ui_kit::Theme,
+    theme: Theme,
 ) -> impl IntoElement {
     div()
         .w(px(340.0))
