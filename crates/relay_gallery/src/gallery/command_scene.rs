@@ -1,6 +1,6 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
 use relay_ui_kit::{
-    Button, CommandRow, ConfirmDialog, DropdownMenu, IconButton, IconName, KeybindingRow,
+    Button, CommandRow, ConfirmDialog, DropdownMenu, IconName, KeybindingActions, KeybindingRow,
     KeybindingTable, KeyboardShortcut, MenuItem, Popover, Theme, overlay,
 };
 
@@ -31,26 +31,17 @@ pub(super) fn render(
         .child(section(
             cx,
             "Shortcuts",
-            KeybindingTable::new(vec![
-                KeybindingRow::new("New terminal")
-                    .description("Open a shell session")
-                    .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
-                    .action(IconButton::new(
-                        "keybinding-terminal-edit",
-                        IconName::Settings,
-                    )),
-                KeybindingRow::new("Launch Codex")
-                    .description("Attach an agent to the active terminal")
-                    .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
-                    .action(IconButton::new("keybinding-codex-edit", IconName::Settings)),
-                KeybindingRow::new("Filter files")
-                    .description("Focus the active panel search field")
-                    .shortcut(KeyboardShortcut::new(["Ctrl", "F"]))
-                    .action(IconButton::new(
-                        "keybinding-filter-edit",
-                        IconName::Settings,
-                    )),
-            ]),
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(shortcuts_table(host))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(format!("Shortcut event: {}", state.overlay_event)),
+                ),
         ))
         .child(section(
             cx,
@@ -102,6 +93,44 @@ pub(super) fn render(
     }
 
     stack
+}
+
+fn shortcuts_table(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    KeybindingTable::new(vec![
+        KeybindingRow::new("New terminal")
+            .description("Open a shell session")
+            .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
+            .action(keybinding_actions(host, "New terminal")),
+        KeybindingRow::new("Launch Codex")
+            .description("Attach an agent to the active terminal")
+            .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
+            .action(keybinding_actions(host, "Launch Codex")),
+        KeybindingRow::new("Filter files")
+            .description("Focus the active panel search field")
+            .shortcut(KeyboardShortcut::new(["Ctrl", "F"]))
+            .action(keybinding_actions(host, "Filter files")),
+    ])
+}
+
+fn keybinding_actions(host: &Entity<GalleryScenesApp>, command: &'static str) -> impl IntoElement {
+    KeybindingActions::new(format!("shortcut-actions-{command}"))
+        .on_edit(shortcut_event(host, command, "Edit"))
+        .on_reset(shortcut_event(host, command, "Reset"))
+        .on_clear(shortcut_event(host, command, "Clear"))
+}
+
+fn shortcut_event(
+    host: &Entity<GalleryScenesApp>,
+    command: &'static str,
+    action: &'static str,
+) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+    let host = host.clone();
+    move |_event, _window, cx| {
+        host.update(cx, |this, cx| {
+            this.state.overlay_event = format!("{action} shortcut: {command}");
+            cx.notify();
+        });
+    }
 }
 
 fn overlay_sample(

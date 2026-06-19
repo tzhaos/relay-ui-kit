@@ -33,7 +33,10 @@ pub use workbench::{composer, git, launcher, terminal, viewer};
 // Flat re-exports so callers write `relay_ui_kit::Button` etc.
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
-pub use command::{CommandPalette, CommandRow, KeybindingRow, KeybindingTable, KeyboardShortcut};
+pub use command::{
+    CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
+    KeybindingTable, KeyboardShortcut,
+};
 pub use components::overlay::{
     ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,
     TooltipBody, overlay,
