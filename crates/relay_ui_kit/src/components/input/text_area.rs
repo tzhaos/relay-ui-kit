@@ -1,6 +1,7 @@
 use gpui::{
-    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::theme::{ActiveTheme, radius};
@@ -86,6 +87,7 @@ impl RenderOnce for TextArea {
             theme.border_strong
         };
         let focus_for_click = self.focus.clone();
+        let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
         let show_placeholder = self.is_empty && !self.focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
@@ -133,6 +135,9 @@ impl RenderOnce for TextArea {
                     on_key(event, window, cx);
                     cx.stop_propagation();
                 })
+            })
+            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                window.focus(&focus_for_mouse_down, cx);
             })
             .on_click(move |_, window, cx| {
                 window.focus(&focus_for_click, cx);

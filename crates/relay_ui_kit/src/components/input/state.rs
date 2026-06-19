@@ -118,6 +118,43 @@ impl TextInputState {
         }
     }
 
+    pub fn handle_integer_key(
+        &mut self,
+        event: &KeyDownEvent,
+        allow_negative: bool,
+    ) -> TextInputAction {
+        let keystroke = event.keystroke.clone().with_simulated_ime();
+        let mods = keystroke.modifiers;
+
+        match keystroke.key.as_str() {
+            "enter" | "escape" | "backspace" | "delete" | "left" | "right" | "home" | "end" => {
+                self.handle_key(event)
+            }
+            _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
+                match keystroke
+                    .key_char
+                    .as_ref()
+                    .filter(|text| text.chars().all(|c| !c.is_control()))
+                {
+                    Some(text) if text.chars().all(|c| c.is_ascii_digit()) => {
+                        self.insert(text);
+                        TextInputAction::Edited
+                    }
+                    Some(text) if allow_negative && text == "-" && self.cursor == 0 => {
+                        if self.value.starts_with('-') {
+                            TextInputAction::Ignored
+                        } else {
+                            self.insert(text);
+                            TextInputAction::Edited
+                        }
+                    }
+                    _ => TextInputAction::Ignored,
+                }
+            }
+            _ => TextInputAction::Ignored,
+        }
+    }
+
     pub fn handle_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
         let mods = keystroke.modifiers;
@@ -289,5 +326,42 @@ mod tests {
         k.keystroke.modifiers.control = true;
         assert_eq!(s.handle_key(&k), TextInputAction::Ignored);
         assert!(s.is_empty());
+    }
+
+    #[test]
+    fn integer_input_accepts_digits() {
+        let mut s = TextInputState::new();
+
+        assert_eq!(
+            s.handle_integer_key(&key("1", Some("1")), false),
+            TextInputAction::Edited
+        );
+        assert_eq!(s.value(), "1");
+    }
+
+    #[test]
+    fn integer_input_rejects_letters() {
+        let mut s = TextInputState::new();
+
+        assert_eq!(
+            s.handle_integer_key(&key("a", Some("a")), false),
+            TextInputAction::Ignored
+        );
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn integer_input_accepts_single_leading_minus_when_configured() {
+        let mut s = TextInputState::new();
+
+        assert_eq!(
+            s.handle_integer_key(&key("-", Some("-")), true),
+            TextInputAction::Edited
+        );
+        assert_eq!(
+            s.handle_integer_key(&key("-", Some("-")), true),
+            TextInputAction::Ignored
+        );
+        assert_eq!(s.value(), "-");
     }
 }

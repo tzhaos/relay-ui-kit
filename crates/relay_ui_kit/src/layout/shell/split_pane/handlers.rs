@@ -28,9 +28,6 @@ pub(super) fn resize_handler(
         if let (true, Some(external)) = (changed, external.as_ref()) {
             external(next, window, cx);
         }
-        if changed {
-            window.refresh();
-        }
     }))
 }
 
@@ -54,9 +51,6 @@ pub(super) fn resize_end_handler(
         }
         if let (true, Some(external)) = (changed, external.as_ref()) {
             external(window, cx);
-        }
-        if changed {
-            window.refresh();
         }
     }))
 }

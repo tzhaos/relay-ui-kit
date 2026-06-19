@@ -292,14 +292,18 @@ fn font_size_input(
     let focused = state.ui_font_size_focus.is_focused(window);
 
     NumberInput::new("settings-ui-font-size", state.ui_font_size)
-        .editable(state.ui_font_size_focus.clone(), &state.ui_font_size_input)
+        .input(state.ui_font_size_focus.clone(), &state.ui_font_size_input)
         .focused(focused)
         .suffix("px")
         .on_key({
             let host = host.clone();
             move |event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    match this.state.ui_font_size_input.handle_key(event) {
+                    match this
+                        .state
+                        .ui_font_size_input
+                        .handle_integer_key(event, false)
+                    {
                         TextInputAction::Edited | TextInputAction::Submit => {
                             sync_font_size_from_input(&mut this.state);
                             cx.notify();

@@ -1,7 +1,7 @@
 use gpui::{
     App, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
-    KeyDownEvent, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    KeyDownEvent, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -77,6 +77,10 @@ impl NumberInput {
             on_key: None,
         });
         self
+    }
+
+    pub fn input(self, focus: FocusHandle, state: &TextInputState) -> Self {
+        self.editable(focus, state)
     }
 
     pub fn focused(mut self, focused: bool) -> Self {
@@ -218,6 +222,7 @@ fn editable_number_value(
     theme: crate::Theme,
 ) -> impl IntoElement {
     let focus_for_click = editable.focus.clone();
+    let focus_for_mouse_down = editable.focus.clone();
     let on_key = editable.on_key;
     let show_fallback = editable.is_empty && !editable.focused;
 
@@ -260,6 +265,9 @@ fn editable_number_value(
                 on_key(event, window, cx);
                 cx.stop_propagation();
             })
+        })
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            window.focus(&focus_for_mouse_down, cx);
         })
         .on_click(move |_, window, cx| {
             window.focus(&focus_for_click, cx);

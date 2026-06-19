@@ -70,6 +70,7 @@ fn composer_sample(
             }
         }),
     )
+    .floating(true)
     .leading(
         div()
             .flex()
@@ -83,13 +84,18 @@ fn composer_sample(
                     .child("Active terminal"),
             ),
     )
-    .trailing(Button::new("composer-start", "Start").primary().on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.terminal_session = "codex";
-                cx.notify();
-            });
-        }
-    }))
+    .trailing(
+        Button::new("composer-start", "Start")
+            .primary()
+            .icon(IconName::Play)
+            .on_click({
+                let host = host.clone();
+                move |_event, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.terminal_session = "codex";
+                        cx.notify();
+                    });
+                }
+            }),
+    )
 }

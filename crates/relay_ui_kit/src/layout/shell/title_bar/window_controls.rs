@@ -1,12 +1,12 @@
 use gpui::{
-    App, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
-    Window, WindowControlArea, div, px,
+    App, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px, rgb,
 };
 
 use crate::theme::{ActiveTheme, Theme, ui_family};
 
 fn windows_close_hover() -> Hsla {
-    gpui::hsla(355.6 / 360.0, 0.86, 0.49, 1.0)
+    rgb(0xe81120).into()
 }
 
 /// Native hit-test-backed window controls for client-decorated windows.
@@ -74,15 +74,6 @@ impl WindowControlKind {
         }
     }
 
-    fn group(self) -> &'static str {
-        match self {
-            WindowControlKind::Minimize => "window-control-minimize-hover",
-            WindowControlKind::Maximize => "window-control-maximize-hover",
-            WindowControlKind::Restore => "window-control-restore-hover",
-            WindowControlKind::Close => "window-control-close-hover",
-        }
-    }
-
     fn glyph(self) -> &'static str {
         if cfg!(target_os = "windows") {
             return match self {
@@ -111,34 +102,29 @@ fn window_control_button(
     area: WindowControlArea,
     kind: WindowControlKind,
 ) -> impl IntoElement {
-    let group = kind.group();
-
     div()
         .id(kind.id())
-        .group(group)
         .w(px(36.0))
         .h_full()
         .flex()
         .items_center()
         .justify_center()
+        .occlude()
         .font_family(window_control_font_family())
         .text_size(px(10.0))
-        .line_height(px(10.0))
-        .font_weight(FontWeight::MEDIUM)
+        .text_color(window_control_foreground(theme, kind))
         .window_control_area(area)
-        .hover(move |style| style.bg(window_control_hover_background(theme, kind)))
-        .child(
-            div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_color(theme.text_muted)
-                .group_hover(group, move |style| {
-                    style.text_color(window_control_hover_foreground(theme, kind))
-                })
-                .child(kind.glyph()),
-        )
+        .hover(move |style| {
+            style
+                .bg(window_control_hover_background(theme, kind))
+                .text_color(window_control_hover_foreground(theme, kind))
+        })
+        .active(move |style| {
+            style
+                .bg(window_control_active_background(theme, kind))
+                .text_color(window_control_active_foreground(theme, kind))
+        })
+        .child(kind.glyph())
 }
 
 fn window_control_font_family() -> &'static str {
@@ -163,6 +149,18 @@ fn window_control_hover_foreground(theme: Theme, kind: WindowControlKind) -> Hsl
     } else {
         theme.text_secondary
     }
+}
+
+fn window_control_foreground(theme: Theme, _kind: WindowControlKind) -> Hsla {
+    theme.text_muted
+}
+
+fn window_control_active_background(theme: Theme, kind: WindowControlKind) -> Hsla {
+    window_control_hover_background(theme, kind).opacity(0.86)
+}
+
+fn window_control_active_foreground(theme: Theme, kind: WindowControlKind) -> Hsla {
+    window_control_hover_foreground(theme, kind).opacity(if kind.is_close() { 0.92 } else { 1.0 })
 }
 
 #[cfg(test)]
@@ -201,6 +199,16 @@ mod tests {
         assert_eq!(
             window_control_hover_foreground(theme, WindowControlKind::Close),
             gpui::white()
+        );
+    }
+
+    #[test]
+    fn close_control_active_keeps_high_contrast_foreground() {
+        let theme = Theme::light();
+
+        assert_eq!(
+            window_control_active_foreground(theme, WindowControlKind::Close),
+            gpui::white().opacity(0.92)
         );
     }
 }
