@@ -1,9 +1,10 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
+use relay_ui_primitives::contract::{InputActionKind, InputValueKind};
 use relay_ui_primitives::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow,
-    SettingsSection, Skeleton, Slider, TextInputAction, Theme, ThemePreviewCard, ThemePreviewKind,
-    Toast, Toggle, Tone,
+    SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle,
+    Tone,
 };
 
 use super::{
@@ -299,21 +300,23 @@ fn font_size_input(
             let host = host.clone();
             move |event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    match this
+                    let action = this
                         .state
                         .ui_font_size_input
-                        .handle_integer_key(event, false)
-                    {
-                        TextInputAction::Changed | TextInputAction::Submit => {
+                        .handle_integer_key(event, false);
+                    match action.contract_kind_for(InputValueKind::Number) {
+                        InputActionKind::Changed(InputValueKind::Number)
+                        | InputActionKind::Submit => {
                             sync_font_size_from_input(&mut this.state);
                             cx.notify();
                         }
-                        TextInputAction::CursorMoved => cx.notify(),
-                        TextInputAction::Cancel => {
+                        InputActionKind::CursorMoved => cx.notify(),
+                        InputActionKind::Cancel => {
                             sync_font_size_text(&mut this.state);
                             cx.notify();
                         }
-                        TextInputAction::Ignored => {}
+                        InputActionKind::Ignored => {}
+                        InputActionKind::Changed(_) | InputActionKind::Validate => {}
                     }
                 });
             }

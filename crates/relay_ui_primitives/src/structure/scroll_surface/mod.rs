@@ -6,7 +6,10 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, space};
+use crate::{
+    contract,
+    theme::{ActiveTheme, space},
+};
 
 use state::{ScrollSurfaceState, schedule_scroll_decay, schedule_smooth_scroll};
 use thumb::{THUMB_WIDTH, scroll_rail};
@@ -117,7 +120,8 @@ impl RenderOnce for ScrollSurface {
                 });
             })
             .when(self.reserve_gutter, |this| {
-                this.scrollbar_width(px(10.0)).pr(px(space::SM))
+                this.scrollbar_width(px(contract::SCROLL_GUTTER_WIDTH))
+                    .pr(px(space::SM))
             })
             .child(self.content);
         scroller.style().restrict_scroll_to_axis = Some(true);

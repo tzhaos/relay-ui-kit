@@ -1,6 +1,8 @@
 use gpui::KeyDownEvent;
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::contract::{InputActionKind, InputValueKind};
+
 /// The editable model for a [`crate::TextInput`].
 #[derive(Debug, Clone, Default)]
 pub struct TextInputState {
@@ -19,12 +21,26 @@ pub enum TextInputAction {
 }
 
 impl TextInputAction {
+    pub fn contract_kind(self) -> InputActionKind {
+        self.contract_kind_for(InputValueKind::Text)
+    }
+
+    pub fn contract_kind_for(self, value_kind: InputValueKind) -> InputActionKind {
+        match self {
+            Self::Changed => InputActionKind::Changed(value_kind),
+            Self::CursorMoved => InputActionKind::CursorMoved,
+            Self::Submit => InputActionKind::Submit,
+            Self::Cancel => InputActionKind::Cancel,
+            Self::Ignored => InputActionKind::Ignored,
+        }
+    }
+
     pub fn changes_text(self) -> bool {
-        matches!(self, Self::Changed)
+        self.contract_kind().changes_value()
     }
 
     pub fn should_notify(self) -> bool {
-        !matches!(self, Self::Ignored)
+        self.contract_kind().should_notify()
     }
 
     pub fn is_submit(self) -> bool {
@@ -300,6 +316,22 @@ mod tests {
         assert!(!TextInputAction::CursorMoved.changes_text());
         assert!(TextInputAction::CursorMoved.should_notify());
         assert!(!TextInputAction::Ignored.should_notify());
+    }
+
+    #[test]
+    fn text_input_action_maps_to_contract_action_kind() {
+        assert_eq!(
+            TextInputAction::Changed.contract_kind(),
+            InputActionKind::Changed(InputValueKind::Text)
+        );
+    }
+
+    #[test]
+    fn input_action_can_map_to_numeric_contract_kind() {
+        assert_eq!(
+            TextInputAction::Changed.contract_kind_for(InputValueKind::Number),
+            InputActionKind::Changed(InputValueKind::Number)
+        );
     }
 
     #[test]

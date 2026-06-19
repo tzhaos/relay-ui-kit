@@ -6,6 +6,7 @@
 
 pub(crate) mod component_prelude;
 pub mod components;
+pub mod contract;
 pub mod interaction;
 pub mod structure;
 pub mod styles;

@@ -194,11 +194,11 @@ pub mod space {
 /// selected rows.
 pub mod radius {
     /// 4px — chips, badges, tight controls.
-    pub const SM: f32 = 4.0;
+    pub const SM: f32 = crate::contract::RADIUS_SM;
     /// 6px — buttons, rows, inputs.
-    pub const MD: f32 = 6.0;
+    pub const MD: f32 = crate::contract::RADIUS_MD;
     /// 8px — cards, popovers.
-    pub const LG: f32 = 8.0;
+    pub const LG: f32 = crate::contract::RADIUS_LG;
 }
 
 // ---------------------------------------------------------------------------

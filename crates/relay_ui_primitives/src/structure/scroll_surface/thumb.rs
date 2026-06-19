@@ -1,8 +1,10 @@
 use gpui::{Hsla, IntoElement, Styled, div, px};
 
-pub(super) const THUMB_WIDTH: f32 = 5.0;
+use crate::contract;
 
-const MIN_THUMB_HEIGHT: f32 = 24.0;
+pub(super) const THUMB_WIDTH: f32 = contract::SCROLL_THUMB_WIDTH;
+
+const MIN_THUMB_HEIGHT: f32 = contract::SCROLL_MIN_THUMB_HEIGHT;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct ScrollThumbMetrics {
@@ -16,7 +18,7 @@ pub(super) fn scroll_rail(color: Hsla) -> impl IntoElement {
         .top_0()
         .right_0()
         .bottom_0()
-        .w(px(1.0))
+        .w(px(contract::BORDER_WIDTH))
         .bg(color)
 }
 

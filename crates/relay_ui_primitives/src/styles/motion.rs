@@ -1,44 +1,11 @@
 //! Motion helpers for quiet desktop micro-interactions.
 
-use std::time::Duration;
-
 use gpui::{
     Animation, AnimationElement, AnimationExt, Element, ElementId, Styled, ease_out_quint,
     pulsating_between, px,
 };
 
-/// Standard motion durations used by Relay components.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MotionDuration {
-    Instant,
-    Fast,
-    Slow,
-}
-
-impl MotionDuration {
-    pub fn duration(self) -> Duration {
-        match self {
-            MotionDuration::Instant => Duration::from_millis(50),
-            MotionDuration::Fast => Duration::from_millis(150),
-            MotionDuration::Slow => Duration::from_millis(300),
-        }
-    }
-}
-
-impl From<MotionDuration> for Duration {
-    fn from(value: MotionDuration) -> Self {
-        value.duration()
-    }
-}
-
-/// Direction for entry motion on floating or newly inserted surfaces.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MotionDirection {
-    FromBottom,
-    FromLeft,
-    FromRight,
-    FromTop,
-}
+pub use crate::contract::{MotionDirection, MotionDuration};
 
 /// Common GPUI animation helpers for Relay components.
 pub trait MotionExt: Styled + Element + Sized + 'static {
@@ -106,6 +73,7 @@ fn motion_id(element: &impl Element, animation_name: &'static str) -> ElementId 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn motion_duration_values_are_stable() {
