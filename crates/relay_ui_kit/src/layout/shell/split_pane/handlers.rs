@@ -16,15 +16,20 @@ pub(super) fn resize_handler(
     }
 
     Some(Rc::new(move |next, window, cx| {
+        let mut changed = state.is_none();
         if let Some(state) = &state {
             state.update(cx, |state, cx| {
                 if state.preview_resize_to(next) {
+                    changed = true;
                     cx.notify();
                 }
             });
         }
-        if let Some(external) = &external {
+        if let (true, Some(external)) = (changed, external.as_ref()) {
             external(next, window, cx);
+        }
+        if changed {
+            window.refresh();
         }
     }))
 }
@@ -38,15 +43,20 @@ pub(super) fn resize_end_handler(
     }
 
     Some(Rc::new(move |window, cx| {
+        let mut changed = state.is_none();
         if let Some(state) = &state {
             state.update(cx, |state, cx| {
                 if state.commit_resize() {
+                    changed = true;
                     cx.notify();
                 }
             });
         }
-        if let Some(external) = &external {
+        if let (true, Some(external)) = (changed, external.as_ref()) {
             external(window, cx);
+        }
+        if changed {
+            window.refresh();
         }
     }))
 }
