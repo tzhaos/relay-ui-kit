@@ -6,8 +6,8 @@ use relay_ui_kit::{
 
 use super::{
     GalleryScenesApp, GalleryState,
-    product_samples::{command_sample, launcher_sample},
     shared::{branch_controls, scene_stack, section},
+    workbench_samples::{command_sample, launcher_sample},
 };
 
 pub(super) fn render(

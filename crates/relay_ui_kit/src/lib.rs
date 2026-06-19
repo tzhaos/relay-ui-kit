@@ -19,16 +19,16 @@ pub(crate) mod component_prelude;
 pub mod components;
 pub(crate) mod interaction;
 pub mod layout;
-pub mod patterns;
 pub mod prelude;
 pub mod styles;
+pub mod workbench;
 
 pub use components::{
     button, choice, command, controls, display, feedback, form, icon, input, list, row,
 };
 pub use layout::{shell, structure};
-pub use patterns::{composer, git, launcher, terminal, viewer};
 pub use styles::{motion, theme, tone};
+pub use workbench::{composer, git, launcher, terminal, viewer};
 
 // Flat re-exports so callers write `relay_ui_kit::Button` etc.
 pub use button::{Button, ButtonVariant, IconButton};

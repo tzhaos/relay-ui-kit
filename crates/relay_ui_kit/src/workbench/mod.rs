@@ -1,4 +1,4 @@
-//! Product-shaped patterns built from reusable components.
+//! Workbench-level compositions built from reusable components.
 
 pub mod composer;
 pub mod git;

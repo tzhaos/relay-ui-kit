@@ -1,146 +1,19 @@
+mod item;
+
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+
+pub use item::MenuItem;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::ClickHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, radius, space},
 };
 
 use super::overlay;
-
-/// One row in a [`Menu`].
-pub struct MenuItem {
-    label: String,
-    detail: Option<String>,
-    icon: Option<IconName>,
-    trailing: Option<AnyElement>,
-    checked: bool,
-    danger: bool,
-    disabled: bool,
-    separator: bool,
-    header: bool,
-    submenu: bool,
-    submenu_items: Vec<MenuItem>,
-    submenu_open: bool,
-    on_click: Option<ClickHandler>,
-}
-
-impl MenuItem {
-    pub fn new(label: impl Into<String>) -> Self {
-        Self {
-            label: label.into(),
-            detail: None,
-            icon: None,
-            trailing: None,
-            checked: false,
-            danger: false,
-            disabled: false,
-            separator: false,
-            header: false,
-            submenu: false,
-            submenu_items: Vec::new(),
-            submenu_open: false,
-            on_click: None,
-        }
-    }
-
-    /// A 1px divider row between groups of items.
-    pub fn separator() -> Self {
-        Self {
-            label: String::new(),
-            detail: None,
-            icon: None,
-            trailing: None,
-            checked: false,
-            danger: false,
-            disabled: false,
-            separator: true,
-            header: false,
-            submenu: false,
-            submenu_items: Vec::new(),
-            submenu_open: false,
-            on_click: None,
-        }
-    }
-
-    pub fn header(label: impl Into<String>) -> Self {
-        Self {
-            label: label.into(),
-            detail: None,
-            icon: None,
-            trailing: None,
-            checked: false,
-            danger: false,
-            disabled: true,
-            separator: false,
-            header: true,
-            submenu: false,
-            submenu_items: Vec::new(),
-            submenu_open: false,
-            on_click: None,
-        }
-    }
-
-    pub fn detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = Some(detail.into());
-        self
-    }
-
-    pub fn icon(mut self, icon: IconName) -> Self {
-        self.icon = Some(icon);
-        self
-    }
-
-    pub fn trailing(mut self, trailing: impl IntoElement) -> Self {
-        self.trailing = Some(trailing.into_any_element());
-        self
-    }
-
-    pub fn checked(mut self, checked: bool) -> Self {
-        self.checked = checked;
-        self
-    }
-
-    /// Render in the danger tone.
-    pub fn danger(mut self) -> Self {
-        self.danger = true;
-        self
-    }
-
-    pub fn disabled(mut self, disabled: bool) -> Self {
-        self.disabled = disabled;
-        self
-    }
-
-    pub fn submenu(mut self) -> Self {
-        self.submenu = true;
-        self
-    }
-
-    pub fn submenu_items(mut self, items: Vec<MenuItem>) -> Self {
-        self.submenu = true;
-        self.submenu_items = items;
-        self
-    }
-
-    pub fn submenu_open(mut self, open: bool) -> Self {
-        self.submenu_open = open;
-        self
-    }
-
-    pub fn on_click(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_click = Some(Box::new(handler));
-        self
-    }
-}
 
 /// A floating menu panel.
 #[derive(IntoElement)]
@@ -258,6 +131,7 @@ impl RenderOnce for Menu {
                 });
             panel = panel.child(row);
         }
+
         panel.motion_slide_in(MotionDirection::FromTop, true)
     }
 }
@@ -322,24 +196,4 @@ fn menu_header(label: String, color: gpui::Hsla) -> impl IntoElement {
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(color)
         .child(label)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn submenu_items_mark_item_as_submenu() {
-        let item = MenuItem::new("Open With").submenu_items(vec![MenuItem::new("Shell")]);
-
-        assert!(item.submenu);
-    }
-
-    #[test]
-    fn menu_header_is_not_interactive() {
-        let item = MenuItem::header("Actions");
-
-        assert!(item.header);
-        assert!(item.disabled);
-    }
 }

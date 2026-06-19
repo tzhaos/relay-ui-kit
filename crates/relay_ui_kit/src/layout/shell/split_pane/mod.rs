@@ -227,7 +227,7 @@ fn split_handle(id: &'static str, axis: SplitAxis, handler: Option<ResizeHandler
     };
     let interactive = match axis {
         SplitAxis::Horizontal => div()
-            .id(gpui::SharedString::from(format!("split-handle-{id}")))
+            .id((id, 0usize))
             .absolute()
             .left(px(-3.0))
             .top_0()
@@ -235,7 +235,7 @@ fn split_handle(id: &'static str, axis: SplitAxis, handler: Option<ResizeHandler
             .h_full()
             .cursor_col_resize(),
         SplitAxis::Vertical => div()
-            .id(gpui::SharedString::from(format!("split-handle-{id}")))
+            .id((id, 0usize))
             .absolute()
             .top(px(-3.0))
             .left_0()

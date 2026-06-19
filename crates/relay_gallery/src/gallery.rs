@@ -11,13 +11,13 @@ use relay_ui_kit::{ActiveTheme, ScrollSurface, SplitPaneState, TextInputState, s
 
 mod command_scene;
 mod foundations_scene;
-mod product_samples;
 mod review_scene;
 mod settings_scene;
 mod shared;
 mod stress_scene;
 mod terminal_scene;
 mod viewer_samples;
+mod workbench_samples;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GallerySurface {

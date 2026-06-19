@@ -3,8 +3,8 @@ use relay_ui_kit::{Button, Composer, IconButton, IconName, TextArea, TextInputAc
 
 use super::{
     GalleryScenesApp, GalleryState,
-    product_samples::{launcher_sample, shell_sample, terminal_sample},
     shared::{scene_stack, section},
+    workbench_samples::{launcher_sample, shell_sample, terminal_sample},
 };
 
 pub(super) fn render(

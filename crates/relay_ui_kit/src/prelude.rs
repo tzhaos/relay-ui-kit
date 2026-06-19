@@ -7,5 +7,5 @@ pub use gpui::{
 
 pub use crate::components::*;
 pub use crate::layout::*;
-pub use crate::patterns::*;
 pub use crate::styles::*;
+pub use crate::workbench::*;
