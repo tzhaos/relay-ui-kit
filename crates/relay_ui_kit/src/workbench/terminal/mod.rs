@@ -10,6 +10,7 @@ mod status_badge;
 mod surface;
 mod tab;
 mod toolbar;
+mod transcript;
 
 pub use agent_quick_launch::AgentQuickLaunch;
 pub use line::{TerminalLine, TerminalLineStyle};
@@ -18,3 +19,4 @@ pub use status_badge::TerminalStatusBadge;
 pub use surface::TerminalSurface;
 pub use tab::TerminalTab;
 pub use toolbar::TerminalToolbar;
+pub use transcript::TerminalTranscript;

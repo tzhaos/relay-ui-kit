@@ -1,7 +1,8 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_kit::{
     Button, ButtonVariant, CodeView, FileKind, FileView, IconName, ScrollSurface, TaskRow,
-    TaskRowData, TerminalLine, TerminalLineStyle, TerminalSurface, Theme, Tone, TreeRow,
+    TaskRowData, TerminalLine, TerminalLineStyle, TerminalSurface, TerminalTranscript, Theme, Tone,
+    TreeRow,
 };
 
 use super::{
@@ -60,7 +61,10 @@ pub(super) fn render(
                 .border_color(theme.border)
                 .rounded(px(relay_ui_kit::radius::LG))
                 .overflow_hidden()
-                .child(TerminalSurface::new(stress_terminal_lines()).prompt("relay>")),
+                .child(TerminalSurface::new(
+                    "stress-terminal-surface",
+                    TerminalTranscript::new(stress_terminal_lines()).prompt("relay>"),
+                )),
         ))
         .child(section(
             cx,

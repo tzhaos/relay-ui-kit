@@ -3,7 +3,7 @@ use relay_ui_kit::{
     AgentQuickLaunch, Button, FileKind, FileView, IconButton, IconName, LauncherItem,
     LauncherItemKind, LauncherMenu, MarkdownView, Pane, PaneSurface, PaneWidth, PanelHeader,
     Segment, SegmentedControl, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
-    Theme,
+    TerminalTranscript, Theme,
     theme::{self},
 };
 
@@ -105,9 +105,15 @@ fn terminal_body(
                 .child(TerminalStatusBadge::new(session.tone)),
         )
         .child(
-            TerminalSurface::new(session_lines(session))
-                .prompt(format!("{} {}", prompt_prefix(session), session.cwd))
-                .connected(true),
+            TerminalSurface::new(
+                "workbench-terminal-surface",
+                TerminalTranscript::new(session_lines(session)).prompt(format!(
+                    "{} {}",
+                    prompt_prefix(session),
+                    session.cwd
+                )),
+            )
+            .connected(true),
         )
 }
 

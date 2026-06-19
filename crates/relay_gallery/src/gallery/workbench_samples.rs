@@ -4,7 +4,7 @@ use relay_ui_kit::{
     LauncherItem, LauncherItemKind, LauncherMenu, NavRow, Pane, PaneSurface, PaneWidth,
     PanelHeader, SplitPane, StatusBar, StatusItem, TerminalLine, TerminalLineStyle,
     TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
-    TextInput, TextInputAction, TitleBar, Tone, TreeRow, WorkspaceBreadcrumb,
+    TerminalTranscript, TextInput, TextInputAction, TitleBar, Tone, TreeRow, WorkspaceBreadcrumb,
 };
 
 use super::{GalleryScenesApp, GalleryState};
@@ -39,13 +39,19 @@ pub(super) fn shell_sample(
 
     let center = Pane::new(
         PaneWidth::Flex,
-        div().size_full().flex().flex_col().child(
-            TerminalSurface::new(vec![
-                TerminalLine::new("$ cargo build -p relay_gallery").style(TerminalLineStyle::Input),
-                TerminalLine::new("Finished dev build").style(TerminalLineStyle::Success),
-            ])
-            .prompt("relay>"),
-        ),
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .child(TerminalSurface::new(
+                "gallery-shell-terminal",
+                TerminalTranscript::new(vec![
+                    TerminalLine::new("$ cargo build -p relay_gallery")
+                        .style(TerminalLineStyle::Input),
+                    TerminalLine::new("Finished dev build").style(TerminalLineStyle::Success),
+                ])
+                .prompt("relay>"),
+            )),
     )
     .surface(PaneSurface::Panel)
     .header(PanelHeader::new("Terminal").icon(IconName::Terminal));
@@ -154,9 +160,11 @@ pub(super) fn terminal_sample(
                 ),
         )
         .child(
-            TerminalSurface::new(terminal_sample_lines(active))
-                .prompt(format!("{active}>"))
-                .connected(true),
+            TerminalSurface::new(
+                "gallery-terminal-sample",
+                TerminalTranscript::new(terminal_sample_lines(active)).prompt(format!("{active}>")),
+            )
+            .connected(true),
         )
 }
 

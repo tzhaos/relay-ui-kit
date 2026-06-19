@@ -22,7 +22,7 @@ impl TerminalLineStyle {
     }
 }
 
-/// A single row of text inside [`crate::TerminalSurface`].
+/// A single row of text inside [`crate::TerminalTranscript`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TerminalLine {
     pub text: String,

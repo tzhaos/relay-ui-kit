@@ -64,7 +64,7 @@ pub use shell::{
 pub use structure::{KeyValue, ListSection, ScrollSurface, Tab, Tabs};
 pub use terminal::{
     AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
-    TerminalSurface, TerminalTab, TerminalToolbar,
+    TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
 };
 pub use theme::{ActiveTheme, Theme, radius, space};
 pub use tone::Tone;
