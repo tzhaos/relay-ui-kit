@@ -1,14 +1,14 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    theme::{ActiveTheme, radius, space},
+    interaction::ClickHandler,
+    list::ListItem,
+    theme::{ActiveTheme, space},
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// A file/worktree tree node with indentation and optional disclosure chevron.
 #[derive(IntoElement)]
@@ -70,7 +70,6 @@ impl RenderOnce for TreeRow {
         } else {
             theme.text_secondary
         };
-        let indent = px(space::SM + self.depth as f32 * 14.0);
         let chevron = if self.expandable {
             Some(if self.expanded {
                 IconName::ChevronDown
@@ -81,20 +80,10 @@ impl RenderOnce for TreeRow {
             None
         };
 
-        div()
-            .id(self.id)
-            .h(px(space::ROW_SM))
-            .pr_2()
-            .pl(indent)
+        let start_slot = div()
             .flex()
             .items_center()
             .gap_1()
-            .rounded(px(radius::SM))
-            .text_color(fg)
-            .when(self.selected, |this| this.bg(theme.selection))
-            .when(!self.selected, |this| {
-                this.cursor_pointer().hover(move |s| s.bg(theme.hover))
-            })
             .child(
                 div()
                     .w(px(14.0))
@@ -113,20 +102,27 @@ impl RenderOnce for TreeRow {
                 Icon::new(self.icon)
                     .size(IconSize::Small)
                     .color(theme.text_muted),
-            )
+            );
+
+        let mut row = ListItem::new(self.id)
+            .height(px(space::ROW_SM))
+            .indent(self.depth, 14.0)
+            .selected(self.selected)
+            .start_slot(start_slot)
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .truncate()
                     .text_sm()
+                    .text_color(fg)
                     .child(self.label),
-            )
-            .when_some(self.on_click, |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            })
+            );
+
+        if let Some(handler) = self.on_click {
+            row = row.on_click_handler(handler);
+        }
+
+        row
     }
 }

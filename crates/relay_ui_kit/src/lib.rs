@@ -15,14 +15,16 @@
 //! Install the theme once at startup with [`theme::init`], and register the
 //! embedded icon set with `Application::new().with_assets(icon::KitAssets)`.
 
+pub(crate) mod component_prelude;
 pub mod components;
+pub(crate) mod interaction;
 pub mod layout;
 pub mod patterns;
 pub mod prelude;
 pub mod styles;
 
 pub use components::{
-    button, choice, command, controls, display, feedback, form, icon, input, row,
+    button, choice, command, controls, display, feedback, form, icon, input, list, row,
 };
 pub use layout::{shell, structure};
 pub use patterns::{composer, git, launcher, terminal, viewer};
@@ -32,7 +34,9 @@ pub use styles::{motion, theme, tone};
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
 pub use command::{CommandPalette, CommandRow, KeybindingRow, KeybindingTable, KeyboardShortcut};
-pub use components::overlay::{Menu, MenuItem, Overlay, TooltipBody, overlay};
+pub use components::overlay::{
+    ConfirmDialog, ContextMenu, Dialog, Menu, MenuItem, Overlay, Popover, TooltipBody, overlay,
+};
 pub use composer::Composer;
 pub use controls::{
     ColorField, ColorSwatch, PanelHeader, SearchField, Segment, SegmentedControl, Select,
@@ -47,6 +51,7 @@ pub use git::{
 pub use icon::{Icon, IconName, IconSize, KitAssets};
 pub use input::{NumberInput, TextArea, TextInput, TextInputAction, TextInputState};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
+pub use list::{ListItem, ListItemSpacing};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use shell::{

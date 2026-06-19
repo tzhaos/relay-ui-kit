@@ -9,6 +9,7 @@ pub mod feedback;
 pub mod form;
 pub mod icon;
 pub mod input;
+pub mod list;
 pub mod overlay;
 pub mod row;
 
@@ -21,5 +22,6 @@ pub use feedback::*;
 pub use form::*;
 pub use icon::*;
 pub use input::*;
+pub use list::*;
 pub use overlay::*;
 pub use row::*;

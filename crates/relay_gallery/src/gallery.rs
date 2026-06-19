@@ -68,6 +68,10 @@ pub struct GalleryState {
     pub contrast: f32,
     pub branch_picker_open: bool,
     pub branch_actions_open: bool,
+    pub command_popover_open: bool,
+    pub command_context_open: bool,
+    pub confirm_dialog_open: bool,
+    pub overlay_event: String,
 }
 
 impl GalleryState {
@@ -92,6 +96,10 @@ impl GalleryState {
             contrast: 60.0,
             branch_picker_open: false,
             branch_actions_open: false,
+            command_popover_open: false,
+            command_context_open: false,
+            confirm_dialog_open: false,
+            overlay_event: "No overlay action yet".into(),
         }
     }
 }

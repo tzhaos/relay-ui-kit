@@ -1,14 +1,14 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
+    div, px,
 };
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::ClickHandler,
+    list::ListItem,
     theme::{ActiveTheme, radius, space},
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// A top-level navigation row with a leading icon and optional count.
 #[derive(IntoElement)]
@@ -61,20 +61,10 @@ impl RenderOnce for NavRow {
             (theme.text_secondary, theme.text_muted)
         };
 
-        div()
-            .id(self.id)
-            .h(px(space::ROW_MD))
-            .px_2()
-            .flex()
-            .items_center()
-            .gap_2()
-            .rounded(px(radius::MD))
-            .text_color(fg)
-            .when(self.selected, |this| this.bg(theme.selection))
-            .when(!self.selected, |this| {
-                this.cursor_pointer().hover(move |s| s.bg(theme.hover))
-            })
-            .child(Icon::new(self.icon).size(IconSize::Small).color(icon_color))
+        let mut row = ListItem::new(self.id)
+            .height(px(space::ROW_MD))
+            .selected(self.selected)
+            .start_slot(Icon::new(self.icon).size(IconSize::Small).color(icon_color))
             .child(
                 div()
                     .flex_1()
@@ -86,30 +76,32 @@ impl RenderOnce for NavRow {
                     } else {
                         FontWeight::MEDIUM
                     })
+                    .text_color(fg)
                     .child(self.label),
-            )
-            .when_some(self.count, |this, count| {
-                this.child(
-                    div()
-                        .min_w(px(18.0))
-                        .h(px(18.0))
-                        .px_1()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .rounded(px(radius::SM))
-                        .bg(theme.panel_alt)
-                        .text_color(theme.text_muted)
-                        .text_size(px(11.0))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(count.to_string()),
-                )
-            })
-            .when_some(self.on_click, |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            })
+            );
+
+        if let Some(count) = self.count {
+            row = row.end_slot(
+                div()
+                    .min_w(px(18.0))
+                    .h(px(18.0))
+                    .px_1()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(radius::SM))
+                    .bg(theme.panel_alt)
+                    .text_color(theme.text_muted)
+                    .text_size(px(11.0))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(count.to_string()),
+            );
+        }
+
+        if let Some(handler) = self.on_click {
+            row = row.on_click_handler(handler);
+        }
+
+        row
     }
 }

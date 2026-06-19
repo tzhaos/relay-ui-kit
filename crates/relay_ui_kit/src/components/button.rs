@@ -12,6 +12,7 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::ClickHandler,
     theme::{ActiveTheme, radius},
 };
 
@@ -20,13 +21,13 @@ use crate::{
 pub enum ButtonVariant {
     /// Filled accent — the single primary action in a surface.
     Primary,
+    /// Filled destructive action.
+    Danger,
     /// Outlined neutral — standard actionable controls.
     Secondary,
     /// Borderless text — low-stakes secondary actions.
     Ghost,
 }
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// A compact labelled button with an optional leading icon.
 #[derive(IntoElement)]
@@ -59,6 +60,11 @@ impl Button {
     /// Shorthand for the single primary action in a surface.
     pub fn primary(mut self) -> Self {
         self.variant = ButtonVariant::Primary;
+        self
+    }
+
+    pub fn danger(mut self) -> Self {
+        self.variant = ButtonVariant::Danger;
         self
     }
 
@@ -98,6 +104,13 @@ impl RenderOnce for Button {
                 theme.on_accent,
                 theme.accent,
                 theme.accent,
+            ),
+            ButtonVariant::Danger => (
+                theme.danger,
+                theme.danger,
+                gpui::white(),
+                theme.danger,
+                theme.danger,
             ),
             ButtonVariant::Secondary => (
                 theme.panel,

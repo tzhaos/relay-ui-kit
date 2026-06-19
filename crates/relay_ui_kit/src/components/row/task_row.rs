@@ -1,15 +1,15 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
+    div, prelude::FluentBuilder, px,
 };
 
 use crate::{
     display::StatusDot,
-    theme::{ActiveTheme, radius, space},
+    interaction::ClickHandler,
+    list::{ListItem, ListItemSpacing},
+    theme::{ActiveTheme, space},
     tone::Tone,
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// Metadata for one [`TaskRow`].
 pub struct TaskRowData {
@@ -60,66 +60,60 @@ impl RenderOnce for TaskRow {
         let data = self.data;
         let meta = task_meta(&data);
 
-        div()
-            .id(self.id)
-            .h(px(space::TASK_ROW))
-            .px_2()
-            .py(px(space::SM))
-            .flex()
-            .flex_col()
-            .justify_center()
-            .gap_1()
-            .rounded(px(radius::MD))
-            .border_1()
-            .when(self.selected, |this| {
-                this.bg(theme.accent_bg).border_color(theme.accent_border)
-            })
-            .when(!self.selected, |this| {
-                this.border_color(gpui::transparent_black())
-                    .cursor_pointer()
-                    .hover(move |s| s.bg(theme.hover))
-            })
+        let mut row = ListItem::new(self.id)
+            .spacing(ListItemSpacing::Relaxed)
+            .height(px(space::TASK_ROW))
+            .selected(self.selected)
             .child(
                 div()
+                    .w_full()
+                    .min_w_0()
                     .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(StatusDot::new(data.status_tone))
+                    .flex_col()
+                    .justify_center()
+                    .gap_1()
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.text)
-                            .child(data.title),
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(StatusDot::new(data.status_tone))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(theme.text)
+                                    .child(data.title),
+                            )
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .text_size(px(11.0))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(data.status_tone.fg(&theme))
+                                    .child(data.status_label),
+                            ),
                     )
-                    .child(
-                        div()
-                            .flex_shrink_0()
-                            .text_size(px(11.0))
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(data.status_tone.fg(&theme))
-                            .child(data.status_label),
-                    ),
-            )
-            .when(!meta.is_empty(), |this| {
-                this.child(
-                    div()
-                        .pl(px(15.0))
-                        .truncate()
-                        .text_size(px(11.0))
-                        .text_color(theme.text_muted)
-                        .child(meta),
-                )
-            })
-            .when_some(self.on_click, |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            })
+                    .when(!meta.is_empty(), |this| {
+                        this.child(
+                            div()
+                                .pl(px(15.0))
+                                .truncate()
+                                .text_size(px(11.0))
+                                .text_color(theme.text_muted)
+                                .child(meta),
+                        )
+                    }),
+            );
+
+        if let Some(handler) = self.on_click {
+            row = row.on_click_handler(handler);
+        }
+
+        row
     }
 }
 

@@ -1,6 +1,7 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
 use relay_ui_kit::{
-    CommandRow, IconButton, IconName, KeybindingRow, KeybindingTable, KeyboardShortcut, Theme,
+    Button, CommandRow, ConfirmDialog, ContextMenu, IconButton, IconName, KeybindingRow,
+    KeybindingTable, KeyboardShortcut, MenuItem, Popover, Theme, overlay,
 };
 
 use super::{
@@ -15,7 +16,7 @@ pub(super) fn render(
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
-    scene_stack()
+    let mut stack = scene_stack()
         .child(section(
             cx,
             "Command palette",
@@ -71,6 +72,7 @@ pub(super) fn render(
                         .child(format!("Branch event: {}", state.branch_event)),
                 ),
         ))
+        .child(section(cx, "Overlays", overlay_sample(state, host, theme)))
         .child(section(
             cx,
             "Command rows",
@@ -93,5 +95,178 @@ pub(super) fn render(
                         .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
                         .selected(state.launcher_choice == "agent:codex"),
                 ),
-        ))
+        ));
+
+    if state.confirm_dialog_open {
+        stack = stack.child(close_terminal_dialog(host));
+    }
+
+    stack
+}
+
+fn overlay_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    theme: Theme,
+) -> impl IntoElement {
+    div()
+        .relative()
+        .min_h(px(132.0))
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .flex_wrap()
+                .child(
+                    div()
+                        .relative()
+                        .child(
+                            Button::new("overlay-popover", "Session Info")
+                                .icon(IconName::MessageSquareText)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.state.command_popover_open =
+                                                !this.state.command_popover_open;
+                                            this.state.command_context_open = false;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        )
+                        .when(state.command_popover_open, |this| {
+                            this.child(session_popover(theme))
+                        }),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .child(
+                            Button::new("overlay-context", "Terminal Menu")
+                                .icon(IconName::Ellipsis)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.state.command_context_open =
+                                                !this.state.command_context_open;
+                                            this.state.command_popover_open = false;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        )
+                        .when(state.command_context_open, |this| {
+                            this.child(terminal_context_menu(host))
+                        }),
+                )
+                .child(
+                    Button::new("overlay-confirm", "Close Terminal")
+                        .danger()
+                        .icon(IconName::Archive)
+                        .on_click({
+                            let host = host.clone();
+                            move |_event, _window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.confirm_dialog_open = true;
+                                    this.state.command_popover_open = false;
+                                    this.state.command_context_open = false;
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(theme.text_muted)
+                .child(format!("Overlay event: {}", state.overlay_event)),
+        )
+}
+
+fn session_popover(theme: Theme) -> impl IntoElement {
+    overlay(
+        Popover::new("session-popover")
+            .title("Active terminal")
+            .icon(IconName::Terminal)
+            .width(300.0)
+            .child(
+                div()
+                    .text_sm()
+                    .line_height(px(18.0))
+                    .text_color(theme.text_secondary)
+                    .child("The selected terminal owns the shell state and agent attachment."),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.text_muted)
+                    .child("Popover content is anchored, elevated, and dismissible by host state."),
+            ),
+    )
+    .offset(0.0, 34.0)
+}
+
+fn terminal_context_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    ContextMenu::new(
+        "terminal-context-menu",
+        vec![
+            menu_action(host, "Split terminal", IconName::PanelLeft),
+            menu_action(host, "Rename session", IconName::Settings),
+            MenuItem::separator(),
+            menu_action(host, "Close session", IconName::Archive).danger(),
+        ],
+    )
+    .min_width(220.0)
+    .offset(0.0, 34.0)
+}
+
+fn menu_action(host: &Entity<GalleryScenesApp>, label: &'static str, icon: IconName) -> MenuItem {
+    MenuItem::new(label).icon(icon).on_click({
+        let host = host.clone();
+        move |_event, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.command_context_open = false;
+                this.state.overlay_event = label.to_string();
+                cx.notify();
+            });
+        }
+    })
+}
+
+fn close_terminal_dialog(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    ConfirmDialog::new(
+        "close-terminal-dialog",
+        "Close terminal?",
+        "The terminal view will be removed from this workspace. Running commands should be stopped by the host before closing.",
+    )
+    .danger(true)
+    .confirm_label("Close")
+    .cancel_label("Keep Open")
+    .on_cancel({
+        let host = host.clone();
+        move |_event, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.confirm_dialog_open = false;
+                this.state.overlay_event = "Close cancelled".into();
+                cx.notify();
+            });
+        }
+    })
+    .on_confirm({
+        let host = host.clone();
+        move |_event, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.confirm_dialog_open = false;
+                this.state.overlay_event = "Close confirmed".into();
+                cx.notify();
+            });
+        }
+    })
 }

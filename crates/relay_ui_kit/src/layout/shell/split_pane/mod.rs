@@ -172,7 +172,6 @@ fn resize_handler(
             state.update(cx, |state, cx| {
                 if state.preview_resize_to(next) {
                     cx.notify();
-                    window.refresh();
                 }
             });
         }
@@ -195,7 +194,6 @@ fn resize_end_handler(
             state.update(cx, |state, cx| {
                 if state.commit_resize() {
                     cx.notify();
-                    window.refresh();
                 }
             });
         }
