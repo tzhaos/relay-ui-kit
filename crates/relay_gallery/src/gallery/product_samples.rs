@@ -1,4 +1,4 @@
-use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, px};
+use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div, px};
 use relay_ui_kit::{
     AgentQuickLaunch, AppShell, Button, CommandPalette, CommandRow, IconName, KeyboardShortcut,
     LauncherItem, LauncherItemKind, LauncherMenu, NavRow, Pane, PaneSurface, PaneWidth,
@@ -12,7 +12,9 @@ use super::{GalleryScenesApp, GalleryState};
 pub(super) fn shell_sample(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
-) -> impl IntoElement {
+    cx: &mut Context<GalleryScenesApp>,
+) -> Div {
+    let split_size = state.shell_split.read(cx).first_size();
     let left = Pane::new(
         PaneWidth::Flex,
         div()
@@ -49,28 +51,9 @@ pub(super) fn shell_sample(
     .header(PanelHeader::new("Terminal").icon(IconName::Terminal));
 
     let split = SplitPane::new("gallery-shell-split", left, center)
-        .first_size(state.shell_split.first_size())
-        .min_sizes(220.0, 420.0)
-        .on_resize({
-            let host = host.clone();
-            move |next, _window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.state.shell_split.preview_resize_to(next) {
-                        cx.notify();
-                    }
-                });
-            }
-        })
-        .on_resize_end({
-            let host = host.clone();
-            move |_window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.state.shell_split.commit_resize() {
-                        cx.notify();
-                    }
-                });
-            }
-        });
+        .state(state.shell_split.clone())
+        .first_size(260.0)
+        .min_sizes(220.0, 420.0);
 
     div()
         .h(px(310.0))
@@ -102,10 +85,7 @@ pub(super) fn shell_sample(
                 .status_bar(
                     StatusBar::new()
                         .left(StatusItem::new("Runtime", "Gallery").tone(Tone::Info))
-                        .right(StatusItem::new(
-                            "Split",
-                            format!("{:.0}px", state.shell_split.first_size()),
-                        )),
+                        .right(StatusItem::new("Split", format!("{split_size:.0}px"))),
                 ),
         )
 }

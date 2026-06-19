@@ -4,8 +4,8 @@
 //! them, instead of packing every primitive into one long showcase page.
 
 use gpui::{
-    AnyElement, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled, Window,
-    div, px,
+    AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
+    Styled, Window, div, px,
 };
 use relay_ui_kit::{ActiveTheme, ScrollSurface, SplitPaneState, TextInputState, space};
 
@@ -62,7 +62,7 @@ pub struct GalleryState {
     pub branch_choice: &'static str,
     pub branch_event: String,
     pub viewer_tab: &'static str,
-    pub shell_split: SplitPaneState,
+    pub shell_split: Entity<SplitPaneState>,
     pub settings_select_open: bool,
     pub ui_font_size: i32,
     pub contrast: f32,
@@ -86,7 +86,7 @@ impl GalleryState {
             branch_choice: "ui-kit-branch-controls",
             branch_event: "Ready".into(),
             viewer_tab: "diff",
-            shell_split: SplitPaneState::new(260.0),
+            shell_split: cx.new(|_| SplitPaneState::new(260.0)),
             settings_select_open: false,
             ui_font_size: 14,
             contrast: 60.0,

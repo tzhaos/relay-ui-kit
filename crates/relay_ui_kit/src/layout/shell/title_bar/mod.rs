@@ -1,9 +1,13 @@
+mod window_controls;
+
 use gpui::{
-    AnyElement, App, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    AnyElement, App, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     Styled, Window, WindowControlArea, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, Theme, radius, space, ui_family};
+use crate::theme::{ActiveTheme, radius, space};
+
+pub use window_controls::WindowControls;
 
 /// A client-side title bar for windows opened without native decorations.
 #[derive(IntoElement)]
@@ -136,162 +140,14 @@ impl RenderOnce for TitleBar {
     }
 }
 
-/// Native hit-test-backed window controls for client-decorated windows.
-#[derive(IntoElement)]
-pub struct WindowControls;
-
-impl WindowControls {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for WindowControls {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl RenderOnce for WindowControls {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let theme = *cx.theme();
-        let maximize_kind = if window.is_maximized() {
-            WindowControlKind::Restore
-        } else {
-            WindowControlKind::Maximize
-        };
-
-        div()
-            .h_full()
-            .flex()
-            .items_center()
-            .child(window_control_button(
-                theme,
-                WindowControlArea::Min,
-                WindowControlKind::Minimize,
-            ))
-            .child(window_control_button(
-                theme,
-                WindowControlArea::Max,
-                maximize_kind,
-            ))
-            .child(window_control_button(
-                theme,
-                WindowControlArea::Close,
-                WindowControlKind::Close,
-            ))
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum WindowControlKind {
-    Minimize,
-    Maximize,
-    Restore,
-    Close,
-}
-
-impl WindowControlKind {
-    fn glyph(self) -> &'static str {
-        if cfg!(target_os = "windows") {
-            return match self {
-                WindowControlKind::Minimize => "\u{E921}",
-                WindowControlKind::Maximize => "\u{E922}",
-                WindowControlKind::Restore => "\u{E923}",
-                WindowControlKind::Close => "\u{E8BB}",
-            };
-        }
-
-        match self {
-            WindowControlKind::Minimize => "\u{2212}",
-            WindowControlKind::Maximize => "\u{25A1}",
-            WindowControlKind::Restore => "\u{2750}",
-            WindowControlKind::Close => "\u{00D7}",
-        }
-    }
-
-    fn is_close(self) -> bool {
-        self == WindowControlKind::Close
-    }
-}
-
-fn window_control_button(
-    theme: Theme,
-    area: WindowControlArea,
-    kind: WindowControlKind,
-) -> gpui::Div {
-    div()
-        .w(px(44.0))
-        .h_full()
-        .flex()
-        .items_center()
-        .justify_center()
-        .font_family(window_control_font_family())
-        .text_size(px(11.0))
-        .line_height(px(11.0))
-        .font_weight(FontWeight::MEDIUM)
-        .text_color(theme.text_muted)
-        .window_control_area(area)
-        .hover(move |style| {
-            style
-                .bg(window_control_hover_background(theme, kind))
-                .text_color(window_control_hover_foreground(theme, kind))
-        })
-        .child(
-            div()
-                .size(px(12.0))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(kind.glyph()),
-        )
-}
-
-fn window_control_font_family() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "Segoe Fluent Icons"
-    } else {
-        ui_family()
-    }
-}
-
-fn window_control_hover_background(theme: Theme, kind: WindowControlKind) -> Hsla {
-    if kind.is_close() {
-        theme.danger
-    } else {
-        theme.hover
-    }
-}
-
-fn window_control_hover_foreground(theme: Theme, kind: WindowControlKind) -> Hsla {
-    if kind.is_close() {
-        gpui::white()
-    } else {
-        theme.text_secondary
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn close_control_is_the_only_danger_control() {
-        assert!(WindowControlKind::Close.is_close());
-    }
+    fn title_bar_hides_window_controls_when_disabled() {
+        let bar = TitleBar::new("Relay").window_controls(false);
 
-    #[test]
-    fn window_control_glyphs_are_not_empty() {
-        assert!(!WindowControlKind::Minimize.glyph().is_empty());
-    }
-
-    #[test]
-    fn close_control_hover_uses_high_contrast_foreground() {
-        let theme = Theme::light();
-
-        assert_eq!(
-            window_control_hover_foreground(theme, WindowControlKind::Close),
-            gpui::white()
-        );
+        assert!(!bar.show_window_controls);
     }
 }

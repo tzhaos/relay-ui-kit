@@ -13,6 +13,8 @@ pub(super) fn render(
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
+    let shell_split = shell_sample(state, host, cx);
+
     scene_stack()
         .child(section(
             cx,
@@ -29,7 +31,7 @@ pub(super) fn render(
             "Agent composer",
             composer_sample(state, host, theme),
         ))
-        .child(section(cx, "Shell split", shell_sample(state, host)))
+        .child(section(cx, "Shell split", shell_split))
 }
 
 fn composer_sample(

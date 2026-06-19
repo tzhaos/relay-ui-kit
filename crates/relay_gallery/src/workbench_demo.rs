@@ -5,7 +5,7 @@ mod context;
 mod data;
 mod rail;
 
-use gpui::{Context, FocusHandle, IntoElement, Render, Window};
+use gpui::{AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
 use relay_ui_kit::{
     ActiveTheme, AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem, TextInputState, Tone,
     icon::IconName, theme::space,
@@ -37,8 +37,8 @@ pub struct WorkbenchState {
     pub filter: TextInputState,
     pub filter_focus: FocusHandle,
     pub launcher_open: bool,
-    pub left_split: SplitPaneState,
-    pub terminal_split: SplitPaneState,
+    pub left_split: Entity<SplitPaneState>,
+    pub terminal_split: Entity<SplitPaneState>,
 }
 
 impl WorkbenchState {
@@ -51,8 +51,8 @@ impl WorkbenchState {
             filter: TextInputState::new(),
             filter_focus: cx.focus_handle(),
             launcher_open: false,
-            left_split: SplitPaneState::new(space::RAIL_WIDTH),
-            terminal_split: SplitPaneState::new(760.0),
+            left_split: cx.new(|_| SplitPaneState::new(space::RAIL_WIDTH)),
+            terminal_split: cx.new(|_| SplitPaneState::new(760.0)),
         }
     }
 }
@@ -66,52 +66,14 @@ impl Render for WorkbenchApp {
         let center = center_pane(state, &host, theme);
         let right = right_context(state, &host, window, theme);
         let center_and_context = SplitPane::new("center-context-split", center, right)
-            .first_size(state.terminal_split.first_size())
+            .state(state.terminal_split.clone())
             .min_sizes(560.0, 320.0)
-            .on_resize({
-                let host = host.clone();
-                move |next, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        if this.state.terminal_split.preview_resize_to(next) {
-                            cx.notify();
-                        }
-                    });
-                }
-            })
-            .on_resize_end({
-                let host = host.clone();
-                move |_window, cx| {
-                    host.update(cx, |this, cx| {
-                        if this.state.terminal_split.commit_resize() {
-                            cx.notify();
-                        }
-                    });
-                }
-            });
+            .first_size(760.0);
 
         let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
-            .first_size(state.left_split.first_size())
+            .state(state.left_split.clone())
             .min_sizes(260.0, 780.0)
-            .on_resize({
-                let host = host.clone();
-                move |next, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        if this.state.left_split.preview_resize_to(next) {
-                            cx.notify();
-                        }
-                    });
-                }
-            })
-            .on_resize_end({
-                let host = host.clone();
-                move |_window, cx| {
-                    host.update(cx, |this, cx| {
-                        if this.state.left_split.commit_resize() {
-                            cx.notify();
-                        }
-                    });
-                }
-            });
+            .first_size(space::RAIL_WIDTH);
 
         AppShell::new(workbench).status_bar(status_bar(state))
     }
