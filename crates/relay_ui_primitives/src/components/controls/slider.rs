@@ -1,6 +1,6 @@
 use gpui::{
     App, AppContext as _, ClickEvent, DragMoveEvent, ElementId, Empty, InteractiveElement,
-    IntoElement, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    IntoElement, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px, relative,
 };
 
@@ -82,6 +82,7 @@ impl RenderOnce for Slider {
             .flex()
             .items_center()
             .gap_2()
+            .role(Role::Slider)
             .child(step_button(
                 "slider-decrement",
                 IconName::Minus,

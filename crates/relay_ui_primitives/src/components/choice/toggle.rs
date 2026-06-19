@@ -1,6 +1,6 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
+    StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{interaction::ClickHandler, theme::ActiveTheme};
@@ -74,6 +74,8 @@ impl RenderOnce for Toggle {
             .flex()
             .items_center()
             .gap_2()
+            .role(Role::Switch)
+            .aria_toggled(Toggled::from(self.on))
             .when(disabled, |this| this.opacity(0.5))
             .when(!disabled, |this| this.cursor_pointer())
             .child(track)

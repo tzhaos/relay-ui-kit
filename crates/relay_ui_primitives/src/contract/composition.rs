@@ -24,44 +24,26 @@ impl Layer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LayerDependency {
-    pub layer: Layer,
-    pub may_depend_on: &'static [Layer],
-}
-
-pub const LAYER_DEPENDENCIES: &[LayerDependency] = &[
-    LayerDependency {
-        layer: Layer::Primitive,
-        may_depend_on: &[Layer::Primitive],
-    },
-    LayerDependency {
-        layer: Layer::Component,
-        may_depend_on: &[Layer::Primitive, Layer::Component],
-    },
-    LayerDependency {
-        layer: Layer::Workbench,
-        may_depend_on: &[Layer::Primitive, Layer::Component, Layer::Workbench],
-    },
-    LayerDependency {
-        layer: Layer::Gallery,
-        may_depend_on: &[
-            Layer::Primitive,
-            Layer::Component,
-            Layer::Workbench,
-            Layer::Gallery,
-        ],
-    },
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const PRIMITIVES_CARGO: &str = include_str!("../../Cargo.toml");
-    const COMPONENTS_CARGO: &str = include_str!("../../../relay_ui_components/Cargo.toml");
-    const WORKBENCH_CARGO: &str = include_str!("../../../relay_workbench_ui/Cargo.toml");
-    const GALLERY_CARGO: &str = include_str!("../../../relay_gallery/Cargo.toml");
+    /// Read a crate's `Cargo.toml` at test time using `CARGO_MANIFEST_DIR`.
+    /// This avoids fragile relative `include_str!` paths that break when source
+    /// files are moved.
+    fn read_cargo_toml(crate_name: &str) -> String {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let workspace_root = manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("workspace root");
+        let path = workspace_root
+            .join("crates")
+            .join(crate_name)
+            .join("Cargo.toml");
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e))
+    }
 
     #[test]
     fn primitive_layer_only_depends_on_itself() {
@@ -85,12 +67,17 @@ mod tests {
 
     #[test]
     fn cargo_dependencies_follow_layer_direction() {
-        assert!(!PRIMITIVES_CARGO.contains("relay_ui_components"));
-        assert!(!PRIMITIVES_CARGO.contains("relay_workbench_ui"));
-        assert!(COMPONENTS_CARGO.contains("relay_ui_primitives.workspace"));
-        assert!(!COMPONENTS_CARGO.contains("relay_workbench_ui"));
-        assert!(WORKBENCH_CARGO.contains("relay_ui_primitives.workspace"));
-        assert!(WORKBENCH_CARGO.contains("relay_ui_components.workspace"));
-        assert!(GALLERY_CARGO.contains("relay_workbench_ui.workspace"));
+        let primitives_cargo = read_cargo_toml("relay_ui_primitives");
+        let components_cargo = read_cargo_toml("relay_ui_components");
+        let workbench_cargo = read_cargo_toml("relay_workbench_ui");
+        let gallery_cargo = read_cargo_toml("relay_gallery");
+
+        assert!(!primitives_cargo.contains("relay_ui_components"));
+        assert!(!primitives_cargo.contains("relay_workbench_ui"));
+        assert!(components_cargo.contains("relay_ui_primitives.workspace"));
+        assert!(!components_cargo.contains("relay_workbench_ui"));
+        assert!(workbench_cargo.contains("relay_ui_primitives.workspace"));
+        assert!(workbench_cargo.contains("relay_ui_components.workspace"));
+        assert!(gallery_cargo.contains("relay_workbench_ui.workspace"));
     }
 }

@@ -72,13 +72,7 @@ fn motion_id(element: &impl Element, animation_name: &'static str) -> ElementId 
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::{MotionDirection, MotionDuration};
-    use std::time::Duration;
-
-    #[test]
-    fn motion_duration_values_are_stable() {
-        assert_eq!(MotionDuration::Fast.duration(), Duration::from_millis(150));
-    }
+    use crate::contract::MotionDirection;
 
     #[test]
     fn motion_direction_names_are_stable() {

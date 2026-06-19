@@ -1,6 +1,7 @@
 //! Relay UI gallery.
 //!
 //! A standalone, fully-interactive showcase app that proves the Relay UI crates
+#![allow(clippy::expect_used)]
 //! render and behave at Orca quality in GPUI. The gallery is a studio that
 //! launches several small app-shaped scenes so components appear in the kind of
 //! surface where Relay will use them:

@@ -13,6 +13,18 @@ edition = "2024"
 license = "Apache-2.0"
 publish = false
 
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "allow"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+
 [workspace.dependencies]
 anyhow = "1"
 gpui = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui" }

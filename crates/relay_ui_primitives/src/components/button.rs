@@ -6,7 +6,7 @@
 //! different handlers.
 
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
@@ -130,7 +130,8 @@ impl RenderOnce for Button {
 
         let icon_color = fg;
         let handler = self.on_click;
-        let disabled = self.disabled || handler.is_none();
+        let disabled = self.disabled;
+        let interactive = handler.is_some() && !disabled;
 
         div()
             .id(self.id)
@@ -147,8 +148,9 @@ impl RenderOnce for Button {
             .text_xs()
             .font_weight(gpui::FontWeight::MEDIUM)
             .text_color(fg)
+            .role(Role::Button)
             .when(disabled, |this| this.opacity(0.5))
-            .when(!disabled, |this| {
+            .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(hover_bg).border_color(hover_border))
             })
@@ -156,7 +158,7 @@ impl RenderOnce for Button {
                 this.child(Icon::new(icon).size(IconSize::Small).color(icon_color))
             })
             .child(self.label)
-            .when_some(handler.filter(|_| !disabled), |this, handler| {
+            .when_some(handler.filter(|_| interactive), |this, handler| {
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
@@ -172,6 +174,7 @@ pub struct IconButton {
     icon: IconName,
     size: IconSize,
     active: bool,
+    disabled: bool,
     on_click: Option<ClickHandler>,
 }
 
@@ -182,6 +185,7 @@ impl IconButton {
             icon,
             size: IconSize::Small,
             active: false,
+            disabled: false,
             on_click: None,
         }
     }
@@ -194,6 +198,11 @@ impl IconButton {
     /// Render in the active/selected state (accent foreground).
     pub fn active(mut self, active: bool) -> Self {
         self.active = active;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -215,6 +224,7 @@ impl RenderOnce for IconButton {
             theme.text_muted
         };
         let handler = self.on_click;
+        let interactive = handler.is_some() && !self.disabled;
 
         div()
             .id(self.id)
@@ -224,10 +234,14 @@ impl RenderOnce for IconButton {
             .justify_center()
             .rounded(px(radius::MD))
             .text_color(fg)
-            .cursor_pointer()
-            .hover(move |style| style.bg(theme.hover).text_color(theme.text))
+            .role(Role::Button)
+            .when(self.disabled, |this| this.opacity(0.5))
+            .when(interactive, |this| {
+                this.cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover).text_color(theme.text))
+            })
             .child(Icon::new(self.icon).size(self.size).color(fg))
-            .when_some(handler, |this, handler| {
+            .when_some(handler.filter(|_| interactive), |this, handler| {
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();

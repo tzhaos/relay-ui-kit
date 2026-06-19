@@ -1,16 +1,16 @@
 use super::Layer;
 
+/// Who owns the mutable state for a component.
+///
+/// - [`HostOwned`]: the parent view owns the state (value flows through the GPUI
+///   entity tree). This is the dominant pattern for interactive components.
+/// - [`WindowKeyed`]: state is purely visual and keyed to the window (e.g.,
+///   scroll position). It persists across renders of the same surface but is
+///   not considered semantic state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StateOwnership {
     HostOwned,
     WindowKeyed,
-    VisualLocal,
-}
-
-impl StateOwnership {
-    pub fn is_semantic_host_state(self) -> bool {
-        matches!(self, Self::HostOwned)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

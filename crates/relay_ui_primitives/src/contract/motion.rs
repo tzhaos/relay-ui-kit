@@ -31,17 +31,24 @@ pub enum MotionDirection {
     FromTop,
 }
 
+/// What kind of motion a component uses.
+///
+/// Currently only [`Entry`] and [`ContinuousFeedback`] are in active use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionPolicy {
-    None,
-    HoverOnly,
+    /// Animate the component when it first appears (slide-in + optional fade).
     Entry,
+    /// A repeating animation that runs as long as the component is visible.
     ContinuousFeedback,
 }
 
+/// When a component's motion should be disabled.
+///
+/// Currently only [`HostDisabled`] is used — the host view suppresses animation
+/// by omitting the motion extension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionDisablePolicy {
-    Never,
+    /// The host can disable motion (e.g., for tests or reduced-motion mode).
     HostDisabled,
 }
 

@@ -1,7 +1,6 @@
 use gpui::{
-    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
+    RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -19,7 +18,6 @@ pub struct TextInput {
     focus: FocusHandle,
     before: String,
     after: String,
-    is_empty: bool,
     placeholder: String,
     leading_icon: Option<IconName>,
     focused: bool,
@@ -35,7 +33,6 @@ impl TextInput {
             focus,
             before: before.to_string(),
             after: after.to_string(),
-            is_empty: state.is_empty(),
             placeholder: String::new(),
             leading_icon: None,
             focused: false,
@@ -82,9 +79,8 @@ impl RenderOnce for TextInput {
             theme.border_strong
         };
         let focus_for_click = self.focus.clone();
-        let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let show_placeholder = self.is_empty && !self.focused;
+        let show_placeholder = self.before.is_empty() && self.after.is_empty() && !self.focused;
 
         div()
             .id(self.id)
@@ -100,6 +96,7 @@ impl RenderOnce for TextInput {
             .border_color(border)
             .track_focus(&self.focus)
             .tab_index(0)
+            .role(Role::TextInput)
             .key_context(self.key_context)
             .cursor(gpui::CursorStyle::IBeam)
             .when(!self.focused, |this| {
@@ -134,9 +131,6 @@ impl RenderOnce for TextInput {
                     on_key(event, window, cx);
                     cx.stop_propagation();
                 })
-            })
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                window.focus(&focus_for_mouse_down, cx);
             })
             .on_click(move |_, window, cx| {
                 window.focus(&focus_for_click, cx);

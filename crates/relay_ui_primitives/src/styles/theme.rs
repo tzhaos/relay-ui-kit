@@ -206,23 +206,29 @@ pub mod radius {
 // ---------------------------------------------------------------------------
 
 /// Monospace family for terminal + code, with a per-OS fallback.
+#[cfg(target_os = "windows")]
 pub fn mono_family() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "Consolas"
-    } else if cfg!(target_os = "macos") {
-        "Menlo"
-    } else {
-        "monospace"
-    }
+    "Consolas"
+}
+#[cfg(target_os = "macos")]
+pub fn mono_family() -> &'static str {
+    "Menlo"
+}
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn mono_family() -> &'static str {
+    "monospace"
 }
 
 /// UI sans-serif family with a per-OS system stack.
+#[cfg(target_os = "windows")]
 pub fn ui_family() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "Segoe UI"
-    } else if cfg!(target_os = "macos") {
-        "-apple-system"
-    } else {
-        "sans-serif"
-    }
+    "Segoe UI"
+}
+#[cfg(target_os = "macos")]
+pub fn ui_family() -> &'static str {
+    "-apple-system"
+}
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn ui_family() -> &'static str {
+    "sans-serif"
 }

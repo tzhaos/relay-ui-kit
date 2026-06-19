@@ -1,6 +1,6 @@
 use gpui::{
     Anchor, AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
-    Window, anchored, deferred, div, prelude::FluentBuilder, px,
+    Window, anchored, deferred, div, px,
 };
 
 use crate::{contract, interaction::DismissHandler};
@@ -52,19 +52,30 @@ impl RenderOnce for Overlay {
             anchored()
                 .snap_to_window_with_margin(px(contract::OVERLAY_WINDOW_MARGIN))
                 .anchor(self.anchor)
-                .child(
-                    div()
+                .child({
+                    let mut container = div()
                         .absolute()
                         .left(px(self.left))
                         .top(px(self.top))
                         .occlude()
-                        .child(self.content)
-                        .when_some(on_dismiss, |this, on_dismiss| {
-                            this.on_mouse_down_out(move |_event, window, cx| {
-                                on_dismiss(window, cx);
+                        .child(self.content);
+                    if let Some(on_dismiss) = on_dismiss {
+                        let dismiss_for_key = std::rc::Rc::new(on_dismiss);
+                        let dismiss_for_mouse = dismiss_for_key.clone();
+                        container = container
+                            .on_mouse_down_out(move |_event, window, cx| {
+                                dismiss_for_mouse(window, cx);
                             })
-                        }),
-                ),
+                            .key_context("Overlay")
+                            .on_key_down(move |event: &gpui::KeyDownEvent, window, cx| {
+                                if event.keystroke.key.as_str() == "escape" {
+                                    dismiss_for_key(window, cx);
+                                    cx.stop_propagation();
+                                }
+                            });
+                    }
+                    container
+                }),
         )
         .with_priority(contract::OVERLAY_PRIORITY_FLOATING)
     }

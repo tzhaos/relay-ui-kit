@@ -1,6 +1,6 @@
 use gpui::{
-    App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
-    Window, div, prelude::FluentBuilder, px, relative,
+    App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 
 use crate::{theme::ActiveTheme, tone::Tone};
@@ -54,6 +54,7 @@ impl RenderOnce for ProgressBar {
             .w_full()
             .rounded_full()
             .bg(theme.panel_alt)
+            .role(Role::ProgressIndicator)
             .border_1()
             .border_color(theme.border)
             .child(div().h_full().rounded_full().bg(fg).w(relative(ratio)));

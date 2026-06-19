@@ -1,6 +1,6 @@
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{interaction::ClickHandler, theme::ActiveTheme};
@@ -56,6 +56,7 @@ impl RenderOnce for Radio {
             .flex()
             .items_center()
             .gap_2()
+            .role(Role::RadioButton)
             .when(disabled, |this| this.opacity(0.5))
             .when(!disabled, |this| this.cursor_pointer())
             .child(
