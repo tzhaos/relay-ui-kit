@@ -244,7 +244,7 @@ fn agent_quick_launches(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoEle
 
 fn preview_body(active: &DemoTask) -> impl IntoElement {
     div().size_full().p_2().child(FileView::new(
-        format!("docs/tasks/{}.md", active.branch.replace('/', "-")),
+        format!("tasks/{}.md", active.branch.replace('/', "-")),
         FileKind::Markdown,
         MarkdownView::new(task_preview(active)),
     ))

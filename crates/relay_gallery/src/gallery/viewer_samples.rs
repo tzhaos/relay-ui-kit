@@ -51,7 +51,7 @@ pub(super) fn viewer_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> 
                 .when(active == "markdown", |this| {
                     this.child(
                         FileView::new(
-                            "docs/rfc-004-ui-workbench.md",
+                            "DESIGN.md",
                             FileKind::Markdown,
                             MarkdownView::new(MARKDOWN_SAMPLE),
                         )
@@ -103,7 +103,7 @@ const DIFF_OLD: &str = r#"pub fn preview_body(active: &DemoTask, theme: Theme) -
 
 const DIFF_NEW: &str = r#"pub fn preview_body(active: &DemoTask, _theme: Theme) -> impl IntoElement {
     FileView::new(
-        format!("docs/tasks/{}.md", active.branch),
+        format!("tasks/{}.md", active.branch),
         FileKind::Markdown,
         MarkdownView::new(task_preview(active)),
     )
