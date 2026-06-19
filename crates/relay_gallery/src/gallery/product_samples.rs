@@ -7,10 +7,12 @@ use relay_ui_kit::{
     TextInput, TextInputAction, TitleBar, Tone, TreeRow, WorkspaceBreadcrumb,
 };
 
-use super::GalleryState;
-use crate::GalleryApp;
+use super::{GalleryScenesApp, GalleryState};
 
-pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+pub(super) fn shell_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+) -> impl IntoElement {
     let left = Pane::new(
         PaneWidth::Flex,
         div()
@@ -53,7 +55,7 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    if this.gallery.shell_split.preview_resize_to(next) {
+                    if this.state.shell_split.preview_resize_to(next) {
                         cx.notify();
                     }
                 });
@@ -63,7 +65,7 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
             let host = host.clone();
             move |_window, cx| {
                 host.update(cx, |this, cx| {
-                    if this.gallery.shell_split.commit_resize() {
+                    if this.state.shell_split.commit_resize() {
                         cx.notify();
                     }
                 });
@@ -90,7 +92,7 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
                             let host = host.clone();
                             move |_event, _window, cx| {
                                 host.update(cx, |this, cx| {
-                                    this.gallery.seg_tab = "files";
+                                    this.state.seg_tab = "files";
                                     cx.notify();
                                 });
                             }
@@ -110,15 +112,15 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
 
 pub(super) fn terminal_sample(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: relay_ui_kit::Theme,
 ) -> impl IntoElement {
     let active = state.terminal_session;
-    let set_session = |key: &'static str, host: &Entity<GalleryApp>| {
+    let set_session = |key: &'static str, host: &Entity<GalleryScenesApp>| {
         let host = host.clone();
         move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut gpui::App| {
             host.update(cx, |this, cx| {
-                this.gallery.terminal_session = key;
+                this.state.terminal_session = key;
                 cx.notify();
             });
         }
@@ -197,14 +199,17 @@ fn terminal_sample_lines(active: &'static str) -> Vec<TerminalLine> {
     }
 }
 
-pub(super) fn command_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+pub(super) fn command_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+) -> impl IntoElement {
     let command_handler = {
         let host = host.clone();
         move |key: &'static str, _window: &mut Window, cx: &mut gpui::App| {
             host.update(cx, |this, cx| {
-                this.gallery.launcher_choice = key;
+                this.state.launcher_choice = key;
                 if key == "agent:codex" {
-                    this.gallery.terminal_session = "codex";
+                    this.state.terminal_session = "codex";
                 }
                 cx.notify();
             });
@@ -228,9 +233,9 @@ pub(super) fn command_sample(state: &GalleryState, host: &Entity<GalleryApp>) ->
                 let host = host.clone();
                 move |event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        match this.gallery.search_input.handle_key(event) {
+                        match this.state.search_input.handle_key(event) {
                             TextInputAction::Cancel => {
-                                this.gallery.search_input.clear();
+                                this.state.search_input.clear();
                                 cx.notify();
                             }
                             TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
@@ -273,7 +278,7 @@ pub(super) fn command_sample(state: &GalleryState, host: &Entity<GalleryApp>) ->
 
 pub(super) fn launcher_sample(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: relay_ui_kit::Theme,
 ) -> impl IntoElement {
     div()
@@ -300,8 +305,8 @@ pub(super) fn launcher_sample(
                 let host = host.clone();
                 move |key, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.launcher_choice = key;
-                        this.gallery.terminal_session = match key {
+                        this.state.launcher_choice = key;
+                        this.state.terminal_session = match key {
                             "codex" => "codex",
                             "claude" => "claude",
                             _ => "shell",

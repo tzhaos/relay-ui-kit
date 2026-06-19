@@ -1,18 +1,17 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div};
-use relay_ui_kit::{Button, Composer, IconButton, IconName, TextInput, TextInputAction, Theme};
+use relay_ui_kit::{Button, Composer, IconButton, IconName, TextArea, TextInputAction, Theme};
 
 use super::{
-    GalleryState,
+    GalleryScenesApp, GalleryState,
     product_samples::{launcher_sample, shell_sample, terminal_sample},
     shared::{scene_stack, section},
 };
-use crate::GalleryApp;
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: Theme,
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     scene_stack()
         .child(section(
@@ -35,26 +34,26 @@ pub(super) fn render(
 
 fn composer_sample(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: Theme,
 ) -> impl IntoElement {
     Composer::new(
         "terminal-composer",
-        TextInput::new(
+        TextArea::new(
             "terminal-composer-input",
             state.search_focus.clone(),
             &state.search_input,
         )
         .placeholder("Ask an agent to work in the active terminal")
-        .leading_icon(IconName::Bot)
+        .min_rows(3)
         .on_key({
             let host = host.clone();
             move |event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    match this.gallery.search_input.handle_key(event) {
+                    match this.state.search_input.handle_multiline_key(event) {
                         TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
                         TextInputAction::Cancel => {
-                            this.gallery.search_input.clear();
+                            this.state.search_input.clear();
                             cx.notify();
                         }
                         TextInputAction::Ignored => {}
@@ -80,7 +79,7 @@ fn composer_sample(
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.terminal_session = "codex";
+                this.state.terminal_session = "codex";
                 cx.notify();
             });
         }

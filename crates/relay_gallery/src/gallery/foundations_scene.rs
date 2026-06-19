@@ -5,16 +5,15 @@ use relay_ui_kit::{
 };
 
 use super::{
-    GalleryState,
+    GalleryScenesApp, GalleryState,
     shared::{dot_label, icon_sample, scene_stack, section, strip},
 };
-use crate::GalleryApp;
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: Theme,
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     scene_stack()
         .child(section(cx, "Buttons", button_samples(host)))
@@ -65,7 +64,7 @@ pub(super) fn render(
         ))
 }
 
-fn button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
+fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
             Button::new("btn-primary", "Launch Agent")
@@ -75,7 +74,7 @@ fn button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.gallery.terminal_session = "codex";
+                            this.state.terminal_session = "codex";
                             cx.notify();
                         });
                     }
@@ -88,7 +87,7 @@ fn button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.gallery.search_input.clear();
+                            this.state.search_input.clear();
                             cx.notify();
                         });
                     }
@@ -102,7 +101,7 @@ fn button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.gallery.auto_archive = !this.gallery.auto_archive;
+                            this.state.auto_archive = !this.state.auto_archive;
                             cx.notify();
                         });
                     }
@@ -115,14 +114,14 @@ fn button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
         )
 }
 
-fn icon_button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
+fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
             IconButton::new("ib-filter", IconName::ListFilter).on_click({
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.seg_tab = "files";
+                        this.state.seg_tab = "files";
                         cx.notify();
                     });
                 }
@@ -133,7 +132,7 @@ fn icon_button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.search_input.clear();
+                        this.state.search_input.clear();
                         cx.notify();
                     });
                 }
@@ -144,7 +143,7 @@ fn icon_button_samples(host: &Entity<GalleryApp>) -> impl IntoElement {
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.launcher_choice = "settings";
+                        this.state.launcher_choice = "settings";
                         cx.notify();
                     });
                 }
@@ -228,7 +227,7 @@ fn task_rows_sample() -> impl IntoElement {
         ))
 }
 
-fn tab_samples(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn tab_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -249,7 +248,7 @@ fn tab_samples(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElem
                 let host = host.clone();
                 move |key, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.seg_tab = key;
+                        this.state.seg_tab = key;
                         cx.notify();
                     });
                 }
@@ -270,7 +269,7 @@ fn tab_samples(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElem
                     let host = host.clone();
                     move |key, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.gallery.seg_tab = key;
+                            this.state.seg_tab = key;
                             cx.notify();
                         });
                     }

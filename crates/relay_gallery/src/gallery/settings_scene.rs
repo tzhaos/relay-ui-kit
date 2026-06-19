@@ -6,17 +6,16 @@ use relay_ui_kit::{
 };
 
 use super::{
-    GalleryState,
+    GalleryScenesApp, GalleryState,
     shared::{scene_stack, section, strip, text_input_field},
 };
-use crate::GalleryApp;
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     window: &Window,
     theme: Theme,
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     let name_focused = state.name_focus.is_focused(window);
     let search_focused = state.search_focus.is_focused(window);
@@ -108,7 +107,7 @@ pub(super) fn render(
                                 let host = host.clone();
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
-                                        this.gallery.launcher_choice = "settings";
+                                        this.state.launcher_choice = "settings";
                                         cx.notify();
                                     });
                                 }
@@ -167,7 +166,7 @@ pub(super) fn render(
         ))
 }
 
-fn theme_select(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn theme_select(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     Select::new(
         "settings-theme-select",
         state.theme_choice,
@@ -182,7 +181,7 @@ fn theme_select(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoEle
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.settings_select_open = !this.gallery.settings_select_open;
+                this.state.settings_select_open = !this.state.settings_select_open;
                 cx.notify();
             });
         }
@@ -191,22 +190,22 @@ fn theme_select(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoEle
         let host = host.clone();
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.theme_choice = key;
-                this.gallery.settings_select_open = false;
+                this.state.theme_choice = key;
+                this.state.settings_select_open = false;
                 cx.notify();
             });
         }
     })
 }
 
-fn font_size_input(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn font_size_input(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     NumberInput::new("settings-ui-font-size", state.ui_font_size)
         .suffix("px")
         .on_decrement({
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.ui_font_size = (this.gallery.ui_font_size - 1).max(11);
+                    this.state.ui_font_size = (this.state.ui_font_size - 1).max(11);
                     cx.notify();
                 });
             }
@@ -215,20 +214,20 @@ fn font_size_input(state: &GalleryState, host: &Entity<GalleryApp>) -> impl Into
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.ui_font_size = (this.gallery.ui_font_size + 1).min(18);
+                    this.state.ui_font_size = (this.state.ui_font_size + 1).min(18);
                     cx.notify();
                 });
             }
         })
 }
 
-fn contrast_slider(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn contrast_slider(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     Slider::new("settings-contrast", state.contrast, 0.0, 100.0)
         .on_decrement({
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.contrast = (this.gallery.contrast - 5.0).max(0.0);
+                    this.state.contrast = (this.state.contrast - 5.0).max(0.0);
                     cx.notify();
                 });
             }
@@ -237,31 +236,31 @@ fn contrast_slider(state: &GalleryState, host: &Entity<GalleryApp>) -> impl Into
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.contrast = (this.gallery.contrast + 5.0).min(100.0);
+                    this.state.contrast = (this.state.contrast + 5.0).min(100.0);
                     cx.notify();
                 });
             }
         })
 }
 
-fn notifications_toggle(on: bool, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn notifications_toggle(on: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     Checkbox::new("settings-notifications", on).on_click({
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.notifications = !this.gallery.notifications;
+                this.state.notifications = !this.state.notifications;
                 cx.notify();
             });
         }
     })
 }
 
-fn auto_archive_toggle(on: bool, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn auto_archive_toggle(on: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     Toggle::new("settings-auto-archive", on).on_click({
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.auto_archive = !this.gallery.auto_archive;
+                this.state.auto_archive = !this.state.auto_archive;
                 cx.notify();
             });
         }

@@ -17,9 +17,9 @@
 //! - **Stress Lab** — long labels, dense rows, disabled states, and overflow.
 //!
 //! Interactivity pattern: components carry view-free callbacks
-//! (`Fn(&ClickEvent, &mut Window, &mut App)`). The page render functions receive
-//! the `Entity<GalleryApp>`, so a callback closes over it and calls
-//! `entity.update(cx, |this, cx| ...)` to mutate state + `cx.notify()`.
+//! (`Fn(&ClickEvent, &mut Window, &mut App)`). App-shaped scenes are GPUI child
+//! entities so high-frequency interactions redraw the active surface instead of
+//! the entire gallery shell.
 //!
 //! Run with `cargo run -p relay_gallery`.
 
@@ -27,8 +27,9 @@ mod gallery;
 mod workbench_demo;
 
 use gpui::{
-    App, AppContext, Application, Bounds, Context, Entity, FocusHandle, IntoElement, ParentElement,
-    Render, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
+    AnyElement, AnyView, App, AppContext, Application, Bounds, Context, IntoElement, ParentElement,
+    Render, StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div,
+    px, size,
 };
 use relay_ui_kit::{
     ActiveTheme, IconName, KitAssets, NavRow, TitleBar, WorkspaceBreadcrumb, theme,
@@ -48,17 +49,28 @@ pub enum Page {
 
 pub struct GalleryApp {
     page: Page,
-    pub gallery: gallery::GalleryState,
-    pub workbench: workbench_demo::WorkbenchState,
+    gallery: gpui::Entity<gallery::GalleryScenesApp>,
+    workbench: gpui::Entity<workbench_demo::WorkbenchApp>,
 }
 
 impl GalleryApp {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
             page: Page::Workbench,
-            gallery: gallery::GalleryState::new(cx),
-            workbench: workbench_demo::WorkbenchState::new(cx),
+            gallery: cx.new(gallery::GalleryScenesApp::new),
+            workbench: cx.new(workbench_demo::WorkbenchApp::new),
         }
+    }
+
+    fn set_page(&mut self, page: Page, cx: &mut Context<Self>) {
+        self.page = page;
+        if let Some(surface) = page.gallery_surface() {
+            self.gallery.update(cx, |gallery, cx| {
+                gallery.set_surface(surface);
+                cx.notify();
+            });
+        }
+        cx.notify();
     }
 
     fn top_bar(&self) -> impl IntoElement {
@@ -135,8 +147,7 @@ impl GalleryApp {
         )
         .selected(self.page == page)
         .on_click(cx.listener(move |this, _, _, cx| {
-            this.page = page;
-            cx.notify();
+            this.set_page(page, cx);
         }));
         if let Some(count) = Self::page_count(page) {
             row = row.count(count);
@@ -170,61 +181,16 @@ impl GalleryApp {
 }
 
 impl Render for GalleryApp {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
-        let entity = cx.entity();
         let body = match self.page {
-            Page::Workbench => {
-                workbench_demo::render(&self.workbench, &entity, window, cx).into_any_element()
-            }
-            Page::Terminal => gallery::render(
-                gallery::GallerySurface::Terminal,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
-            Page::Review => gallery::render(
-                gallery::GallerySurface::Review,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
-            Page::Command => gallery::render(
-                gallery::GallerySurface::Command,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
-            Page::Settings => gallery::render(
-                gallery::GallerySurface::Settings,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
-            Page::Foundations => gallery::render(
-                gallery::GallerySurface::Foundations,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
-            Page::Stress => gallery::render(
-                gallery::GallerySurface::Stress,
-                &self.gallery,
-                &entity,
-                window,
-                cx,
-            )
-            .into_any_element(),
+            Page::Workbench => cached_scene(self.workbench.clone()),
+            Page::Terminal
+            | Page::Review
+            | Page::Command
+            | Page::Settings
+            | Page::Foundations
+            | Page::Stress => cached_scene(self.gallery.clone()),
         };
 
         div()
@@ -246,13 +212,26 @@ impl Render for GalleryApp {
     }
 }
 
-/// Shared helper: a focusable handle factory for state structs.
-pub fn focus(cx: &mut Context<GalleryApp>) -> FocusHandle {
-    cx.focus_handle()
+impl Page {
+    fn gallery_surface(self) -> Option<gallery::GallerySurface> {
+        match self {
+            Page::Workbench => None,
+            Page::Terminal => Some(gallery::GallerySurface::Terminal),
+            Page::Review => Some(gallery::GallerySurface::Review),
+            Page::Command => Some(gallery::GallerySurface::Command),
+            Page::Settings => Some(gallery::GallerySurface::Settings),
+            Page::Foundations => Some(gallery::GallerySurface::Foundations),
+            Page::Stress => Some(gallery::GallerySurface::Stress),
+        }
+    }
 }
 
-/// Type alias so page modules can name the host entity tersely.
-pub type Host = Entity<GalleryApp>;
+fn cached_scene(scene: impl Into<AnyView>) -> AnyElement {
+    scene
+        .into()
+        .cached(StyleRefinement::default().size_full())
+        .into_any_element()
+}
 
 fn main() {
     Application::new()

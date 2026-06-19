@@ -2,18 +2,17 @@ use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px}
 use relay_ui_kit::{Button, IconName, TaskRow, TaskRowData, Theme, Tone, TreeRow};
 
 use super::{
-    GalleryState,
+    GalleryScenesApp, GalleryState,
     shared::{section, text_input_field},
     viewer_samples::viewer_sample,
 };
-use crate::GalleryApp;
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     window: &Window,
     theme: Theme,
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     div()
         .h(px(650.0))
@@ -42,7 +41,7 @@ pub(super) fn render(
 
 fn file_tree_sample(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     window: &Window,
 ) -> impl IntoElement {
     let search_focused = state.search_focus.is_focused(window);
@@ -84,7 +83,7 @@ fn file_tree_sample(
         )
 }
 
-fn review_state_sample(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElement {
+fn review_state_sample(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -110,7 +109,7 @@ fn review_state_sample(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElem
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.gallery.terminal_session = "codex";
+                            this.state.terminal_session = "codex";
                             cx.notify();
                         });
                     }

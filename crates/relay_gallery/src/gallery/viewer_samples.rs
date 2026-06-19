@@ -3,10 +3,12 @@ use relay_ui_kit::{
     CodeView, DiffView, FileKind, FileView, MarkdownView, Segment, SegmentedControl,
 };
 
-use super::GalleryState;
-use crate::GalleryApp;
+use super::{GalleryScenesApp, GalleryState};
 
-pub(super) fn viewer_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> impl IntoElement {
+pub(super) fn viewer_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+) -> impl IntoElement {
     let active = state.viewer_tab;
 
     div()
@@ -28,7 +30,7 @@ pub(super) fn viewer_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> 
                 let host = host.clone();
                 move |key, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.gallery.viewer_tab = key;
+                        this.state.viewer_tab = key;
                         cx.notify();
                     });
                 }

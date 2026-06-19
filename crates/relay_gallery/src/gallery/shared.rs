@@ -8,10 +8,10 @@ use relay_ui_kit::{
     overlay, space,
 };
 
-use crate::GalleryApp;
+use super::GalleryScenesApp;
 
 pub(super) fn section(
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
     title: &str,
     body: impl IntoElement,
 ) -> impl IntoElement {
@@ -48,7 +48,7 @@ pub(super) fn strip() -> gpui::Div {
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn text_input_field(
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     id: &'static str,
     input: &TextInputState,
     focus: FocusHandle,
@@ -64,9 +64,9 @@ pub(super) fn text_input_field(
         .on_key(move |event, _window, cx| {
             host.update(cx, |this, cx| {
                 let target = if is_name {
-                    &mut this.gallery.name_input
+                    &mut this.state.name_input
                 } else {
-                    &mut this.gallery.search_input
+                    &mut this.state.search_input
                 };
                 match target.handle_key(event) {
                     TextInputAction::Edited | TextInputAction::Submit | TextInputAction::Cancel => {
@@ -83,7 +83,7 @@ pub(super) fn text_input_field(
 }
 
 pub(super) fn branch_controls(
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     selected: &'static str,
     picker_open: bool,
     actions_open: bool,
@@ -102,7 +102,7 @@ pub(super) fn branch_controls(
 }
 
 fn branch_selector(
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     selected: &'static str,
     open: bool,
 ) -> impl IntoElement {
@@ -123,8 +123,8 @@ fn branch_selector(
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.branch_picker_open = !this.gallery.branch_picker_open;
-                this.gallery.branch_actions_open = false;
+                this.state.branch_picker_open = !this.state.branch_picker_open;
+                this.state.branch_actions_open = false;
                 cx.notify();
             });
         }
@@ -133,9 +133,9 @@ fn branch_selector(
         let host = host.clone();
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.branch_choice = key;
-                this.gallery.branch_picker_open = false;
-                this.gallery.branch_event = format!("Switched to {key}");
+                this.state.branch_choice = key;
+                this.state.branch_picker_open = false;
+                this.state.branch_event = format!("Switched to {key}");
                 cx.notify();
             });
         }
@@ -144,8 +144,8 @@ fn branch_selector(
         let host = host.clone();
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
-                this.gallery.branch_picker_open = false;
-                this.gallery.branch_event = match key {
+                this.state.branch_picker_open = false;
+                this.state.branch_event = match key {
                     "branch:create" => "Create branch requested".into(),
                     "worktree:create" => "New worktree requested".into(),
                     _ => format!("Branch picker action: {key}"),
@@ -156,29 +156,29 @@ fn branch_selector(
     })
 }
 
-fn branch_actions_button(host: &Entity<GalleryApp>, open: bool) -> impl IntoElement {
+fn branch_actions_button(host: &Entity<GalleryScenesApp>, open: bool) -> impl IntoElement {
     IconButton::new("gallery-branch-actions", IconName::Ellipsis)
         .active(open)
         .on_click({
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.branch_actions_open = !this.gallery.branch_actions_open;
-                    this.gallery.branch_picker_open = false;
+                    this.state.branch_actions_open = !this.state.branch_actions_open;
+                    this.state.branch_picker_open = false;
                     cx.notify();
                 });
             }
         })
 }
 
-fn branch_actions_menu(host: &Entity<GalleryApp>) -> impl IntoElement {
+fn branch_actions_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     overlay(
         BranchActionsMenu::new("gallery-branch-actions-menu").on_select({
             let host = host.clone();
             move |action: BranchActionKind, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.branch_actions_open = false;
-                    this.gallery.branch_event = action.label().to_string();
+                    this.state.branch_actions_open = false;
+                    this.state.branch_event = action.label().to_string();
                     cx.notify();
                 });
             }

@@ -4,11 +4,10 @@
 //! them, instead of packing every primitive into one long showcase page.
 
 use gpui::{
-    AnyElement, Context, Entity, FocusHandle, IntoElement, ParentElement, Styled, Window, div, px,
+    AnyElement, Context, Entity, FocusHandle, IntoElement, ParentElement, Render, Styled, Window,
+    div, px,
 };
 use relay_ui_kit::{ActiveTheme, ScrollSurface, SplitPaneState, TextInputState, space};
-
-use crate::GalleryApp;
 
 mod command_scene;
 mod foundations_scene;
@@ -28,6 +27,24 @@ pub enum GallerySurface {
     Settings,
     Foundations,
     Stress,
+}
+
+pub struct GalleryScenesApp {
+    pub surface: GallerySurface,
+    pub state: GalleryState,
+}
+
+impl GalleryScenesApp {
+    pub fn new(cx: &mut Context<Self>) -> Self {
+        Self {
+            surface: GallerySurface::Terminal,
+            state: GalleryState::new(cx),
+        }
+    }
+
+    pub fn set_surface(&mut self, surface: GallerySurface) {
+        self.surface = surface;
+    }
 }
 
 /// Interactive state shared by the gallery scenes.
@@ -54,7 +71,7 @@ pub struct GalleryState {
 }
 
 impl GalleryState {
-    pub fn new(cx: &mut Context<GalleryApp>) -> Self {
+    pub fn new(cx: &mut Context<GalleryScenesApp>) -> Self {
         Self {
             name_input: TextInputState::with_text("relay-agent"),
             name_focus: cx.focus_handle(),
@@ -79,13 +96,20 @@ impl GalleryState {
     }
 }
 
-pub fn render(
+impl Render for GalleryScenesApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let host = cx.entity();
+        render_surface(self.surface, &self.state, &host, window, cx)
+    }
+}
+
+fn render_surface(
     surface: GallerySurface,
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     window: &Window,
-    cx: &mut Context<GalleryApp>,
-) -> impl IntoElement {
+    cx: &mut Context<GalleryScenesApp>,
+) -> AnyElement {
     let theme = *cx.theme();
     let content: AnyElement = match surface {
         GallerySurface::Terminal => {
@@ -104,15 +128,19 @@ pub fn render(
         GallerySurface::Stress => stress_scene::render(state, host, theme, cx).into_any_element(),
     };
 
-    div().size_full().bg(theme.app_bg).child(
-        ScrollSurface::new(
-            "gallery-scroll",
-            div()
-                .max_w(px(1160.0))
-                .mx_auto()
-                .p(px(space::XL))
-                .child(content),
+    div()
+        .size_full()
+        .bg(theme.app_bg)
+        .child(
+            ScrollSurface::new(
+                "gallery-scroll",
+                div()
+                    .max_w(px(1160.0))
+                    .mx_auto()
+                    .p(px(space::XL))
+                    .child(content),
+            )
+            .reserve_gutter(true),
         )
-        .reserve_gutter(true),
-    )
+        .into_any_element()
 }

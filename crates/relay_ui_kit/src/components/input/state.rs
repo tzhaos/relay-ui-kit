@@ -118,6 +118,20 @@ impl TextInputState {
         }
     }
 
+    pub fn handle_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+        let keystroke = event.keystroke.clone().with_simulated_ime();
+        let mods = keystroke.modifiers;
+
+        match keystroke.key.as_str() {
+            "enter" if mods.control || mods.platform => TextInputAction::Submit,
+            "enter" => {
+                self.insert("\n");
+                TextInputAction::Edited
+            }
+            _ => self.handle_key(event),
+        }
+    }
+
     pub(crate) fn split(&self) -> (&str, &str) {
         self.value.split_at(self.cursor)
     }
@@ -225,6 +239,27 @@ mod tests {
         let mut s = TextInputState::with_text("x");
         assert_eq!(s.handle_key(&key("enter", None)), TextInputAction::Submit);
         assert_eq!(s.handle_key(&key("escape", None)), TextInputAction::Cancel);
+    }
+
+    #[test]
+    fn multiline_enter_inserts_newline() {
+        let mut s = TextInputState::with_text("a");
+
+        assert_eq!(
+            s.handle_multiline_key(&key("enter", None)),
+            TextInputAction::Edited
+        );
+        assert_eq!(s.value(), "a\n");
+    }
+
+    #[test]
+    fn multiline_control_enter_reports_submit() {
+        let mut s = TextInputState::with_text("a");
+        let mut event = key("enter", None);
+        event.keystroke.modifiers.control = true;
+
+        assert_eq!(s.handle_multiline_key(&event), TextInputAction::Submit);
+        assert_eq!(s.value(), "a");
     }
 
     #[test]

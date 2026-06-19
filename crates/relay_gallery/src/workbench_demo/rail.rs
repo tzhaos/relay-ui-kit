@@ -6,14 +6,13 @@ use relay_ui_kit::{
 };
 
 use super::{
-    WorkbenchState,
+    WorkbenchApp, WorkbenchState,
     data::{DEMO_TASKS, active_session, session_index_for_key},
 };
-use crate::GalleryApp;
 
 pub(super) fn left_rail(
     state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     theme: Theme,
 ) -> impl IntoElement {
     let body = div()
@@ -33,7 +32,7 @@ pub(super) fn left_rail(
 }
 
 fn nav_section(
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     state: &WorkbenchState,
     theme: Theme,
 ) -> impl IntoElement {
@@ -53,7 +52,7 @@ fn nav_section(
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.workbench.route = "terminal";
+                        this.state.route = "terminal";
                         cx.notify();
                     });
                 }
@@ -64,7 +63,7 @@ fn nav_section(
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.workbench.context_tab = "files";
+                        this.state.context_tab = "files";
                         cx.notify();
                     });
                 }
@@ -115,7 +114,7 @@ fn project_tree(theme: Theme) -> impl IntoElement {
         .child(TreeRow::new("wt-agent", IconName::GitBranch, "fix/agent-retry").depth(1))
 }
 
-fn tasks_header(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElement {
+fn tasks_header(host: &Entity<WorkbenchApp>, theme: Theme) -> impl IntoElement {
     div()
         .px_3()
         .h(px(space::PANE_HEADER))
@@ -133,16 +132,15 @@ fn tasks_header(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElement {
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.workbench.active_task = 0;
-                    this.workbench.active_session =
-                        session_index_for_key(DEMO_TASKS[0].session_key);
+                    this.state.active_task = 0;
+                    this.state.active_session = session_index_for_key(DEMO_TASKS[0].session_key);
                     cx.notify();
                 });
             }
         }))
 }
 
-fn task_rows(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn task_rows(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
     div()
         .flex_1()
         .min_h_0()
@@ -167,9 +165,9 @@ fn task_rows(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl IntoElem
             .selected(index == state.active_task)
             .on_click(move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.workbench.active_task = index;
-                    this.workbench.active_session = session_index_for_key(task.session_key);
-                    this.workbench.route = "terminal";
+                    this.state.active_task = index;
+                    this.state.active_session = session_index_for_key(task.session_key);
+                    this.state.route = "terminal";
                     cx.notify();
                 });
             })

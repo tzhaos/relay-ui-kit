@@ -6,14 +6,13 @@ use relay_ui_kit::{
 };
 
 use super::{
-    WorkbenchState,
+    WorkbenchApp, WorkbenchState,
     data::{DEMO_FILES, active_session},
 };
-use crate::GalleryApp;
 
 pub(super) fn right_context(
     state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     window: &Window,
     theme: Theme,
 ) -> impl IntoElement {
@@ -39,7 +38,7 @@ pub(super) fn right_context(
                     let host = host.clone();
                     move |key, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.workbench.context_tab = key;
+                            this.state.context_tab = key;
                             cx.notify();
                         });
                     }
@@ -69,7 +68,7 @@ pub(super) fn right_context(
                                 let host = host.clone();
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
-                                        this.workbench.filter.clear();
+                                        this.state.filter.clear();
                                         cx.notify();
                                     });
                                 }
@@ -79,7 +78,7 @@ pub(super) fn right_context(
                             let host = host.clone();
                             move |_event, _window, cx| {
                                 host.update(cx, |this, cx| {
-                                    this.workbench.context_tab = "review";
+                                    this.state.context_tab = "review";
                                     cx.notify();
                                 });
                             }
@@ -90,7 +89,7 @@ pub(super) fn right_context(
 
 fn files_tab(
     state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     window: &Window,
 ) -> impl IntoElement {
     let host_for_key = host.clone();
@@ -124,9 +123,9 @@ fn files_tab(
                     .focused(filter_focused)
                     .on_key(move |event, _window, cx| {
                         host_for_key.update(cx, |this, cx| {
-                            match this.workbench.filter.handle_key(event) {
+                            match this.state.filter.handle_key(event) {
                                 TextInputAction::Cancel => {
-                                    this.workbench.filter.clear();
+                                    this.state.filter.clear();
                                     cx.notify();
                                 }
                                 TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
@@ -160,7 +159,11 @@ fn diff_tab() -> impl IntoElement {
     )
 }
 
-fn review_tab(state: &WorkbenchState, host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElement {
+fn review_tab(
+    state: &WorkbenchState,
+    host: &Entity<WorkbenchApp>,
+    theme: Theme,
+) -> impl IntoElement {
     div()
         .flex_1()
         .min_h_0()
@@ -180,8 +183,8 @@ fn review_tab(state: &WorkbenchState, host: &Entity<GalleryApp>, theme: Theme) -
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.workbench.route = "terminal";
-                        this.workbench.context_tab = "files";
+                        this.state.route = "terminal";
+                        this.state.context_tab = "files";
                         cx.notify();
                     });
                 }
@@ -227,7 +230,7 @@ const DIFF_NEW: &str = r#"let center_and_context = SplitPane::new("center-contex
         let host = host.clone();
         move |next, _window, cx| {
             host.update(cx, |this, cx| {
-                if this.workbench.terminal_split.resize_to(next) {
+                if this.state.terminal_split.resize_to(next) {
                     cx.notify();
                 }
             });

@@ -8,17 +8,16 @@ use relay_ui_kit::{
 };
 
 use super::{
-    WorkbenchState,
+    WorkbenchApp, WorkbenchState,
     data::{
         DEMO_SESSIONS, DemoTask, active_session, active_task, prompt_prefix, session_index_for_key,
         session_lines,
     },
 };
-use crate::GalleryApp;
 
 pub(super) fn center_pane(
     state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     theme: Theme,
 ) -> impl IntoElement {
     let active = active_task(state);
@@ -41,7 +40,7 @@ pub(super) fn center_pane(
         .header(header)
 }
 
-fn route_switch(host: &Entity<GalleryApp>, route: &'static str) -> impl IntoElement {
+fn route_switch(host: &Entity<WorkbenchApp>, route: &'static str) -> impl IntoElement {
     SegmentedControl::new(
         "route",
         vec![
@@ -54,7 +53,7 @@ fn route_switch(host: &Entity<GalleryApp>, route: &'static str) -> impl IntoElem
         let host = host.clone();
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
-                this.workbench.route = key;
+                this.state.route = key;
                 cx.notify();
             });
         }
@@ -63,7 +62,7 @@ fn route_switch(host: &Entity<GalleryApp>, route: &'static str) -> impl IntoElem
 
 fn terminal_body(
     state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<WorkbenchApp>,
     theme: Theme,
 ) -> impl IntoElement {
     let session = active_session(state);
@@ -112,7 +111,7 @@ fn terminal_body(
         )
 }
 
-fn terminal_toolbar(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn terminal_toolbar(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
     let mut toolbar = TerminalToolbar::new();
     for (index, session) in DEMO_SESSIONS.iter().enumerate() {
         let host = host.clone();
@@ -122,8 +121,8 @@ fn terminal_toolbar(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl I
                 .status(session.tone)
                 .on_click(move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.workbench.active_session = index;
-                        this.workbench.launcher_open = false;
+                        this.state.active_session = index;
+                        this.state.launcher_open = false;
                         cx.notify();
                     });
                 }),
@@ -133,7 +132,7 @@ fn terminal_toolbar(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl I
     toolbar.actions(terminal_actions(state, host))
 }
 
-fn terminal_actions(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl IntoElement {
+fn terminal_actions(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
     div()
         .relative()
         .flex()
@@ -146,7 +145,7 @@ fn terminal_actions(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl I
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.workbench.launcher_open = !this.workbench.launcher_open;
+                            this.state.launcher_open = !this.state.launcher_open;
                             cx.notify();
                         });
                     }
@@ -157,7 +156,7 @@ fn terminal_actions(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl I
                 let host = host.clone();
                 move |_event, _window, cx| {
                     host.update(cx, |this, cx| {
-                        this.workbench.launcher_open = false;
+                        this.state.launcher_open = false;
                         cx.notify();
                     });
                 }
@@ -174,7 +173,7 @@ fn terminal_actions(state: &WorkbenchState, host: &Entity<GalleryApp>) -> impl I
         })
 }
 
-fn launcher_menu(host: &Entity<GalleryApp>) -> impl IntoElement {
+fn launcher_menu(host: &Entity<WorkbenchApp>) -> impl IntoElement {
     LauncherMenu::new(
         "terminal-launcher",
         vec![
@@ -193,23 +192,23 @@ fn launcher_menu(host: &Entity<GalleryApp>) -> impl IntoElement {
         let host = host.clone();
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
-                this.workbench.active_session = session_index_for_key(key);
-                this.workbench.route = "terminal";
-                this.workbench.launcher_open = false;
+                this.state.active_session = session_index_for_key(key);
+                this.state.route = "terminal";
+                this.state.launcher_open = false;
                 cx.notify();
             });
         }
     })
 }
 
-fn agent_quick_launches(host: &Entity<GalleryApp>, theme: Theme) -> impl IntoElement {
-    let launch = |key: &'static str, host: &Entity<GalleryApp>| {
+fn agent_quick_launches(host: &Entity<WorkbenchApp>, theme: Theme) -> impl IntoElement {
+    let launch = |key: &'static str, host: &Entity<WorkbenchApp>| {
         let host = host.clone();
         move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut gpui::App| {
             host.update(cx, |this, cx| {
-                this.workbench.active_session = session_index_for_key(key);
-                this.workbench.route = "terminal";
-                this.workbench.launcher_open = false;
+                this.state.active_session = session_index_for_key(key);
+                this.state.route = "terminal";
+                this.state.launcher_open = false;
                 cx.notify();
             });
         }

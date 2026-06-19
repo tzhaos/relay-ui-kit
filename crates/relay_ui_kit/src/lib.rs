@@ -45,7 +45,7 @@ pub use git::{
     BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
 };
 pub use icon::{Icon, IconName, IconSize, KitAssets};
-pub use input::{NumberInput, TextInput, TextInputAction, TextInputState};
+pub use input::{NumberInput, TextArea, TextInput, TextInputAction, TextInputState};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};

@@ -5,17 +5,28 @@ mod context;
 mod data;
 mod rail;
 
-use gpui::{Context, Entity, FocusHandle, IntoElement, Window};
+use gpui::{Context, FocusHandle, IntoElement, Render, Window};
 use relay_ui_kit::{
     ActiveTheme, AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem, TextInputState, Tone,
     icon::IconName, theme::space,
 };
 
-use crate::GalleryApp;
 use center::center_pane;
 use context::right_context;
 use data::{active_session, active_task};
 use rail::left_rail;
+
+pub struct WorkbenchApp {
+    pub state: WorkbenchState,
+}
+
+impl WorkbenchApp {
+    pub fn new(cx: &mut Context<Self>) -> Self {
+        Self {
+            state: WorkbenchState::new(cx),
+        }
+    }
+}
 
 /// Interactive state for the Workbench page.
 pub struct WorkbenchState {
@@ -31,7 +42,7 @@ pub struct WorkbenchState {
 }
 
 impl WorkbenchState {
-    pub fn new(cx: &mut Context<GalleryApp>) -> Self {
+    pub fn new(cx: &mut Context<WorkbenchApp>) -> Self {
         Self {
             active_task: 0,
             active_session: 0,
@@ -46,65 +57,64 @@ impl WorkbenchState {
     }
 }
 
-pub fn render(
-    state: &WorkbenchState,
-    host: &Entity<GalleryApp>,
-    window: &Window,
-    cx: &mut Context<GalleryApp>,
-) -> impl IntoElement {
-    let theme = *cx.theme();
-    let left = left_rail(state, host, theme);
-    let center = center_pane(state, host, theme);
-    let right = right_context(state, host, window, theme);
-    let center_and_context = SplitPane::new("center-context-split", center, right)
-        .first_size(state.terminal_split.first_size())
-        .min_sizes(560.0, 320.0)
-        .on_resize({
-            let host = host.clone();
-            move |next, _window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.workbench.terminal_split.preview_resize_to(next) {
-                        cx.notify();
-                    }
-                });
-            }
-        })
-        .on_resize_end({
-            let host = host.clone();
-            move |_window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.workbench.terminal_split.commit_resize() {
-                        cx.notify();
-                    }
-                });
-            }
-        });
+impl Render for WorkbenchApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = *cx.theme();
+        let host = cx.entity();
+        let state = &self.state;
+        let left = left_rail(state, &host, theme);
+        let center = center_pane(state, &host, theme);
+        let right = right_context(state, &host, window, theme);
+        let center_and_context = SplitPane::new("center-context-split", center, right)
+            .first_size(state.terminal_split.first_size())
+            .min_sizes(560.0, 320.0)
+            .on_resize({
+                let host = host.clone();
+                move |next, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        if this.state.terminal_split.preview_resize_to(next) {
+                            cx.notify();
+                        }
+                    });
+                }
+            })
+            .on_resize_end({
+                let host = host.clone();
+                move |_window, cx| {
+                    host.update(cx, |this, cx| {
+                        if this.state.terminal_split.commit_resize() {
+                            cx.notify();
+                        }
+                    });
+                }
+            });
 
-    let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
-        .first_size(state.left_split.first_size())
-        .min_sizes(260.0, 780.0)
-        .on_resize({
-            let host = host.clone();
-            move |next, _window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.workbench.left_split.preview_resize_to(next) {
-                        cx.notify();
-                    }
-                });
-            }
-        })
-        .on_resize_end({
-            let host = host.clone();
-            move |_window, cx| {
-                host.update(cx, |this, cx| {
-                    if this.workbench.left_split.commit_resize() {
-                        cx.notify();
-                    }
-                });
-            }
-        });
+        let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
+            .first_size(state.left_split.first_size())
+            .min_sizes(260.0, 780.0)
+            .on_resize({
+                let host = host.clone();
+                move |next, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        if this.state.left_split.preview_resize_to(next) {
+                            cx.notify();
+                        }
+                    });
+                }
+            })
+            .on_resize_end({
+                let host = host.clone();
+                move |_window, cx| {
+                    host.update(cx, |this, cx| {
+                        if this.state.left_split.commit_resize() {
+                            cx.notify();
+                        }
+                    });
+                }
+            });
 
-    AppShell::new(workbench).status_bar(status_bar(state))
+        AppShell::new(workbench).status_bar(status_bar(state))
+    }
 }
 
 fn status_bar(state: &WorkbenchState) -> impl IntoElement {

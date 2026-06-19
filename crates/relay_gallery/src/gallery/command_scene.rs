@@ -4,17 +4,16 @@ use relay_ui_kit::{
 };
 
 use super::{
-    GalleryState,
+    GalleryScenesApp, GalleryState,
     product_samples::{command_sample, launcher_sample},
     shared::{branch_controls, scene_stack, section},
 };
-use crate::GalleryApp;
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: Theme,
-    cx: &mut Context<GalleryApp>,
+    cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     scene_stack()
         .child(section(
