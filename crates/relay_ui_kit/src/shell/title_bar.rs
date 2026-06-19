@@ -3,7 +3,7 @@ use gpui::{
     Styled, Window, WindowControlArea, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius, space};
+use crate::theme::{ActiveTheme, Theme, radius, space, ui_family};
 
 /// A client-side title bar for windows opened without native decorations.
 #[derive(IntoElement)]
@@ -155,7 +155,11 @@ impl Default for WindowControls {
 impl RenderOnce for WindowControls {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let maximize_label = if window.is_maximized() { "[]" } else { "[ ]" };
+        let maximize_kind = if window.is_maximized() {
+            WindowControlKind::Restore
+        } else {
+            WindowControlKind::Maximize
+        };
 
         div()
             .h_full()
@@ -164,29 +168,57 @@ impl RenderOnce for WindowControls {
             .child(window_control_button(
                 theme,
                 WindowControlArea::Min,
-                "-",
-                false,
+                WindowControlKind::Minimize,
             ))
             .child(window_control_button(
                 theme,
                 WindowControlArea::Max,
-                maximize_label,
-                false,
+                maximize_kind,
             ))
             .child(window_control_button(
                 theme,
                 WindowControlArea::Close,
-                "x",
-                true,
+                WindowControlKind::Close,
             ))
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WindowControlKind {
+    Minimize,
+    Maximize,
+    Restore,
+    Close,
+}
+
+impl WindowControlKind {
+    fn glyph(self) -> &'static str {
+        if cfg!(target_os = "windows") {
+            return match self {
+                WindowControlKind::Minimize => "\u{E921}",
+                WindowControlKind::Maximize => "\u{E922}",
+                WindowControlKind::Restore => "\u{E923}",
+                WindowControlKind::Close => "\u{E8BB}",
+            };
+        }
+
+        match self {
+            WindowControlKind::Minimize => "\u{2212}",
+            WindowControlKind::Maximize => "\u{25A1}",
+            WindowControlKind::Restore => "\u{2750}",
+            WindowControlKind::Close => "\u{00D7}",
+        }
+    }
+
+    fn is_close(self) -> bool {
+        self == WindowControlKind::Close
+    }
+}
+
 fn window_control_button(
-    theme: crate::Theme,
+    theme: Theme,
     area: WindowControlArea,
-    label: &'static str,
-    danger: bool,
+    kind: WindowControlKind,
 ) -> gpui::Div {
     div()
         .w(px(44.0))
@@ -194,16 +226,43 @@ fn window_control_button(
         .flex()
         .items_center()
         .justify_center()
-        .text_size(px(13.0))
+        .font_family(window_control_font_family())
+        .text_size(px(10.0))
+        .line_height(px(12.0))
         .font_weight(FontWeight::MEDIUM)
         .text_color(theme.text_muted)
         .window_control_area(area)
         .hover(move |style| {
-            if danger {
-                style.bg(theme.danger).text_color(gpui::white())
+            if kind.is_close() {
+                style
+                    .bg(theme.danger.opacity(0.08))
+                    .text_color(theme.danger)
             } else {
-                style.bg(theme.hover).text_color(theme.text)
+                style.bg(theme.hover).text_color(theme.text_secondary)
             }
         })
-        .child(label)
+        .child(kind.glyph())
+}
+
+fn window_control_font_family() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "Segoe Fluent Icons"
+    } else {
+        ui_family()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn close_control_is_the_only_danger_control() {
+        assert!(WindowControlKind::Close.is_close());
+    }
+
+    #[test]
+    fn window_control_glyphs_are_not_empty() {
+        assert!(!WindowControlKind::Minimize.glyph().is_empty());
+    }
 }

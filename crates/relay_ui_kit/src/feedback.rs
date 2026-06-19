@@ -64,7 +64,14 @@ impl RenderOnce for LoadingSpinner {
             .items_center()
             .gap_1()
             .text_color(theme.text_secondary)
-            .child(glyph)
+            .child(
+                div()
+                    .size(px(16.0))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(glyph),
+            )
             .when_some(self.label, |this, label| {
                 this.child(div().text_xs().child(label))
             })
@@ -224,13 +231,7 @@ impl RenderOnce for InlineError {
             .items_start()
             .gap_2()
             .text_color(theme.danger)
-            .child(
-                div().pt(px(1.0)).child(
-                    Icon::new(IconName::X)
-                        .size(IconSize::Small)
-                        .color(theme.danger),
-                ),
-            )
+            .child(feedback_icon(IconName::X, theme.danger))
             .child(
                 div()
                     .min_w_0()
@@ -301,11 +302,7 @@ impl RenderOnce for Banner {
             .border_1()
             .border_color(self.tone.soft_border(&theme))
             .bg(self.tone.soft_bg(&theme))
-            .child(
-                Icon::new(tone_icon(self.tone))
-                    .size(IconSize::Small)
-                    .color(fg),
-            )
+            .child(feedback_icon(tone_icon(self.tone), fg))
             .child(
                 div()
                     .min_w_0()
@@ -389,13 +386,7 @@ impl RenderOnce for Toast {
             .border_color(theme.border_strong)
             .bg(theme.panel)
             .shadow_lg()
-            .child(
-                div().pt(px(1.0)).child(
-                    Icon::new(tone_icon(self.tone))
-                        .size(IconSize::Small)
-                        .color(fg),
-                ),
-            )
+            .child(feedback_icon(tone_icon(self.tone), fg))
             .child(
                 div()
                     .min_w_0()
@@ -422,6 +413,15 @@ impl RenderOnce for Toast {
             base.into_any_element()
         }
     }
+}
+
+fn feedback_icon(icon: IconName, color: gpui::Hsla) -> gpui::Div {
+    div()
+        .size(px(16.0))
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(Icon::new(icon).size(IconSize::Small).color(color))
 }
 
 fn tone_icon(tone: Tone) -> IconName {
