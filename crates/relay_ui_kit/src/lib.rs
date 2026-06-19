@@ -33,6 +33,8 @@ pub mod controls;
 pub mod display;
 #[path = "components/feedback/mod.rs"]
 pub mod feedback;
+#[path = "components/form/mod.rs"]
+pub mod form;
 #[path = "patterns/git/mod.rs"]
 pub mod git;
 #[path = "components/icon.rs"]
@@ -64,14 +66,18 @@ pub mod viewer;
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
 pub use command::{CommandPalette, CommandRow, KeyboardShortcut};
-pub use controls::{PanelHeader, SearchField, Segment, SegmentedControl};
+pub use controls::{
+    ColorField, ColorSwatch, PanelHeader, SearchField, Segment, SegmentedControl, Select,
+    SelectOption, Slider,
+};
 pub use display::{Badge, BadgeStyle, Divider, EmptyState, StatusDot};
 pub use feedback::{Banner, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
+pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use git::{
     BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
 };
 pub use icon::{Icon, IconName, IconSize, KitAssets};
-pub use input::{TextInput, TextInputAction, TextInputState};
+pub use input::{NumberInput, TextInput, TextInputAction, TextInputState};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};
 pub use overlay::{Menu, MenuItem, Overlay, TooltipBody, overlay};

@@ -46,6 +46,9 @@ pub struct GalleryState {
     pub branch_event: String,
     pub viewer_tab: &'static str,
     pub shell_split: SplitPaneState,
+    pub settings_select_open: bool,
+    pub ui_font_size: i32,
+    pub contrast: f32,
     pub branch_picker_open: bool,
     pub branch_actions_open: bool,
 }
@@ -67,6 +70,9 @@ impl GalleryState {
             branch_event: "Ready".into(),
             viewer_tab: "diff",
             shell_split: SplitPaneState::new(260.0),
+            settings_select_open: false,
+            ui_font_size: 14,
+            contrast: 60.0,
             branch_picker_open: false,
             branch_actions_open: false,
         }

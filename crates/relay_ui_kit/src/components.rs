@@ -6,6 +6,7 @@ pub use crate::command::*;
 pub use crate::controls::*;
 pub use crate::display::*;
 pub use crate::feedback::*;
+pub use crate::form::*;
 pub use crate::icon::*;
 pub use crate::input::*;
 pub use crate::overlay::*;

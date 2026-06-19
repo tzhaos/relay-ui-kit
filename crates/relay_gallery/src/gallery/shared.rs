@@ -3,9 +3,9 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use relay_ui_kit::{
-    ActiveTheme, BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector, Checkbox, Icon,
-    IconButton, IconName, IconSize, Radio, StatusDot, TextInput, TextInputAction, TextInputState,
-    Toggle, Tone, overlay, space,
+    ActiveTheme, BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector, Icon,
+    IconButton, IconName, IconSize, StatusDot, TextInput, TextInputAction, TextInputState, Tone,
+    overlay, space,
 };
 
 use crate::GalleryApp;
@@ -80,51 +80,6 @@ pub(super) fn text_input_field(
         field = field.leading_icon(icon);
     }
     field
-}
-
-pub(super) fn checkbox_row(host: &Entity<GalleryApp>, checked: bool) -> impl IntoElement {
-    Checkbox::new("cb-notify", checked)
-        .label("Enable notifications")
-        .on_click({
-            let host = host.clone();
-            move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.gallery.notifications = !this.gallery.notifications;
-                    cx.notify();
-                });
-            }
-        })
-}
-
-pub(super) fn toggle_row(host: &Entity<GalleryApp>, on: bool) -> impl IntoElement {
-    Toggle::new("tg-archive", on)
-        .label("Auto-archive merged tasks")
-        .on_click({
-            let host = host.clone();
-            move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.gallery.auto_archive = !this.gallery.auto_archive;
-                    cx.notify();
-                });
-            }
-        })
-}
-
-pub(super) fn radio_row(
-    host: &Entity<GalleryApp>,
-    key: &'static str,
-    label: &'static str,
-    selected: &'static str,
-) -> impl IntoElement {
-    Radio::new(key, key == selected, label).on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.gallery.theme_choice = key;
-                cx.notify();
-            });
-        }
-    })
 }
 
 pub(super) fn branch_controls(
