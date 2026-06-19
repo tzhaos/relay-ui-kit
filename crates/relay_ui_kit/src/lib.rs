@@ -15,24 +15,49 @@
 //! Install the theme once at startup with [`theme::init`], and register the
 //! embedded icon set with `Application::new().with_assets(icon::KitAssets)`.
 
+pub mod components;
+pub mod layout;
+pub mod patterns;
+pub mod prelude;
+pub mod styles;
+
+#[path = "components/button.rs"]
 pub mod button;
+#[path = "components/choice.rs"]
 pub mod choice;
+#[path = "components/command/mod.rs"]
 pub mod command;
+#[path = "components/controls/mod.rs"]
 pub mod controls;
+#[path = "components/display.rs"]
 pub mod display;
+#[path = "components/feedback/mod.rs"]
 pub mod feedback;
+#[path = "patterns/git/mod.rs"]
 pub mod git;
+#[path = "components/icon.rs"]
 pub mod icon;
+#[path = "components/input/mod.rs"]
 pub mod input;
+#[path = "patterns/launcher.rs"]
 pub mod launcher;
+#[path = "styles/motion.rs"]
 pub mod motion;
+#[path = "components/overlay/mod.rs"]
 pub mod overlay;
+#[path = "components/row/mod.rs"]
 pub mod row;
+#[path = "layout/shell/mod.rs"]
 pub mod shell;
+#[path = "layout/structure/mod.rs"]
 pub mod structure;
+#[path = "patterns/terminal/mod.rs"]
 pub mod terminal;
+#[path = "styles/theme.rs"]
 pub mod theme;
+#[path = "styles/tone.rs"]
 pub mod tone;
+#[path = "patterns/viewer/mod.rs"]
 pub mod viewer;
 
 // Flat re-exports so callers write `relay_ui_kit::Button` etc.

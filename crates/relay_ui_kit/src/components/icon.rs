@@ -107,7 +107,7 @@ macro_rules! icon_assets {
                 match path {
                     $(
                         concat!("icons/", $file, ".svg") => Ok(Some(Cow::Borrowed(
-                            include_bytes!(concat!("../assets/icons/", $file, ".svg")).as_slice(),
+                            include_bytes!(concat!("../../assets/icons/", $file, ".svg")).as_slice(),
                         ))),
                     )*
                     _ => Ok(None),

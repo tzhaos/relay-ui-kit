@@ -115,6 +115,8 @@ impl RenderOnce for SplitPane {
         let min_second = self.min_second;
         let first_size = snap_split_size(self.first_size);
         let last_resize = Rc::new(Cell::new(first_size));
+        let pending_resize = Rc::new(Cell::new(first_size));
+        let resize_frame_queued = Rc::new(Cell::new(false));
         let handle = split_handle(id, axis, handler.clone());
 
         let first = match axis {
@@ -146,14 +148,26 @@ impl RenderOnce for SplitPane {
             .child(second)
             .when_some(handler, |this, handler| {
                 let last_resize = last_resize.clone();
+                let pending_resize = pending_resize.clone();
+                let resize_frame_queued = resize_frame_queued.clone();
                 this.on_drag_move::<DraggedSplitPane>(move |event, window, cx| {
                     if event.drag(cx).id != id {
                         return;
                     }
                     let next = split_size_from_drag(event, axis, min_first, min_second);
                     if should_emit_resize(last_resize.get(), next) {
+                        pending_resize.set(next);
                         last_resize.set(next);
-                        handler(next, window, cx);
+                        if !resize_frame_queued.replace(true) {
+                            let handler = handler.clone();
+                            let pending_resize = pending_resize.clone();
+                            let resize_frame_queued = resize_frame_queued.clone();
+                            window.on_next_frame(move |window, cx| {
+                                resize_frame_queued.set(false);
+                                handler(pending_resize.get(), window, cx);
+                                window.request_animation_frame();
+                            });
+                        }
                     }
                     cx.stop_propagation();
                 })
