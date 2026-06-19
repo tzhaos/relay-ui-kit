@@ -10,8 +10,8 @@ publish = false
 
 [workspace.dependencies]
 anyhow = "1"
-gpui = { git = "https://github.com/zed-industries/zed", rev = "e4f6742a996e2c79a994ee2687151572334e3d9b", package = "gpui" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "e4f6742a996e2c79a994ee2687151572334e3d9b", package = "gpui_platform" }
+gpui = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui_platform" }
 pulldown-cmark = "0.13.4"
 relay_ui_kit = { path = "crates/relay_ui_kit" }
 similar = "2"
