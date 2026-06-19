@@ -1,9 +1,9 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
 use relay_ui_kit::{
-    Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, Icon, IconButton,
-    IconName, Label, LabelSize, ListItem, NavRow, SectionedList, SectionedListGroup, Segment,
-    SegmentedControl, Tab, Tabs, TaskRow, TaskRowData, Theme, Tone, ToolbarGroup, TreeNode,
-    TreeRow, TreeView,
+    Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, FilterBar,
+    FilterChip, Icon, IconButton, IconName, Label, LabelSize, ListItem, NavRow, SectionedList,
+    SectionedListGroup, Segment, SegmentedControl, Stepper, Tab, Tabs, TaskRow, TaskRowData, Theme,
+    Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::{
@@ -20,6 +20,11 @@ pub(super) fn render(
     scene_stack()
         .child(section(cx, "Buttons", button_samples(host)))
         .child(section(cx, "Icon buttons", icon_button_samples(host)))
+        .child(section(
+            cx,
+            "Steppers and filters",
+            stepper_filter_samples(state, host),
+        ))
         .child(section(
             cx,
             "Status and icons",
@@ -228,6 +233,97 @@ fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                 ),
         )
         .child(IconButton::new("ib-active", IconName::PanelLeft).active(true))
+}
+
+fn stepper_filter_samples(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(
+            FilterBar::new("foundation-filter-bar")
+                .child(
+                    FilterChip::new("filter-all-sessions", "All sessions")
+                        .icon(IconName::ListFilter)
+                        .count(4)
+                        .selected(state.theme_choice == "system")
+                        .dropdown(true)
+                        .on_click({
+                            let host = host.clone();
+                            move |_event, _window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.theme_choice = "system";
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                )
+                .child(
+                    FilterChip::new("filter-running", "Running")
+                        .icon(IconName::CircleDot)
+                        .selected(state.theme_choice == "light")
+                        .on_click({
+                            let host = host.clone();
+                            move |_event, _window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.theme_choice = "light";
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                )
+                .child(
+                    FilterChip::new("filter-projects", "All projects")
+                        .icon(IconName::Folder)
+                        .selected(state.theme_choice == "dark")
+                        .dropdown(true)
+                        .on_click({
+                            let host = host.clone();
+                            move |_event, _window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.theme_choice = "dark";
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                ),
+        )
+        .child(
+            Stepper::new(
+                "foundation-stepper",
+                format!("{}%", state.contrast.round() as i32),
+            )
+            .on_decrement({
+                let host = host.clone();
+                move |_event, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.contrast = (this.state.contrast - 5.0).max(0.0);
+                        cx.notify();
+                    });
+                }
+            })
+            .on_increment({
+                let host = host.clone();
+                move |_event, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.contrast = (this.state.contrast + 5.0).min(100.0);
+                        cx.notify();
+                    });
+                }
+            })
+            .on_reset({
+                let host = host.clone();
+                move |_event, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.contrast = 60.0;
+                        cx.notify();
+                    });
+                }
+            }),
+        )
 }
 
 fn nav_rows_sample() -> impl IntoElement {
