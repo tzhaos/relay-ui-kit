@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/relay_ui_kit", "crates/relay_gallery"]
+default-members = ["crates/relay_gallery"]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+anyhow = "1"
+gpui = "0.2.2"
+pulldown-cmark = "0.13.4"
+relay_ui_kit = { path = "crates/relay_ui_kit" }
+similar = "2"
+unicode-segmentation = "1.13"
