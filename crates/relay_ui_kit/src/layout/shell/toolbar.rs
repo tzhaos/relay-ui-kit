@@ -110,7 +110,7 @@ impl RenderOnce for WorkspaceBreadcrumb {
         let fg = if self.active {
             theme.text_muted
         } else {
-            theme.text_muted
+            theme.text_muted.opacity(0.72)
         };
         let last = self.items.len().saturating_sub(1);
         let mut row = div()
@@ -130,7 +130,7 @@ impl RenderOnce for WorkspaceBreadcrumb {
                     .font_weight(if index == last {
                         FontWeight::MEDIUM
                     } else {
-                        FontWeight::MEDIUM
+                        FontWeight::NORMAL
                     })
                     .text_color(if index == last && self.active {
                         theme.text_secondary

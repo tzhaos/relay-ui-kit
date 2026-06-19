@@ -3,6 +3,8 @@ use gpui::{
     deferred, div, px,
 };
 
+type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
+
 /// Anchored floating content with window-edge snapping.
 #[derive(IntoElement)]
 pub struct Overlay {
@@ -10,7 +12,7 @@ pub struct Overlay {
     top: f32,
     left: f32,
     corner: Corner,
-    on_dismiss: Option<Box<dyn Fn(&mut Window, &mut App) + 'static>>,
+    on_dismiss: Option<DismissHandler>,
 }
 
 /// Build an [`Overlay`] around floating content.
