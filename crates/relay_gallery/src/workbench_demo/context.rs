@@ -221,14 +221,15 @@ const DIFF_OLD: &str = r#"let center_and_context = SplitPane::new("center-contex
 "#;
 
 const DIFF_NEW: &str = r#"let center_and_context = SplitPane::new("center-context-split", center, right)
-    .first_size(state.terminal_width)
+    .first_size(state.terminal_split.first_size())
     .min_sizes(560.0, 320.0)
     .on_resize({
         let host = host.clone();
         move |next, _window, cx| {
             host.update(cx, |this, cx| {
-                this.workbench.terminal_width = next;
-                cx.notify();
+                if this.workbench.terminal_split.resize_to(next) {
+                    cx.notify();
+                }
             });
         }
     });

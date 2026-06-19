@@ -47,14 +47,15 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
     .header(PanelHeader::new("Terminal").icon(IconName::Terminal));
 
     let split = SplitPane::new("gallery-shell-split", left, center)
-        .first_size(state.shell_split_width)
+        .first_size(state.shell_split.first_size())
         .min_sizes(220.0, 420.0)
         .on_resize({
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.gallery.shell_split_width = next;
-                    cx.notify();
+                    if this.gallery.shell_split.resize_to(next) {
+                        cx.notify();
+                    }
                 });
             }
         });
@@ -91,7 +92,7 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
                         .left(StatusItem::new("Runtime", "Gallery").tone(Tone::Info))
                         .right(StatusItem::new(
                             "Split",
-                            format!("{:.0}px", state.shell_split_width),
+                            format!("{:.0}px", state.shell_split.first_size()),
                         )),
                 ),
         )

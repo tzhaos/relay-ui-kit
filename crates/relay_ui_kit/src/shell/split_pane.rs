@@ -1,3 +1,5 @@
+use std::{cell::Cell, rc::Rc};
+
 use gpui::{
     AnyElement, App, AppContext, DragMoveEvent, Empty, InteractiveElement, IntoElement,
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
@@ -18,7 +20,41 @@ struct DraggedSplitPane {
     id: &'static str,
 }
 
-type ResizeHandler = std::rc::Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
+const SPLIT_DRAG_STEP: f32 = 1.0;
+
+type ResizeHandler = Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
+
+/// Host-owned split sizing state with pixel-stable resize updates.
+#[derive(Debug, Clone, Copy)]
+pub struct SplitPaneState {
+    first_size: f32,
+}
+
+impl SplitPaneState {
+    pub fn new(first_size: f32) -> Self {
+        Self {
+            first_size: snap_split_size(first_size),
+        }
+    }
+
+    pub fn first_size(&self) -> f32 {
+        self.first_size
+    }
+
+    pub fn set_first_size(&mut self, first_size: f32) {
+        self.first_size = snap_split_size(first_size);
+    }
+
+    pub fn resize_to(&mut self, first_size: f32) -> bool {
+        let next = snap_split_size(first_size);
+        if should_emit_resize(self.first_size, next) {
+            self.first_size = next;
+            true
+        } else {
+            false
+        }
+    }
+}
 
 /// A two-pane layout with a draggable divider.
 #[derive(IntoElement)]
@@ -64,7 +100,7 @@ impl SplitPane {
     }
 
     pub fn on_resize(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
-        self.on_resize = Some(std::rc::Rc::new(handler));
+        self.on_resize = Some(Rc::new(handler));
         self
     }
 }
@@ -77,17 +113,19 @@ impl RenderOnce for SplitPane {
         let axis = self.axis;
         let min_first = self.min_first;
         let min_second = self.min_second;
+        let first_size = snap_split_size(self.first_size);
+        let last_resize = Rc::new(Cell::new(first_size));
         let handle = split_handle(id, axis, handler.clone());
 
         let first = match axis {
             SplitAxis::Horizontal => div()
-                .w(px(self.first_size))
+                .w(px(first_size))
                 .h_full()
                 .min_h_0()
                 .flex_shrink_0()
                 .child(self.first),
             SplitAxis::Vertical => div()
-                .h(px(self.first_size))
+                .h(px(first_size))
                 .w_full()
                 .min_w_0()
                 .flex_shrink_0()
@@ -107,12 +145,16 @@ impl RenderOnce for SplitPane {
             .child(handle)
             .child(second)
             .when_some(handler, |this, handler| {
+                let last_resize = last_resize.clone();
                 this.on_drag_move::<DraggedSplitPane>(move |event, window, cx| {
                     if event.drag(cx).id != id {
                         return;
                     }
                     let next = split_size_from_drag(event, axis, min_first, min_second);
-                    handler(next, window, cx);
+                    if should_emit_resize(last_resize.get(), next) {
+                        last_resize.set(next);
+                        handler(next, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })
@@ -133,7 +175,7 @@ fn split_size_from_drag(
         SplitAxis::Horizontal => f32::from(event.event.position.x - event.bounds.left()),
         SplitAxis::Vertical => f32::from(event.event.position.y - event.bounds.top()),
     };
-    clamp_split_size(raw, total, min_first, min_second)
+    snap_split_size(clamp_split_size(raw, total, min_first, min_second))
 }
 
 fn split_handle(id: &'static str, axis: SplitAxis, handler: Option<ResizeHandler>) -> gpui::Div {
@@ -188,6 +230,14 @@ fn clamp_split_size(raw: f32, total: f32, min_first: f32, min_second: f32) -> f3
     raw.clamp(min_first, total - min_second)
 }
 
+fn snap_split_size(value: f32) -> f32 {
+    (value / SPLIT_DRAG_STEP).round() * SPLIT_DRAG_STEP
+}
+
+fn should_emit_resize(previous: f32, next: f32) -> bool {
+    snap_split_size(previous) != snap_split_size(next)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +250,34 @@ mod tests {
     #[test]
     fn split_size_clamps_to_secondary_minimum() {
         assert_eq!(clamp_split_size(900.0, 1000.0, 220.0, 420.0), 580.0);
+    }
+
+    #[test]
+    fn split_size_snaps_to_whole_pixels() {
+        assert_eq!(snap_split_size(301.2), 301.0);
+    }
+
+    #[test]
+    fn resize_event_skips_duplicate_snapped_size() {
+        assert!(!should_emit_resize(300.0, 300.4));
+    }
+
+    #[test]
+    fn resize_event_emits_next_snapped_size() {
+        assert!(should_emit_resize(300.0, 300.6));
+    }
+
+    #[test]
+    fn split_state_reports_when_size_changes() {
+        let mut state = SplitPaneState::new(300.2);
+
+        assert!(state.resize_to(300.6));
+    }
+
+    #[test]
+    fn split_state_skips_subpixel_resize() {
+        let mut state = SplitPaneState::new(300.2);
+
+        assert!(!state.resize_to(300.4));
     }
 }

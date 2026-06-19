@@ -7,8 +7,8 @@ mod rail;
 
 use gpui::{Context, Entity, FocusHandle, IntoElement, Window};
 use relay_ui_kit::{
-    ActiveTheme, AppShell, SplitPane, StatusBar, StatusItem, TextInputState, Tone, icon::IconName,
-    theme::space,
+    ActiveTheme, AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem, TextInputState, Tone,
+    icon::IconName, theme::space,
 };
 
 use crate::GalleryApp;
@@ -26,8 +26,8 @@ pub struct WorkbenchState {
     pub filter: TextInputState,
     pub filter_focus: FocusHandle,
     pub launcher_open: bool,
-    pub left_width: f32,
-    pub terminal_width: f32,
+    pub left_split: SplitPaneState,
+    pub terminal_split: SplitPaneState,
 }
 
 impl WorkbenchState {
@@ -40,8 +40,8 @@ impl WorkbenchState {
             filter: TextInputState::new(),
             filter_focus: cx.focus_handle(),
             launcher_open: false,
-            left_width: space::RAIL_WIDTH,
-            terminal_width: 760.0,
+            left_split: SplitPaneState::new(space::RAIL_WIDTH),
+            terminal_split: SplitPaneState::new(760.0),
         }
     }
 }
@@ -57,27 +57,29 @@ pub fn render(
     let center = center_pane(state, host, theme);
     let right = right_context(state, host, window, theme);
     let center_and_context = SplitPane::new("center-context-split", center, right)
-        .first_size(state.terminal_width)
+        .first_size(state.terminal_split.first_size())
         .min_sizes(560.0, 320.0)
         .on_resize({
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.workbench.terminal_width = next;
-                    cx.notify();
+                    if this.workbench.terminal_split.resize_to(next) {
+                        cx.notify();
+                    }
                 });
             }
         });
 
     let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
-        .first_size(state.left_width)
+        .first_size(state.left_split.first_size())
         .min_sizes(260.0, 780.0)
         .on_resize({
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.workbench.left_width = next;
-                    cx.notify();
+                    if this.workbench.left_split.resize_to(next) {
+                        cx.notify();
+                    }
                 });
             }
         });

@@ -7,7 +7,7 @@ use gpui::{
     AnyElement, Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
-use relay_ui_kit::{ActiveTheme, TextInputState, space};
+use relay_ui_kit::{ActiveTheme, SplitPaneState, TextInputState, space};
 
 use crate::GalleryApp;
 
@@ -46,7 +46,7 @@ pub struct GalleryState {
     pub branch_choice: &'static str,
     pub branch_event: String,
     pub viewer_tab: &'static str,
-    pub shell_split_width: f32,
+    pub shell_split: SplitPaneState,
     pub branch_picker_open: bool,
     pub branch_actions_open: bool,
 }
@@ -67,7 +67,7 @@ impl GalleryState {
             branch_choice: "ui-kit-branch-controls",
             branch_event: "Ready".into(),
             viewer_tab: "diff",
-            shell_split_width: 260.0,
+            shell_split: SplitPaneState::new(260.0),
             branch_picker_open: false,
             branch_actions_open: false,
         }

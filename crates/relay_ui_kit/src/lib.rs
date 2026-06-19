@@ -52,8 +52,8 @@ pub use motion::{MotionDirection, MotionDuration, MotionExt};
 pub use overlay::{Menu, MenuItem, Overlay, TooltipBody, overlay};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use shell::{
-    AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, StatusBar,
-    StatusItem, TitleBar, TopToolbar, WindowControls, WorkspaceBreadcrumb,
+    AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, SplitPaneState,
+    StatusBar, StatusItem, TitleBar, TopToolbar, WindowControls, WorkspaceBreadcrumb,
 };
 pub use structure::{KeyValue, ListSection, Tab, Tabs};
 pub use terminal::{

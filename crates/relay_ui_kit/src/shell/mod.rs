@@ -13,7 +13,7 @@ mod toolbar;
 
 pub use app_shell::AppShell;
 pub use pane::{Pane, PaneSurface, PaneWidth};
-pub use split_pane::{SplitAxis, SplitPane};
+pub use split_pane::{SplitAxis, SplitPane, SplitPaneState};
 pub use status_bar::{StatusBar, StatusItem};
 pub use title_bar::{TitleBar, WindowControls};
 pub use toolbar::{PaneToolbar, TopToolbar, WorkspaceBreadcrumb};
