@@ -10,9 +10,10 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
+    contract::MotionDirection,
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
-    motion::{MotionDirection, MotionExt},
+    motion::MotionExt,
     theme::{ActiveTheme, radius, space},
 };
 

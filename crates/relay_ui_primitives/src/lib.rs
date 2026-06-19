@@ -42,7 +42,7 @@ pub use input::{
     NumberInput, NumberInputLayout, TextArea, TextInput, TextInputAction, TextInputState,
 };
 pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
-pub use motion::{MotionDirection, MotionDuration, MotionExt};
+pub use motion::MotionExt;
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use theme::{ActiveTheme, Theme, radius, space};
 pub use tone::Tone;

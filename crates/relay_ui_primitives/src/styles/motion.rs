@@ -5,7 +5,7 @@ use gpui::{
     pulsating_between, px,
 };
 
-pub use crate::contract::{MotionDirection, MotionDuration};
+use crate::contract::{MotionDirection, MotionDuration};
 
 /// Common GPUI animation helpers for Relay components.
 pub trait MotionExt: Styled + Element + Sized + 'static {
@@ -72,7 +72,7 @@ fn motion_id(element: &impl Element, animation_name: &'static str) -> ElementId 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::contract::{MotionDirection, MotionDuration};
     use std::time::Duration;
 
     #[test]

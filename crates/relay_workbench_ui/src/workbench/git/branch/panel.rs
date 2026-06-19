@@ -5,9 +5,10 @@ use gpui::{
 
 use relay_ui_primitives::{
     components::overlay::overlay,
+    contract::MotionDirection,
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
-    motion::{MotionDirection, MotionExt},
+    motion::MotionExt,
     theme::{ActiveTheme, radius, space},
 };
 
