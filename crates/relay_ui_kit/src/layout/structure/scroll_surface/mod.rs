@@ -67,16 +67,14 @@ impl RenderOnce for ScrollSurface {
             .overflow_y_scroll()
             .on_scroll_wheel(move |_, window, cx| {
                 let should_schedule = state_for_scroll.update(cx, |state, cx| {
-                    if state.mark_scrolling() {
-                        cx.notify();
-                    }
+                    state.mark_scrolling();
+                    cx.notify();
                     state.schedule_decay_if_needed()
                 });
 
                 if should_schedule {
                     schedule_scroll_decay(state_for_scroll.clone(), window);
                 }
-                window.request_animation_frame();
             })
             .on_hover(move |hovered, _window, cx| {
                 state_for_hover.update(cx, |state, cx| {

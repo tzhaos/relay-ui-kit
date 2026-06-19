@@ -100,7 +100,6 @@ pub(super) fn schedule_scroll_decay(state: Entity<ScrollSurfaceState>, window: &
 
         if should_continue {
             schedule_scroll_decay(state, window);
-            window.request_animation_frame();
         }
     });
 }
