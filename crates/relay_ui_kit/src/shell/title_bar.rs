@@ -1,5 +1,5 @@
 use gpui::{
-    AnyElement, App, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    AnyElement, App, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     Styled, Window, WindowControlArea, div, prelude::FluentBuilder, px,
 };
 
@@ -227,19 +227,24 @@ fn window_control_button(
         .items_center()
         .justify_center()
         .font_family(window_control_font_family())
-        .text_size(px(10.0))
-        .line_height(px(12.0))
+        .text_size(px(11.0))
+        .line_height(px(11.0))
         .font_weight(FontWeight::MEDIUM)
         .text_color(theme.text_muted)
         .window_control_area(area)
         .hover(move |style| {
-            if kind.is_close() {
-                style.bg(theme.danger).text_color(gpui::white())
-            } else {
-                style.bg(theme.hover).text_color(theme.text_secondary)
-            }
+            style
+                .bg(window_control_hover_background(theme, kind))
+                .text_color(window_control_hover_foreground(theme, kind))
         })
-        .child(kind.glyph())
+        .child(
+            div()
+                .size(px(12.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(kind.glyph()),
+        )
 }
 
 fn window_control_font_family() -> &'static str {
@@ -247,6 +252,22 @@ fn window_control_font_family() -> &'static str {
         "Segoe Fluent Icons"
     } else {
         ui_family()
+    }
+}
+
+fn window_control_hover_background(theme: Theme, kind: WindowControlKind) -> Hsla {
+    if kind.is_close() {
+        theme.danger
+    } else {
+        theme.hover
+    }
+}
+
+fn window_control_hover_foreground(theme: Theme, kind: WindowControlKind) -> Hsla {
+    if kind.is_close() {
+        gpui::white()
+    } else {
+        theme.text_secondary
     }
 }
 
@@ -262,5 +283,15 @@ mod tests {
     #[test]
     fn window_control_glyphs_are_not_empty() {
         assert!(!WindowControlKind::Minimize.glyph().is_empty());
+    }
+
+    #[test]
+    fn close_control_hover_uses_high_contrast_foreground() {
+        let theme = Theme::light();
+
+        assert_eq!(
+            window_control_hover_foreground(theme, WindowControlKind::Close),
+            gpui::white()
+        );
     }
 }

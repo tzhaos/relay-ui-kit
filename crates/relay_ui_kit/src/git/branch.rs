@@ -7,6 +7,7 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    motion::{MotionDirection, MotionExt},
     overlay::{Menu, MenuItem, overlay},
     theme::{ActiveTheme, radius, space},
 };
@@ -377,7 +378,7 @@ impl RenderOnce for BranchPickerPanel {
             );
         }
 
-        panel
+        panel.motion_slide_in(MotionDirection::FromTop, true)
     }
 }
 

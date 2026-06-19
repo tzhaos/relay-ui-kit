@@ -1,7 +1,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_kit::{
-    Button, ButtonVariant, CodeView, FileKind, FileView, IconName, TaskRow, TaskRowData,
-    TerminalLine, TerminalLineStyle, TerminalSurface, Theme, Tone, TreeRow,
+    Button, ButtonVariant, CodeView, FileKind, FileView, IconName, ScrollSurface, TaskRow,
+    TaskRowData, TerminalLine, TerminalLineStyle, TerminalSurface, Theme, Tone, TreeRow,
 };
 
 use super::{
@@ -51,6 +51,7 @@ pub(super) fn render(
                         .disabled(true),
                 ),
         ))
+        .child(section(cx, "Scroll surface", scroll_surface_sample(theme)))
         .child(section(
             cx,
             "Terminal scrollback",
@@ -74,6 +75,42 @@ pub(super) fn render(
                 .detail("long line"),
             ),
         ))
+}
+
+fn scroll_surface_sample(theme: Theme) -> impl IntoElement {
+    div().h(px(180.0)).child(ScrollSurface::new(
+        "stress-scroll-surface",
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(1.0))
+            .children((0..24).map(move |index| {
+                div()
+                    .h(px(28.0))
+                    .px_2()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .rounded(px(relay_ui_kit::radius::MD))
+                    .bg(if index % 2 == 0 {
+                        theme.panel
+                    } else {
+                        theme.panel_alt
+                    })
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.text_secondary)
+                            .child(format!("Session history row {index:02}")),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.0))
+                            .text_color(theme.text_muted)
+                            .child(if index % 3 == 0 { "active" } else { "idle" }),
+                    )
+            })),
+    ))
 }
 
 fn long_task_rows() -> impl IntoElement {

@@ -55,7 +55,7 @@ pub use shell::{
     AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, SplitPaneState,
     StatusBar, StatusItem, TitleBar, TopToolbar, WindowControls, WorkspaceBreadcrumb,
 };
-pub use structure::{KeyValue, ListSection, Tab, Tabs};
+pub use structure::{KeyValue, ListSection, ScrollSurface, Tab, Tabs};
 pub use terminal::{
     AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
     TerminalSurface, TerminalTab, TerminalToolbar,

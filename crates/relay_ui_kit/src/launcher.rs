@@ -11,6 +11,7 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, radius, space},
 };
 
@@ -196,7 +197,7 @@ impl RenderOnce for LauncherMenu {
             panel = panel.child(row);
         }
 
-        panel
+        panel.motion_slide_in(MotionDirection::FromTop, true)
     }
 }
 

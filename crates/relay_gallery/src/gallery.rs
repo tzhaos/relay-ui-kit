@@ -4,10 +4,9 @@
 //! them, instead of packing every primitive into one long showcase page.
 
 use gpui::{
-    AnyElement, Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, Window, div, px,
+    AnyElement, Context, Entity, FocusHandle, IntoElement, ParentElement, Styled, Window, div, px,
 };
-use relay_ui_kit::{ActiveTheme, SplitPaneState, TextInputState, space};
+use relay_ui_kit::{ActiveTheme, ScrollSurface, SplitPaneState, TextInputState, space};
 
 use crate::GalleryApp;
 
@@ -99,16 +98,15 @@ pub fn render(
         GallerySurface::Stress => stress_scene::render(state, host, theme, cx).into_any_element(),
     };
 
-    div()
-        .id("gallery-scroll")
-        .size_full()
-        .overflow_y_scroll()
-        .bg(theme.app_bg)
-        .child(
+    div().size_full().bg(theme.app_bg).child(
+        ScrollSurface::new(
+            "gallery-scroll",
             div()
                 .max_w(px(1160.0))
                 .mx_auto()
                 .p(px(space::XL))
                 .child(content),
         )
+        .reserve_gutter(true),
+    )
 }

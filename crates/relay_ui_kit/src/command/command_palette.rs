@@ -1,11 +1,13 @@
 use gpui::{
     AnyElement, App, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
     display::EmptyState,
     icon::IconName,
+    motion::{MotionDirection, MotionExt},
+    structure::ScrollSurface,
     theme::{ActiveTheme, radius, space},
 };
 
@@ -88,19 +90,19 @@ impl RenderOnce for CommandPalette {
                 )
             })
             .child(
-                div()
-                    .id("command-palette-list")
-                    .flex_1()
-                    .min_h(px(0.0))
-                    .p(px(space::XS))
-                    .overflow_y_scroll()
-                    .when(has_rows, |this| this.children(self.rows))
-                    .when(!has_rows, |this| {
-                        this.child(
-                            EmptyState::new("No commands", "Try a different query.")
-                                .icon(IconName::Search),
-                        )
-                    }),
+                ScrollSurface::new(
+                    "command-palette-list",
+                    div()
+                        .p(px(space::XS))
+                        .when(has_rows, |this| this.children(self.rows))
+                        .when(!has_rows, |this| {
+                            this.child(
+                                EmptyState::new("No commands", "Try a different query.")
+                                    .icon(IconName::Search),
+                            )
+                        }),
+                )
+                .show_rail(false),
             )
             .when_some(self.footer, |this, footer| {
                 this.child(
@@ -112,5 +114,6 @@ impl RenderOnce for CommandPalette {
                         .child(footer),
                 )
             })
+            .motion_slide_in(MotionDirection::FromTop, true)
     }
 }
