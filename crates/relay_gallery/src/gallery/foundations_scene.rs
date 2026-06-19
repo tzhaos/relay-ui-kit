@@ -1,7 +1,8 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div};
 use relay_ui_kit::{
-    Button, ButtonVariant, Divider, EmptyState, IconButton, IconName, NavRow, Segment,
-    SegmentedControl, Tab, Tabs, TaskRow, TaskRowData, Theme, Tone, TreeRow,
+    Button, ButtonVariant, Divider, EmptyState, Icon, IconButton, IconName, ListItem, NavRow,
+    SectionedList, SectionedListGroup, Segment, SegmentedControl, Tab, Tabs, TaskRow, TaskRowData,
+    Theme, Tone, TreeNode, TreeRow, TreeView,
 };
 
 use super::{
@@ -56,6 +57,11 @@ pub(super) fn render(
                 .child(nav_rows_sample())
                 .child(tree_rows_sample())
                 .child(task_rows_sample()),
+        ))
+        .child(section(
+            cx,
+            "List foundations",
+            list_foundation_samples(state, host, theme),
         ))
         .child(section(
             cx,
@@ -225,6 +231,102 @@ fn task_rows_sample() -> impl IntoElement {
                 review: 2,
             },
         ))
+}
+
+fn list_foundation_samples(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    theme: Theme,
+) -> impl IntoElement {
+    let selected = state.viewer_tab;
+    let select_tree = {
+        let host = host.clone();
+        move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
+            host.update(cx, |this, cx| {
+                this.state.viewer_tab = key;
+                cx.notify();
+            });
+        }
+    };
+
+    div()
+        .flex()
+        .items_start()
+        .gap_4()
+        .flex_wrap()
+        .child(
+            div().w(gpui::px(320.0)).child(
+                TreeView::new(
+                    "foundation-tree-view",
+                    vec![
+                        TreeNode::new("tree:src", IconName::Folder, "src").expanded(true),
+                        TreeNode::new("tree:components", IconName::Folder, "components")
+                            .depth(1)
+                            .expanded(true),
+                        TreeNode::new("tree:list", IconName::Folder, "list")
+                            .depth(2)
+                            .expanded(true),
+                        TreeNode::new("tree:item", IconName::FileText, "item.rs")
+                            .depth(3)
+                            .selected(selected == "tree:item"),
+                    ],
+                )
+                .on_select(select_tree),
+            ),
+        )
+        .child(div().w(gpui::px(340.0)).child(SectionedList::new(
+            "foundation-sectioned-list",
+            vec![
+                    SectionedListGroup::new("Recent")
+                        .count(2)
+                        .child(
+                            ListItem::new("recent-terminal")
+                                .selected(selected == "recent:terminal")
+                                .start_slot(Icon::new(IconName::Terminal))
+                                .child(list_item_text(
+                                    "Terminal surface",
+                                    "PTY host shell preview",
+                                    theme,
+                                )),
+                        )
+                        .child(
+                            ListItem::new("recent-diff")
+                                .selected(selected == "recent:diff")
+                                .start_slot(Icon::new(IconName::FileDiff))
+                                .child(list_item_text("Diff viewer", "Unified file delta", theme)),
+                        ),
+                    SectionedListGroup::new("Pinned").child(
+                        ListItem::new("pinned-command")
+                            .start_slot(Icon::new(IconName::Zap))
+                            .child(list_item_text(
+                                "Command palette",
+                                "Keyboard-first launcher",
+                                theme,
+                            )),
+                    ),
+                ],
+        )))
+}
+
+fn list_item_text(title: &'static str, detail: &'static str, theme: Theme) -> impl IntoElement {
+    div()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .child(
+            div()
+                .truncate()
+                .text_sm()
+                .text_color(theme.text)
+                .child(title),
+        )
+        .child(
+            div()
+                .truncate()
+                .text_size(gpui::px(11.0))
+                .text_color(theme.text_muted)
+                .child(detail),
+        )
 }
 
 fn tab_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {

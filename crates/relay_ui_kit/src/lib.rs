@@ -51,7 +51,7 @@ pub use git::{
 pub use icon::{Icon, IconName, IconSize, KitAssets};
 pub use input::{NumberInput, TextArea, TextInput, TextInputAction, TextInputState};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
-pub use list::{ListItem, ListItemSpacing};
+pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use shell::{
