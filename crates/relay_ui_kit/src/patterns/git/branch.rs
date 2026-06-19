@@ -6,9 +6,9 @@ use gpui::{
 };
 
 use crate::{
+    components::overlay::{Menu, MenuItem, overlay},
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    overlay::{Menu, MenuItem, overlay},
     theme::{ActiveTheme, radius, space},
 };
 

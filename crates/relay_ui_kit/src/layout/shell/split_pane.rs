@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc};
+use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, AppContext, DragMoveEvent, Empty, InteractiveElement, IntoElement,
@@ -23,36 +23,65 @@ struct DraggedSplitPane {
 const SPLIT_DRAG_STEP: f32 = 1.0;
 
 type ResizeHandler = Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
+type ResizeEndHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
-/// Host-owned split sizing state with pixel-stable resize updates.
+/// Host-owned split sizing state with pixel-stable resize previews.
 #[derive(Debug, Clone, Copy)]
 pub struct SplitPaneState {
-    first_size: f32,
+    committed_first_size: f32,
+    visible_first_size: f32,
+    resizing: bool,
 }
 
 impl SplitPaneState {
     pub fn new(first_size: f32) -> Self {
+        let first_size = snap_split_size(first_size);
         Self {
-            first_size: snap_split_size(first_size),
+            committed_first_size: first_size,
+            visible_first_size: first_size,
+            resizing: false,
         }
     }
 
     pub fn first_size(&self) -> f32 {
-        self.first_size
+        self.visible_first_size
+    }
+
+    pub fn committed_first_size(&self) -> f32 {
+        self.committed_first_size
+    }
+
+    pub fn is_resizing(&self) -> bool {
+        self.resizing
     }
 
     pub fn set_first_size(&mut self, first_size: f32) {
-        self.first_size = snap_split_size(first_size);
+        let first_size = snap_split_size(first_size);
+        self.committed_first_size = first_size;
+        self.visible_first_size = first_size;
+        self.resizing = false;
     }
 
     pub fn resize_to(&mut self, first_size: f32) -> bool {
+        self.preview_resize_to(first_size)
+    }
+
+    pub fn preview_resize_to(&mut self, first_size: f32) -> bool {
         let next = snap_split_size(first_size);
-        if should_emit_resize(self.first_size, next) {
-            self.first_size = next;
+        if should_emit_resize(self.visible_first_size, next) {
+            self.visible_first_size = next;
+            self.resizing = true;
             true
         } else {
             false
         }
+    }
+
+    pub fn commit_resize(&mut self) -> bool {
+        let changed = should_emit_resize(self.committed_first_size, self.visible_first_size);
+        self.committed_first_size = self.visible_first_size;
+        self.resizing = false;
+        changed
     }
 }
 
@@ -67,6 +96,7 @@ pub struct SplitPane {
     min_first: f32,
     min_second: f32,
     on_resize: Option<ResizeHandler>,
+    on_resize_end: Option<ResizeEndHandler>,
 }
 
 impl SplitPane {
@@ -80,6 +110,7 @@ impl SplitPane {
             min_first: 220.0,
             min_second: 420.0,
             on_resize: None,
+            on_resize_end: None,
         }
     }
 
@@ -103,6 +134,11 @@ impl SplitPane {
         self.on_resize = Some(Rc::new(handler));
         self
     }
+
+    pub fn on_resize_end(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_resize_end = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for SplitPane {
@@ -114,9 +150,7 @@ impl RenderOnce for SplitPane {
         let min_first = self.min_first;
         let min_second = self.min_second;
         let first_size = snap_split_size(self.first_size);
-        let last_resize = Rc::new(Cell::new(first_size));
-        let pending_resize = Rc::new(Cell::new(first_size));
-        let resize_frame_queued = Rc::new(Cell::new(false));
+        let resize_end = self.on_resize_end;
         let handle = split_handle(id, axis, handler.clone());
 
         let first = match axis {
@@ -147,29 +181,23 @@ impl RenderOnce for SplitPane {
             .child(handle)
             .child(second)
             .when_some(handler, |this, handler| {
-                let last_resize = last_resize.clone();
-                let pending_resize = pending_resize.clone();
-                let resize_frame_queued = resize_frame_queued.clone();
                 this.on_drag_move::<DraggedSplitPane>(move |event, window, cx| {
                     if event.drag(cx).id != id {
                         return;
                     }
                     let next = split_size_from_drag(event, axis, min_first, min_second);
-                    if should_emit_resize(last_resize.get(), next) {
-                        pending_resize.set(next);
-                        last_resize.set(next);
-                        if !resize_frame_queued.replace(true) {
-                            let handler = handler.clone();
-                            let pending_resize = pending_resize.clone();
-                            let resize_frame_queued = resize_frame_queued.clone();
-                            window.on_next_frame(move |window, cx| {
-                                resize_frame_queued.set(false);
-                                handler(pending_resize.get(), window, cx);
-                                window.request_animation_frame();
-                            });
-                        }
+                    if should_emit_resize(first_size, next) {
+                        handler(next, window, cx);
                     }
                     cx.stop_propagation();
+                })
+            })
+            .when_some(resize_end, |this, handler| {
+                this.on_drop::<DraggedSplitPane>(move |drag, window, cx| {
+                    if drag.id == id {
+                        handler(window, cx);
+                        cx.stop_propagation();
+                    }
                 })
             })
     }
@@ -285,13 +313,34 @@ mod tests {
     fn split_state_reports_when_size_changes() {
         let mut state = SplitPaneState::new(300.2);
 
-        assert!(state.resize_to(300.6));
+        assert!(state.preview_resize_to(300.6));
     }
 
     #[test]
     fn split_state_skips_subpixel_resize() {
         let mut state = SplitPaneState::new(300.2);
 
-        assert!(!state.resize_to(300.4));
+        assert!(!state.preview_resize_to(300.4));
+    }
+
+    #[test]
+    fn split_state_keeps_committed_size_until_drop() {
+        let mut state = SplitPaneState::new(300.0);
+
+        assert!(state.preview_resize_to(340.0));
+        assert_eq!(state.first_size(), 340.0);
+        assert_eq!(state.committed_first_size(), 300.0);
+        assert!(state.is_resizing());
+    }
+
+    #[test]
+    fn split_state_commits_visible_size() {
+        let mut state = SplitPaneState::new(300.0);
+
+        state.preview_resize_to(340.0);
+
+        assert!(state.commit_resize());
+        assert_eq!(state.committed_first_size(), 340.0);
+        assert!(!state.is_resizing());
     }
 }

@@ -1,10 +1,12 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
-use relay_ui_kit::{CommandRow, IconName, KeyboardShortcut, Theme};
+use relay_ui_kit::{
+    CommandRow, IconButton, IconName, KeybindingRow, KeybindingTable, KeyboardShortcut, Theme,
+};
 
 use super::{
     GalleryState,
     product_samples::{command_sample, launcher_sample},
-    shared::{branch_controls, scene_stack, section, strip},
+    shared::{branch_controls, scene_stack, section},
 };
 use crate::GalleryApp;
 
@@ -29,25 +31,26 @@ pub(super) fn render(
         .child(section(
             cx,
             "Shortcuts",
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(shortcut_row(
-                    theme,
-                    "New terminal",
-                    KeyboardShortcut::new(["Ctrl", "Shift", "T"]),
-                ))
-                .child(shortcut_row(
-                    theme,
-                    "Launch Codex",
-                    KeyboardShortcut::new(["Ctrl", "K"]),
-                ))
-                .child(shortcut_row(
-                    theme,
-                    "Filter files",
-                    KeyboardShortcut::new(["Ctrl", "F"]),
-                )),
+            KeybindingTable::new(vec![
+                KeybindingRow::new("New terminal")
+                    .description("Open a shell session")
+                    .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
+                    .action(IconButton::new(
+                        "keybinding-terminal-edit",
+                        IconName::Settings,
+                    )),
+                KeybindingRow::new("Launch Codex")
+                    .description("Attach an agent to the active terminal")
+                    .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
+                    .action(IconButton::new("keybinding-codex-edit", IconName::Settings)),
+                KeybindingRow::new("Filter files")
+                    .description("Focus the active panel search field")
+                    .shortcut(KeyboardShortcut::new(["Ctrl", "F"]))
+                    .action(IconButton::new(
+                        "keybinding-filter-edit",
+                        IconName::Settings,
+                    )),
+            ]),
         ))
         .child(section(
             cx,
@@ -92,17 +95,4 @@ pub(super) fn render(
                         .selected(state.launcher_choice == "agent:codex"),
                 ),
         ))
-}
-
-fn shortcut_row(theme: Theme, label: &'static str, shortcut: KeyboardShortcut) -> impl IntoElement {
-    strip()
-        .w(px(340.0))
-        .justify_between()
-        .child(
-            div()
-                .text_sm()
-                .text_color(theme.text_secondary)
-                .child(label),
-        )
-        .child(shortcut)
 }

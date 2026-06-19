@@ -1,5 +1,9 @@
 //! Theme, tone, spacing, and motion primitives.
 
-pub use crate::motion::*;
-pub use crate::theme::*;
-pub use crate::tone::*;
+pub mod motion;
+pub mod theme;
+pub mod tone;
+
+pub use motion::*;
+pub use theme::*;
+pub use tone::*;

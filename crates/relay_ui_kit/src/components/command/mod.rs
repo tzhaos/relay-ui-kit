@@ -6,8 +6,10 @@
 
 mod command_palette;
 mod command_row;
+mod keybinding_table;
 mod keyboard_shortcut;
 
 pub use command_palette::CommandPalette;
 pub use command_row::CommandRow;
+pub use keybinding_table::{KeybindingRow, KeybindingTable};
 pub use keyboard_shortcut::KeyboardShortcut;

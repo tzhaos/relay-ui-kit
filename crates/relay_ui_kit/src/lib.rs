@@ -21,51 +21,19 @@ pub mod patterns;
 pub mod prelude;
 pub mod styles;
 
-#[path = "components/button.rs"]
-pub mod button;
-#[path = "components/choice.rs"]
-pub mod choice;
-#[path = "components/command/mod.rs"]
-pub mod command;
-#[path = "components/controls/mod.rs"]
-pub mod controls;
-#[path = "components/display.rs"]
-pub mod display;
-#[path = "components/feedback/mod.rs"]
-pub mod feedback;
-#[path = "components/form/mod.rs"]
-pub mod form;
-#[path = "patterns/git/mod.rs"]
-pub mod git;
-#[path = "components/icon.rs"]
-pub mod icon;
-#[path = "components/input/mod.rs"]
-pub mod input;
-#[path = "patterns/launcher.rs"]
-pub mod launcher;
-#[path = "styles/motion.rs"]
-pub mod motion;
-#[path = "components/overlay/mod.rs"]
-pub mod overlay;
-#[path = "components/row/mod.rs"]
-pub mod row;
-#[path = "layout/shell/mod.rs"]
-pub mod shell;
-#[path = "layout/structure/mod.rs"]
-pub mod structure;
-#[path = "patterns/terminal/mod.rs"]
-pub mod terminal;
-#[path = "styles/theme.rs"]
-pub mod theme;
-#[path = "styles/tone.rs"]
-pub mod tone;
-#[path = "patterns/viewer/mod.rs"]
-pub mod viewer;
+pub use components::{
+    button, choice, command, controls, display, feedback, form, icon, input, row,
+};
+pub use layout::{shell, structure};
+pub use patterns::{composer, git, launcher, terminal, viewer};
+pub use styles::{motion, theme, tone};
 
 // Flat re-exports so callers write `relay_ui_kit::Button` etc.
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
-pub use command::{CommandPalette, CommandRow, KeyboardShortcut};
+pub use command::{CommandPalette, CommandRow, KeybindingRow, KeybindingTable, KeyboardShortcut};
+pub use components::overlay::{Menu, MenuItem, Overlay, TooltipBody, overlay};
+pub use composer::Composer;
 pub use controls::{
     ColorField, ColorSwatch, PanelHeader, SearchField, Segment, SegmentedControl, Select,
     SelectOption, Slider,
@@ -80,7 +48,6 @@ pub use icon::{Icon, IconName, IconSize, KitAssets};
 pub use input::{NumberInput, TextInput, TextInputAction, TextInputState};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};
-pub use overlay::{Menu, MenuItem, Overlay, TooltipBody, overlay};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use shell::{
     AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, SplitPaneState,

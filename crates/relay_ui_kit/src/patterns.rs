@@ -1,6 +1,13 @@
 //! Product-shaped patterns built from reusable components.
 
-pub use crate::git::*;
-pub use crate::launcher::*;
-pub use crate::terminal::*;
-pub use crate::viewer::*;
+pub mod composer;
+pub mod git;
+pub mod launcher;
+pub mod terminal;
+pub mod viewer;
+
+pub use composer::*;
+pub use git::*;
+pub use launcher::*;
+pub use terminal::*;
+pub use viewer::*;

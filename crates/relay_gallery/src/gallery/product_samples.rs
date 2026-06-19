@@ -53,7 +53,17 @@ pub(super) fn shell_sample(state: &GalleryState, host: &Entity<GalleryApp>) -> i
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    if this.gallery.shell_split.resize_to(next) {
+                    if this.gallery.shell_split.preview_resize_to(next) {
+                        cx.notify();
+                    }
+                });
+            }
+        })
+        .on_resize_end({
+            let host = host.clone();
+            move |_window, cx| {
+                host.update(cx, |this, cx| {
+                    if this.gallery.shell_split.commit_resize() {
                         cx.notify();
                     }
                 });

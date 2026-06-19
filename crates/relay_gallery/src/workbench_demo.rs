@@ -63,7 +63,17 @@ pub fn render(
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    if this.workbench.terminal_split.resize_to(next) {
+                    if this.workbench.terminal_split.preview_resize_to(next) {
+                        cx.notify();
+                    }
+                });
+            }
+        })
+        .on_resize_end({
+            let host = host.clone();
+            move |_window, cx| {
+                host.update(cx, |this, cx| {
+                    if this.workbench.terminal_split.commit_resize() {
                         cx.notify();
                     }
                 });
@@ -77,7 +87,17 @@ pub fn render(
             let host = host.clone();
             move |next, _window, cx| {
                 host.update(cx, |this, cx| {
-                    if this.workbench.left_split.resize_to(next) {
+                    if this.workbench.left_split.preview_resize_to(next) {
+                        cx.notify();
+                    }
+                });
+            }
+        })
+        .on_resize_end({
+            let host = host.clone();
+            move |_window, cx| {
+                host.update(cx, |this, cx| {
+                    if this.workbench.left_split.commit_resize() {
                         cx.notify();
                     }
                 });
