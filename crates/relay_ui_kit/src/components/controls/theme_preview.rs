@@ -193,32 +193,41 @@ fn preview_frame(id: impl Into<ElementId>, kind: ThemePreviewKind, theme: Theme)
             .rounded(px(radius::MD))
             .border_1()
             .border_color(theme.border)
-            .child(preview_half("theme-preview-system-light-half", light))
-            .child(preview_half("theme-preview-system-dark-half", dark))
+            .child(preview_half(
+                "theme-preview-system-light-half",
+                light,
+                false,
+            ))
+            .child(preview_half("theme-preview-system-dark-half", dark, false))
             .into_any_element(),
-        ThemePreviewKind::Light => preview_scene(id, light, theme.border).into_any_element(),
-        ThemePreviewKind::Dark => preview_scene(id, dark, theme.border).into_any_element(),
+        ThemePreviewKind::Light => preview_scene(id, light, theme.border, true).into_any_element(),
+        ThemePreviewKind::Dark => preview_scene(id, dark, theme.border, true).into_any_element(),
     }
 }
 
-fn preview_half(id: impl Into<ElementId>, palette: PreviewPalette) -> impl IntoElement {
+fn preview_half(
+    id: impl Into<ElementId>,
+    palette: PreviewPalette,
+    framed: bool,
+) -> impl IntoElement {
     div()
         .flex_1()
-        .child(preview_scene(id, palette, palette.chrome))
+        .child(preview_scene(id, palette, palette.chrome, framed))
 }
 
 fn preview_scene(
     id: impl Into<ElementId>,
     palette: PreviewPalette,
     border: Hsla,
+    framed: bool,
 ) -> impl IntoElement {
     div()
         .id(id)
         .h(px(86.0))
         .overflow_hidden()
-        .rounded(px(radius::MD))
-        .border_1()
-        .border_color(border)
+        .when(framed, |this| {
+            this.rounded(px(radius::MD)).border_1().border_color(border)
+        })
         .bg(linear_gradient(
             135.0,
             linear_color_stop(palette.panel, 0.0),

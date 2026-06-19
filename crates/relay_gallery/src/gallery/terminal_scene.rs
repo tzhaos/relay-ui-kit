@@ -1,4 +1,4 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div};
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div};
 use relay_ui_kit::{Button, Composer, IconButton, IconName, TextArea, TextInputAction, Theme};
 
 use super::{
@@ -10,6 +10,7 @@ use super::{
 pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
+    window: &Window,
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
@@ -29,7 +30,7 @@ pub(super) fn render(
         .child(section(
             cx,
             "Agent composer",
-            composer_sample(state, host, theme),
+            composer_sample(state, host, window, theme),
         ))
         .child(section(cx, "Shell split", shell_split))
 }
@@ -37,25 +38,30 @@ pub(super) fn render(
 fn composer_sample(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
+    window: &Window,
     theme: Theme,
 ) -> impl IntoElement {
+    let composer_focused = state.composer_focus.is_focused(window);
+
     Composer::new(
         "terminal-composer",
         TextArea::new(
             "terminal-composer-input",
-            state.search_focus.clone(),
-            &state.search_input,
+            state.composer_focus.clone(),
+            &state.composer_input,
         )
         .placeholder("Ask an agent to work in the active terminal")
+        .focused(composer_focused)
         .min_rows(3)
+        .bordered(false)
         .on_key({
             let host = host.clone();
             move |event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    match this.state.search_input.handle_multiline_key(event) {
+                    match this.state.composer_input.handle_multiline_key(event) {
                         TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
                         TextInputAction::Cancel => {
-                            this.state.search_input.clear();
+                            this.state.composer_input.clear();
                             cx.notify();
                         }
                         TextInputAction::Ignored => {}

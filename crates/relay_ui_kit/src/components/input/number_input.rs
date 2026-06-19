@@ -1,12 +1,34 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
+    icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
     theme::{ActiveTheme, radius},
 };
+
+use super::TextInputState;
+
+type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) + 'static>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumberInputLayout {
+    ControlsAroundValue,
+    ControlsTrailing,
+}
+
+struct EditableNumberValue {
+    focus: FocusHandle,
+    before: String,
+    after: String,
+    is_empty: bool,
+    focused: bool,
+    key_context: &'static str,
+    on_key: Option<KeyHandler>,
+}
 
 /// A compact numeric input with optional stepper callbacks.
 #[derive(IntoElement)]
@@ -14,6 +36,8 @@ pub struct NumberInput {
     id: ElementId,
     value: i32,
     suffix: Option<String>,
+    layout: NumberInputLayout,
+    editable: Option<EditableNumberValue>,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
 }
@@ -24,6 +48,8 @@ impl NumberInput {
             id: id.into(),
             value,
             suffix: None,
+            layout: NumberInputLayout::ControlsAroundValue,
+            editable: None,
             on_decrement: None,
             on_increment: None,
         }
@@ -31,6 +57,49 @@ impl NumberInput {
 
     pub fn suffix(mut self, suffix: impl Into<String>) -> Self {
         self.suffix = Some(suffix.into());
+        self
+    }
+
+    pub fn layout(mut self, layout: NumberInputLayout) -> Self {
+        self.layout = layout;
+        self
+    }
+
+    pub fn editable(mut self, focus: FocusHandle, state: &TextInputState) -> Self {
+        let (before, after) = state.split();
+        self.editable = Some(EditableNumberValue {
+            focus,
+            before: before.to_string(),
+            after: after.to_string(),
+            is_empty: state.is_empty(),
+            focused: false,
+            key_context: "NumberInput",
+            on_key: None,
+        });
+        self
+    }
+
+    pub fn focused(mut self, focused: bool) -> Self {
+        if let Some(editable) = &mut self.editable {
+            editable.focused = focused;
+        }
+        self
+    }
+
+    pub fn key_context(mut self, key_context: &'static str) -> Self {
+        if let Some(editable) = &mut self.editable {
+            editable.key_context = key_context;
+        }
+        self
+    }
+
+    pub fn on_key(
+        mut self,
+        handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        if let Some(editable) = &mut self.editable {
+            editable.on_key = Some(Box::new(handler));
+        }
         self
     }
 
@@ -53,65 +122,153 @@ impl NumberInput {
 
 impl RenderOnce for NumberInput {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let NumberInput {
+            id,
+            value: current_value,
+            suffix,
+            layout,
+            editable,
+            on_decrement,
+            on_increment,
+        } = self;
         let theme = *cx.theme();
+        let value_id = format!("{id}-value");
+        let value = match editable {
+            Some(editable) => {
+                editable_number_value(value_id, editable, current_value, suffix, theme)
+                    .into_any_element()
+            }
+            None => {
+                number_value(current_value, suffix, theme.text, theme.text_muted).into_any_element()
+            }
+        };
+        let decrement = stepper(
+            "number-decrement",
+            IconName::Minus,
+            on_decrement,
+            theme.hover,
+            theme.text_muted,
+        );
+        let increment = stepper(
+            "number-increment",
+            IconName::Plus,
+            on_increment,
+            theme.hover,
+            theme.text_muted,
+        );
+
         div()
-            .id(self.id)
+            .id(id)
             .h(px(30.0))
             .min_w(px(108.0))
-            .pl_2()
             .flex()
             .items_center()
+            .overflow_hidden()
             .rounded(px(radius::MD))
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
-            .child(
-                div()
-                    .flex_1()
-                    .text_sm()
-                    .font_weight(FontWeight::MEDIUM)
-                    .text_color(theme.text)
-                    .child(self.value.to_string()),
-            )
-            .when_some(self.suffix, |this, suffix| {
-                this.child(
+            .map(|this| match layout {
+                NumberInputLayout::ControlsAroundValue => {
+                    this.child(decrement).child(value).child(increment)
+                }
+                NumberInputLayout::ControlsTrailing => this.child(value).child(
                     div()
-                        .px_1()
-                        .text_xs()
-                        .text_color(theme.text_muted)
-                        .child(suffix),
-                )
+                        .h_full()
+                        .border_l_1()
+                        .border_color(theme.border)
+                        .flex()
+                        .items_center()
+                        .child(decrement)
+                        .child(div().h(px(16.0)).w(px(1.0)).bg(theme.border.opacity(0.7)))
+                        .child(increment),
+                ),
             })
-            .child(
-                div()
-                    .h_full()
-                    .ml_1()
-                    .border_l_1()
-                    .border_color(theme.border)
-                    .flex()
-                    .items_center()
-                    .child(stepper(
-                        "number-decrement",
-                        "-",
-                        self.on_decrement,
-                        theme.hover,
-                        theme.text_muted,
-                    ))
-                    .child(div().h(px(16.0)).w(px(1.0)).bg(theme.border.opacity(0.7)))
-                    .child(stepper(
-                        "number-increment",
-                        "+",
-                        self.on_increment,
-                        theme.hover,
-                        theme.text_muted,
-                    )),
-            )
     }
+}
+
+fn number_value(
+    value: i32,
+    suffix: Option<String>,
+    text_color: gpui::Hsla,
+    suffix_color: gpui::Hsla,
+) -> impl IntoElement {
+    div()
+        .min_w(px(58.0))
+        .h_full()
+        .px_2()
+        .flex()
+        .items_center()
+        .justify_center()
+        .gap_1()
+        .text_sm()
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(text_color)
+        .child(value.to_string())
+        .when_some(suffix, |this, suffix| {
+            this.child(div().text_xs().text_color(suffix_color).child(suffix))
+        })
+}
+
+fn editable_number_value(
+    id: impl Into<ElementId>,
+    editable: EditableNumberValue,
+    fallback: i32,
+    suffix: Option<String>,
+    theme: crate::Theme,
+) -> impl IntoElement {
+    let focus_for_click = editable.focus.clone();
+    let on_key = editable.on_key;
+    let show_fallback = editable.is_empty && !editable.focused;
+
+    div()
+        .id(id)
+        .min_w(px(58.0))
+        .h_full()
+        .px_2()
+        .flex()
+        .items_center()
+        .justify_center()
+        .gap_1()
+        .border_l_1()
+        .border_r_1()
+        .border_color(theme.border)
+        .text_sm()
+        .font_weight(FontWeight::MEDIUM)
+        .track_focus(&editable.focus)
+        .tab_index(0)
+        .key_context(editable.key_context)
+        .cursor(gpui::CursorStyle::IBeam)
+        .when(editable.focused, |this| this.bg(theme.accent_bg))
+        .when(show_fallback, |this| {
+            this.text_color(theme.text_muted)
+                .child(fallback.to_string())
+        })
+        .when(!show_fallback, |this| {
+            this.text_color(theme.text)
+                .child(editable.before)
+                .when(editable.focused, |this| {
+                    this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
+                })
+                .child(editable.after)
+        })
+        .when_some(suffix, |this, suffix| {
+            this.child(div().text_xs().text_color(theme.text_muted).child(suffix))
+        })
+        .when_some(on_key, |this, on_key| {
+            this.on_key_down(move |event, window, cx| {
+                on_key(event, window, cx);
+                cx.stop_propagation();
+            })
+        })
+        .on_click(move |_, window, cx| {
+            window.focus(&focus_for_click, cx);
+        })
 }
 
 fn stepper(
     id: &'static str,
-    label: &'static str,
+    icon: IconName,
     handler: Option<ClickHandler>,
     hover_bg: gpui::Hsla,
     color: gpui::Hsla,
@@ -123,9 +280,6 @@ fn stepper(
         .flex()
         .items_center()
         .justify_center()
-        .text_size(px(11.0))
-        .font_weight(FontWeight::SEMIBOLD)
-        .text_color(color)
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
@@ -134,7 +288,7 @@ fn stepper(
                     cx.stop_propagation();
                 })
         })
-        .child(label)
+        .child(Icon::new(icon).size(IconSize::Small).color(color))
 }
 
 #[cfg(test)]
@@ -146,5 +300,19 @@ mod tests {
         let input = NumberInput::new("number", 14).suffix("px");
 
         assert_eq!(input.suffix.as_deref(), Some("px"));
+    }
+
+    #[test]
+    fn number_input_defaults_to_controls_around_value() {
+        let input = NumberInput::new("number", 14);
+
+        assert_eq!(input.layout, NumberInputLayout::ControlsAroundValue);
+    }
+
+    #[test]
+    fn number_input_starts_read_only() {
+        let input = NumberInput::new("number", 14);
+
+        assert!(input.editable.is_none());
     }
 }

@@ -53,6 +53,10 @@ pub struct GalleryState {
     pub name_focus: FocusHandle,
     pub search_input: TextInputState,
     pub search_focus: FocusHandle,
+    pub composer_input: TextInputState,
+    pub composer_focus: FocusHandle,
+    pub ui_font_size_input: TextInputState,
+    pub ui_font_size_focus: FocusHandle,
     pub notifications: bool,
     pub auto_archive: bool,
     pub theme_choice: &'static str,
@@ -74,6 +78,9 @@ pub struct GalleryState {
     pub accent_choice: &'static str,
     pub overlay_event: String,
     pub foundations_disclosure_open: bool,
+    pub foundations_tree_src_open: bool,
+    pub foundations_tree_components_open: bool,
+    pub foundations_tree_list_open: bool,
 }
 
 impl GalleryState {
@@ -83,6 +90,10 @@ impl GalleryState {
             name_focus: cx.focus_handle(),
             search_input: TextInputState::new(),
             search_focus: cx.focus_handle(),
+            composer_input: TextInputState::new(),
+            composer_focus: cx.focus_handle(),
+            ui_font_size_input: TextInputState::with_text("14"),
+            ui_font_size_focus: cx.focus_handle(),
             notifications: true,
             auto_archive: false,
             theme_choice: "system",
@@ -104,6 +115,9 @@ impl GalleryState {
             accent_choice: "green",
             overlay_event: "No overlay action yet".into(),
             foundations_disclosure_open: true,
+            foundations_tree_src_open: true,
+            foundations_tree_components_open: true,
+            foundations_tree_list_open: true,
         }
     }
 }
@@ -125,7 +139,7 @@ fn render_surface(
     let theme = *cx.theme();
     let content: AnyElement = match surface {
         GallerySurface::Terminal => {
-            terminal_scene::render(state, host, theme, cx).into_any_element()
+            terminal_scene::render(state, host, window, theme, cx).into_any_element()
         }
         GallerySurface::Review => {
             review_scene::render(state, host, window, theme, cx).into_any_element()

@@ -45,8 +45,10 @@ impl RenderOnce for TerminalSurface {
         let content = self.content;
 
         div()
+            .size_full()
             .flex_1()
             .min_h_0()
+            .min_w_0()
             .id(id)
             .overflow_hidden()
             .bg(theme.terminal_bg)

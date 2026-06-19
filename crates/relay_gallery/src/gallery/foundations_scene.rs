@@ -407,11 +407,35 @@ fn list_foundation_samples(
     theme: Theme,
 ) -> impl IntoElement {
     let selected = state.viewer_tab;
+    let tree_nodes = foundation_tree_nodes(state);
     let select_tree = {
         let host = host.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
             host.update(cx, |this, cx| {
                 this.state.viewer_tab = key;
+                cx.notify();
+            });
+        }
+    };
+    let toggle_tree = {
+        let host = host.clone();
+        move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
+            host.update(cx, |this, cx| {
+                match key {
+                    "tree:src" => {
+                        this.state.foundations_tree_src_open =
+                            !this.state.foundations_tree_src_open;
+                    }
+                    "tree:components" => {
+                        this.state.foundations_tree_components_open =
+                            !this.state.foundations_tree_components_open;
+                    }
+                    "tree:list" => {
+                        this.state.foundations_tree_list_open =
+                            !this.state.foundations_tree_list_open;
+                    }
+                    _ => {}
+                }
                 cx.notify();
             });
         }
@@ -424,22 +448,9 @@ fn list_foundation_samples(
         .flex_wrap()
         .child(
             div().w(gpui::px(320.0)).child(
-                TreeView::new(
-                    "foundation-tree-view",
-                    vec![
-                        TreeNode::new("tree:src", IconName::Folder, "src").expanded(true),
-                        TreeNode::new("tree:components", IconName::Folder, "components")
-                            .depth(1)
-                            .expanded(true),
-                        TreeNode::new("tree:list", IconName::Folder, "list")
-                            .depth(2)
-                            .expanded(true),
-                        TreeNode::new("tree:item", IconName::FileText, "item.rs")
-                            .depth(3)
-                            .selected(selected == "tree:item"),
-                    ],
-                )
-                .on_select(select_tree),
+                TreeView::new("foundation-tree-view", tree_nodes)
+                    .on_select(select_tree)
+                    .on_toggle(toggle_tree),
             ),
         )
         .child(div().w(gpui::px(340.0)).child(SectionedList::new(
@@ -451,6 +462,7 @@ fn list_foundation_samples(
                             ListItem::new("recent-terminal")
                                 .selected(selected == "recent:terminal")
                                 .start_slot(Icon::new(IconName::Terminal))
+                                .on_click(select_foundation_item(host, "recent:terminal"))
                                 .child(list_item_text(
                                     "Terminal surface",
                                     "PTY host shell preview",
@@ -461,11 +473,14 @@ fn list_foundation_samples(
                             ListItem::new("recent-diff")
                                 .selected(selected == "recent:diff")
                                 .start_slot(Icon::new(IconName::FileDiff))
+                                .on_click(select_foundation_item(host, "recent:diff"))
                                 .child(list_item_text("Diff viewer", "Unified file delta", theme)),
                         ),
                     SectionedListGroup::new("Pinned").child(
                         ListItem::new("pinned-command")
                             .start_slot(Icon::new(IconName::Zap))
+                            .selected(selected == "pinned:command")
+                            .on_click(select_foundation_item(host, "pinned:command"))
                             .child(list_item_text(
                                 "Command palette",
                                 "Keyboard-first launcher",
@@ -476,9 +491,59 @@ fn list_foundation_samples(
         )))
 }
 
+fn select_foundation_item(
+    host: &Entity<GalleryScenesApp>,
+    key: &'static str,
+) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+    let host = host.clone();
+    move |_event, _window, cx| {
+        host.update(cx, |this, cx| {
+            this.state.viewer_tab = key;
+            cx.notify();
+        });
+    }
+}
+
+fn foundation_tree_nodes(state: &GalleryState) -> Vec<TreeNode> {
+    let mut nodes = vec![
+        TreeNode::new("tree:src", IconName::Folder, "src")
+            .expanded(state.foundations_tree_src_open),
+    ];
+
+    if state.foundations_tree_src_open {
+        nodes.push(
+            TreeNode::new("tree:components", IconName::Folder, "components")
+                .depth(1)
+                .expanded(state.foundations_tree_components_open),
+        );
+    }
+
+    if state.foundations_tree_src_open && state.foundations_tree_components_open {
+        nodes.push(
+            TreeNode::new("tree:list", IconName::Folder, "list")
+                .depth(2)
+                .expanded(state.foundations_tree_list_open),
+        );
+    }
+
+    if state.foundations_tree_src_open
+        && state.foundations_tree_components_open
+        && state.foundations_tree_list_open
+    {
+        nodes.push(
+            TreeNode::new("tree:item", IconName::FileText, "item.rs")
+                .depth(3)
+                .selected(state.viewer_tab == "tree:item"),
+        );
+    }
+
+    nodes
+}
+
 fn list_item_text(title: &'static str, detail: &'static str, theme: Theme) -> impl IntoElement {
     div()
         .min_w_0()
+        .flex_1()
         .flex()
         .flex_col()
         .child(

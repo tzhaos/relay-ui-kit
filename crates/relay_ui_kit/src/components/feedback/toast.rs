@@ -69,6 +69,7 @@ impl RenderOnce for Toast {
             .child(
                 div()
                     .min_w_0()
+                    .flex_1()
                     .flex()
                     .flex_col()
                     .gap(px(1.0))
@@ -76,12 +77,20 @@ impl RenderOnce for Toast {
                         div()
                             .truncate()
                             .text_sm()
+                            .line_height(px(18.0))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(theme.text)
                             .child(self.title),
                     )
                     .when_some(self.detail, |this, detail| {
-                        this.child(div().text_xs().text_color(theme.text_muted).child(detail))
+                        this.child(
+                            div()
+                                .truncate()
+                                .text_xs()
+                                .line_height(px(16.0))
+                                .text_color(theme.text_muted)
+                                .child(detail),
+                        )
                     }),
             );
 

@@ -50,6 +50,7 @@ pub struct TreeView {
     id: ElementId,
     nodes: Vec<TreeNode>,
     on_select: Option<SharedSelectHandler>,
+    on_toggle: Option<SharedSelectHandler>,
 }
 
 impl TreeView {
@@ -58,6 +59,7 @@ impl TreeView {
             id: id.into(),
             nodes,
             on_select: None,
+            on_toggle: None,
         }
     }
 
@@ -66,6 +68,14 @@ impl TreeView {
         handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_select = Some(Rc::new(handler));
+        self
+    }
+
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Rc::new(handler));
         self
     }
 }
@@ -101,7 +111,12 @@ impl RenderOnce for TreeView {
                             .child(node.label),
                     );
 
-                if let Some(on_select) = self.on_select.clone() {
+                if let Some(on_toggle) = self.on_toggle.clone().filter(|_| node.expanded.is_some())
+                {
+                    row = row.on_click(move |_event, window, cx| {
+                        on_toggle(key, window, cx);
+                    });
+                } else if let Some(on_select) = self.on_select.clone() {
                     row = row.on_click(move |_event, window, cx| {
                         on_select(key, window, cx);
                     });
@@ -151,5 +166,12 @@ mod tests {
         let node = TreeNode::new("src", IconName::Folder, "src").expanded(true);
 
         assert_eq!(node.expanded, Some(true));
+    }
+
+    #[test]
+    fn tree_view_starts_without_toggle_handler() {
+        let tree = TreeView::new("tree", vec![]);
+
+        assert!(tree.on_toggle.is_none());
     }
 }

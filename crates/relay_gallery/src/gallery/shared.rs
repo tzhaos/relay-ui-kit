@@ -123,7 +123,7 @@ fn branch_selector(
         let host = host.clone();
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.state.branch_picker_open = !this.state.branch_picker_open;
+                this.state.branch_picker_open = !open;
                 this.state.branch_actions_open = false;
                 cx.notify();
             });
@@ -154,6 +154,15 @@ fn branch_selector(
             });
         }
     })
+    .on_dismiss({
+        let host = host.clone();
+        move |_window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.branch_picker_open = false;
+                cx.notify();
+            });
+        }
+    })
 }
 
 fn branch_actions_button(host: &Entity<GalleryScenesApp>, open: bool) -> impl IntoElement {
@@ -163,7 +172,7 @@ fn branch_actions_button(host: &Entity<GalleryScenesApp>, open: bool) -> impl In
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
-                    this.state.branch_actions_open = !this.state.branch_actions_open;
+                    this.state.branch_actions_open = !open;
                     this.state.branch_picker_open = false;
                     cx.notify();
                 });
@@ -184,7 +193,16 @@ fn branch_actions_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
             }
         }),
     )
-    .offset(-204.0, 32.0)
+    .offset(0.0, 32.0)
+    .on_dismiss({
+        let host = host.clone();
+        move |_window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.branch_actions_open = false;
+                cx.notify();
+            });
+        }
+    })
 }
 
 pub(super) fn dot_label(theme: relay_ui_kit::Theme, tone: Tone, label: &str) -> impl IntoElement {

@@ -3,7 +3,8 @@ use gpui::{Entity, ScrollHandle, Window, point, px};
 use super::thumb::{ScrollThumbMetrics, thumb_metrics_from_values};
 
 const SCROLL_ACTIVITY_FRAMES: u8 = 14;
-const SMOOTH_SCROLL_FACTOR: f32 = 0.34;
+const LINE_WHEEL_DISTANCE_SCALE: f32 = 0.72;
+const SMOOTH_SCROLL_FACTOR: f32 = 0.28;
 const SMOOTH_SCROLL_EPSILON: f32 = 0.7;
 
 pub(super) struct ScrollSurfaceState {
@@ -70,7 +71,7 @@ impl ScrollSurfaceState {
 
         let current_y = f32::from(self.handle.offset().y);
         let base_y = self.smooth_target_y.unwrap_or(current_y);
-        let target_y = clamp_scroll_y(base_y + delta_y, max_scroll_y);
+        let target_y = clamp_scroll_y(base_y + scale_line_wheel_delta(delta_y), max_scroll_y);
 
         if self.smooth_target_y.is_none() && (target_y - current_y).abs() <= SMOOTH_SCROLL_EPSILON {
             return false;
@@ -199,6 +200,10 @@ fn smooth_scroll_step(current_y: f32, target_y: f32) -> (f32, bool) {
     (current_y + distance * SMOOTH_SCROLL_FACTOR, false)
 }
 
+fn scale_line_wheel_delta(delta_y: f32) -> f32 {
+    delta_y * LINE_WHEEL_DISTANCE_SCALE
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,7 +226,12 @@ mod tests {
     fn smooth_scroll_step_moves_toward_target() {
         let (next, done) = smooth_scroll_step(0.0, -100.0);
 
-        assert_eq!(next, -34.0);
+        assert_eq!(next, -28.0);
         assert!(!done);
+    }
+
+    #[test]
+    fn line_wheel_delta_is_slightly_reduced() {
+        assert_eq!(scale_line_wheel_delta(-100.0), -72.0);
     }
 }

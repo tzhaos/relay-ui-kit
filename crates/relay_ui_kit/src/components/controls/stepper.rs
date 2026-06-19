@@ -85,12 +85,16 @@ impl RenderOnce for Stepper {
                         (id.clone(), "decrement"),
                         IconName::Minus,
                         self.on_decrement,
+                        theme.hover,
+                        theme.text_muted,
                     ))
-                    .child(stepper_value(self.value, theme.text))
+                    .child(stepper_value(self.value, theme.text, theme.border))
                     .child(stepper_button(
                         (id.clone(), "increment"),
                         IconName::Plus,
                         self.on_increment,
+                        theme.hover,
+                        theme.text_muted,
                     )),
             )
             .when_some(reset, |this, handler| {
@@ -119,6 +123,8 @@ fn stepper_button(
     id: impl Into<ElementId>,
     icon: IconName,
     handler: Option<ClickHandler>,
+    hover_bg: gpui::Hsla,
+    color: gpui::Hsla,
 ) -> impl IntoElement {
     div()
         .id(id)
@@ -127,19 +133,22 @@ fn stepper_button(
         .flex()
         .items_center()
         .justify_center()
-        .text_color(gpui::black().opacity(0.48))
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
-                .hover(|style| style.bg(gpui::black().opacity(0.05)))
+                .hover(move |style| style.bg(hover_bg))
                 .on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
                 })
         })
-        .child(Icon::new(icon).size(IconSize::XSmall))
+        .child(Icon::new(icon).size(IconSize::Small).color(color))
 }
 
-fn stepper_value(value: String, text_color: gpui::Hsla) -> impl IntoElement {
+fn stepper_value(
+    value: String,
+    text_color: gpui::Hsla,
+    border_color: gpui::Hsla,
+) -> impl IntoElement {
     div()
         .min_w(px(58.0))
         .h_full()
@@ -149,7 +158,7 @@ fn stepper_value(value: String, text_color: gpui::Hsla) -> impl IntoElement {
         .justify_center()
         .border_l_1()
         .border_r_1()
-        .border_color(gpui::black().opacity(0.06))
+        .border_color(border_color)
         .text_sm()
         .font_weight(FontWeight::MEDIUM)
         .text_color(text_color)

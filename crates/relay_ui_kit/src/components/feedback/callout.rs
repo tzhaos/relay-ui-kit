@@ -72,8 +72,8 @@ impl RenderOnce for Callout {
                     .gap(px(1.0))
                     .child(
                         div()
-                            .truncate()
                             .text_sm()
+                            .line_height(px(18.0))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(theme.text)
                             .child(self.title),

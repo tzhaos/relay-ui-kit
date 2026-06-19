@@ -56,7 +56,9 @@ pub use git::{
     BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
 };
 pub use icon::{Icon, IconName, IconSize, KitAssets};
-pub use input::{NumberInput, TextArea, TextInput, TextInputAction, TextInputState};
+pub use input::{
+    NumberInput, NumberInputLayout, TextArea, TextInput, TextInputAction, TextInputState,
+};
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
 pub use motion::{MotionDirection, MotionDuration, MotionExt};

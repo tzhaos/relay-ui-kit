@@ -7,7 +7,9 @@ use crate::{
 
 pub(super) fn feedback_icon(icon: IconName, color: gpui::Hsla) -> gpui::Div {
     div()
-        .size(px(16.0))
+        .size(px(18.0))
+        .mt(px(1.0))
+        .flex_shrink_0()
         .flex()
         .items_center()
         .justify_center()

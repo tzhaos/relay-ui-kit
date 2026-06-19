@@ -2,8 +2,8 @@ use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px,
 use relay_ui_kit::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow,
-    SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle,
-    Tone,
+    SettingsSection, Skeleton, Slider, TextInputAction, Theme, ThemePreviewCard, ThemePreviewKind,
+    Toast, Toggle, Tone,
 };
 
 use super::{
@@ -66,7 +66,7 @@ pub(super) fn render(
                 .row(
                     SettingsRow::new("UI font size")
                         .description("Stepper controls mutate gallery state")
-                        .control(font_size_input(state, host)),
+                        .control(font_size_input(state, host, window)),
                 )
                 .row(
                     SettingsRow::new("Contrast")
@@ -181,9 +181,10 @@ fn theme_select(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl I
     .open(state.settings_select_open)
     .on_toggle({
         let host = host.clone();
+        let open = state.settings_select_open;
         move |_event, _window, cx| {
             host.update(cx, |this, cx| {
-                this.state.settings_select_open = !this.state.settings_select_open;
+                this.state.settings_select_open = !open;
                 cx.notify();
             });
         }
@@ -193,6 +194,15 @@ fn theme_select(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl I
         move |key, _window, cx| {
             host.update(cx, |this, cx| {
                 this.state.theme_choice = key;
+                this.state.settings_select_open = false;
+                cx.notify();
+            });
+        }
+    })
+    .on_dismiss({
+        let host = host.clone();
+        move |_window, cx| {
+            host.update(cx, |this, cx| {
                 this.state.settings_select_open = false;
                 cx.notify();
             });
@@ -274,14 +284,41 @@ fn accent_picker(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
     })
 }
 
-fn font_size_input(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn font_size_input(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    window: &Window,
+) -> impl IntoElement {
+    let focused = state.ui_font_size_focus.is_focused(window);
+
     NumberInput::new("settings-ui-font-size", state.ui_font_size)
+        .editable(state.ui_font_size_focus.clone(), &state.ui_font_size_input)
+        .focused(focused)
         .suffix("px")
+        .on_key({
+            let host = host.clone();
+            move |event, _window, cx| {
+                host.update(cx, |this, cx| {
+                    match this.state.ui_font_size_input.handle_key(event) {
+                        TextInputAction::Edited | TextInputAction::Submit => {
+                            sync_font_size_from_input(&mut this.state);
+                            cx.notify();
+                        }
+                        TextInputAction::Cancel => {
+                            sync_font_size_text(&mut this.state);
+                            cx.notify();
+                        }
+                        TextInputAction::Ignored => {}
+                    }
+                });
+            }
+        })
         .on_decrement({
             let host = host.clone();
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
                     this.state.ui_font_size = (this.state.ui_font_size - 1).max(11);
+                    sync_font_size_text(&mut this.state);
                     cx.notify();
                 });
             }
@@ -291,14 +328,36 @@ fn font_size_input(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> imp
             move |_event, _window, cx| {
                 host.update(cx, |this, cx| {
                     this.state.ui_font_size = (this.state.ui_font_size + 1).min(18);
+                    sync_font_size_text(&mut this.state);
                     cx.notify();
                 });
             }
         })
 }
 
+fn sync_font_size_from_input(state: &mut GalleryState) {
+    if let Ok(value) = state.ui_font_size_input.value().parse::<i32>() {
+        state.ui_font_size = value.clamp(11, 18);
+    }
+}
+
+fn sync_font_size_text(state: &mut GalleryState) {
+    state
+        .ui_font_size_input
+        .set_text(state.ui_font_size.to_string());
+}
+
 fn contrast_slider(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     Slider::new("settings-contrast", state.contrast, 0.0, 100.0)
+        .on_change({
+            let host = host.clone();
+            move |value, _window, cx| {
+                host.update(cx, |this, cx| {
+                    this.state.contrast = value;
+                    cx.notify();
+                });
+            }
+        })
         .on_decrement({
             let host = host.clone();
             move |_event, _window, cx| {

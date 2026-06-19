@@ -13,6 +13,7 @@ use crate::{
 
 type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
+type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 
 /// One option in a [`Select`].
 pub struct SelectOption {
@@ -53,6 +54,7 @@ pub struct Select {
     placeholder: String,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SelectHandler>,
+    on_dismiss: Option<DismissHandler>,
 }
 
 impl Select {
@@ -69,6 +71,7 @@ impl Select {
             placeholder: "Select".into(),
             on_toggle: None,
             on_select: None,
+            on_dismiss: None,
         }
     }
 
@@ -98,6 +101,11 @@ impl Select {
         self
     }
 
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Box::new(handler));
+        self
+    }
+
     pub fn selected_label(&self) -> &str {
         self.options
             .iter()
@@ -112,6 +120,7 @@ impl RenderOnce for Select {
         let label = self.selected_label().to_string();
         let selected_key = self.selected_key;
         let select_handler = self.on_select.map(Rc::new);
+        let dismiss_handler = self.on_dismiss;
         let mut root = div().id(self.id).relative().flex().items_center().child(
             div()
                 .id("select-trigger")
@@ -175,8 +184,13 @@ impl RenderOnce for Select {
                 }
                 items.push(item);
             }
-            root = root
-                .child(overlay(Menu::new("select-menu", items).min_width(220.0)).offset(0.0, 34.0));
+            let menu = overlay(Menu::new("select-menu", items).min_width(220.0)).offset(0.0, 32.0);
+            let menu = if let Some(dismiss_handler) = dismiss_handler {
+                menu.on_dismiss(dismiss_handler)
+            } else {
+                menu
+            };
+            root = root.child(menu);
         }
 
         root

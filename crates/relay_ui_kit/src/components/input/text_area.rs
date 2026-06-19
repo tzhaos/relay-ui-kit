@@ -20,6 +20,7 @@ pub struct TextArea {
     placeholder: String,
     focused: bool,
     min_rows: usize,
+    bordered: bool,
     key_context: &'static str,
     on_key: Option<KeyHandler>,
 }
@@ -36,6 +37,7 @@ impl TextArea {
             placeholder: String::new(),
             focused: false,
             min_rows: 3,
+            bordered: true,
             key_context: "TextArea",
             on_key: None,
         }
@@ -53,6 +55,11 @@ impl TextArea {
 
     pub fn min_rows(mut self, rows: usize) -> Self {
         self.min_rows = rows.max(2);
+        self
+    }
+
+    pub fn bordered(mut self, bordered: bool) -> Self {
+        self.bordered = bordered;
         self
     }
 
@@ -89,9 +96,10 @@ impl RenderOnce for TextArea {
             .w_full()
             .p_2()
             .rounded(px(radius::MD))
-            .bg(theme.panel)
-            .border_1()
-            .border_color(border)
+            .when(self.bordered, |this| {
+                this.bg(theme.panel).border_1().border_color(border)
+            })
+            .when(!self.bordered, |this| this.bg(gpui::transparent_black()))
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)

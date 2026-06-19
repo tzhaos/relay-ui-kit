@@ -65,6 +65,24 @@ enum WindowControlKind {
 }
 
 impl WindowControlKind {
+    fn id(self) -> &'static str {
+        match self {
+            WindowControlKind::Minimize => "window-control-minimize",
+            WindowControlKind::Maximize => "window-control-maximize",
+            WindowControlKind::Restore => "window-control-restore",
+            WindowControlKind::Close => "window-control-close",
+        }
+    }
+
+    fn group(self) -> &'static str {
+        match self {
+            WindowControlKind::Minimize => "window-control-minimize-hover",
+            WindowControlKind::Maximize => "window-control-maximize-hover",
+            WindowControlKind::Restore => "window-control-restore-hover",
+            WindowControlKind::Close => "window-control-close-hover",
+        }
+    }
+
     fn glyph(self) -> &'static str {
         if cfg!(target_os = "windows") {
             return match self {
@@ -92,8 +110,12 @@ fn window_control_button(
     theme: Theme,
     area: WindowControlArea,
     kind: WindowControlKind,
-) -> gpui::Div {
+) -> impl IntoElement {
+    let group = kind.group();
+
     div()
+        .id(kind.id())
+        .group(group)
         .w(px(36.0))
         .h_full()
         .flex()
@@ -103,14 +125,20 @@ fn window_control_button(
         .text_size(px(10.0))
         .line_height(px(10.0))
         .font_weight(FontWeight::MEDIUM)
-        .text_color(theme.text_muted)
         .window_control_area(area)
-        .hover(move |style| {
-            style
-                .bg(window_control_hover_background(theme, kind))
-                .text_color(window_control_hover_foreground(theme, kind))
-        })
-        .child(kind.glyph())
+        .hover(move |style| style.bg(window_control_hover_background(theme, kind)))
+        .child(
+            div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_color(theme.text_muted)
+                .group_hover(group, move |style| {
+                    style.text_color(window_control_hover_foreground(theme, kind))
+                })
+                .child(kind.glyph()),
+        )
 }
 
 fn window_control_font_family() -> &'static str {
@@ -149,6 +177,11 @@ mod tests {
     #[test]
     fn window_control_glyphs_are_not_empty() {
         assert!(!WindowControlKind::Minimize.glyph().is_empty());
+    }
+
+    #[test]
+    fn window_control_ids_are_stable() {
+        assert_eq!(WindowControlKind::Close.id(), "window-control-close");
     }
 
     #[test]

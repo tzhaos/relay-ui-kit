@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::{
-    selector::SelectHandler,
+    selector::{DismissHandler, SelectHandler},
     types::{BranchOption, BranchPickerAction},
 };
 
@@ -21,8 +21,9 @@ pub(super) fn branch_picker_panel(
     actions: Vec<BranchPickerAction>,
     select_handler: Option<SelectHandler>,
     action_handler: Option<SelectHandler>,
+    dismiss_handler: Option<DismissHandler>,
 ) -> impl IntoElement {
-    overlay(
+    let panel = overlay(
         BranchPickerPanel {
             selected_key,
             branches,
@@ -32,7 +33,13 @@ pub(super) fn branch_picker_panel(
         }
         .into_any_element(),
     )
-    .offset(0.0, 34.0)
+    .offset(0.0, 32.0);
+
+    if let Some(dismiss_handler) = dismiss_handler {
+        panel.on_dismiss(move |window, cx| dismiss_handler(window, cx))
+    } else {
+        panel
+    }
 }
 
 #[derive(IntoElement)]

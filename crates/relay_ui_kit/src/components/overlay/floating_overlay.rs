@@ -1,6 +1,6 @@
 use gpui::{
-    Anchor, AnyElement, App, IntoElement, ParentElement, RenderOnce, Styled, Window, anchored,
-    deferred, div, px,
+    Anchor, AnyElement, App, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
+    Window, anchored, deferred, div, prelude::FluentBuilder, px,
 };
 
 type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
@@ -47,7 +47,7 @@ impl Overlay {
 
 impl RenderOnce for Overlay {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let _on_dismiss = self.on_dismiss;
+        let on_dismiss = self.on_dismiss;
         deferred(
             anchored()
                 .snap_to_window_with_margin(px(8.0))
@@ -57,7 +57,13 @@ impl RenderOnce for Overlay {
                         .absolute()
                         .left(px(self.left))
                         .top(px(self.top))
-                        .child(self.content),
+                        .occlude()
+                        .child(self.content)
+                        .when_some(on_dismiss, |this, on_dismiss| {
+                            this.on_mouse_down_out(move |_event, window, cx| {
+                                on_dismiss(window, cx);
+                            })
+                        }),
                 ),
         )
         .with_priority(1)

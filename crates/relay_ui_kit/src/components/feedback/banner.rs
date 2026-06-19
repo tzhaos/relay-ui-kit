@@ -61,6 +61,7 @@ impl RenderOnce for Banner {
             .border_1()
             .border_color(self.tone.soft_border(&theme))
             .bg(self.tone.soft_bg(&theme))
+            .items_start()
             .child(feedback_icon(tone_icon(self.tone), fg))
             .child(
                 div()
@@ -71,8 +72,8 @@ impl RenderOnce for Banner {
                     .gap(px(1.0))
                     .child(
                         div()
-                            .truncate()
                             .text_sm()
+                            .line_height(px(18.0))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(theme.text)
                             .child(self.title),
@@ -80,13 +81,15 @@ impl RenderOnce for Banner {
                     .when_some(self.detail, |this, detail| {
                         this.child(
                             div()
-                                .truncate()
                                 .text_xs()
+                                .line_height(px(16.0))
                                 .text_color(theme.text_muted)
                                 .child(detail),
                         )
                     }),
             )
-            .when_some(self.action, |this, action| this.child(action))
+            .when_some(self.action, |this, action| {
+                this.child(div().flex_shrink_0().child(action))
+            })
     }
 }

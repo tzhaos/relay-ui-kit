@@ -14,6 +14,7 @@ use super::panel::{branch_picker_panel, default_picker_actions};
 use super::types::{BranchOption, BranchPickerAction};
 
 type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
+pub(super) type DismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 pub(super) type SelectHandler = Rc<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// Compact branch selector for title bars and pane toolbars.
@@ -27,6 +28,7 @@ pub struct BranchSelector {
     on_toggle: Option<ClickHandler>,
     on_select: Option<SelectHandler>,
     on_action: Option<SelectHandler>,
+    on_dismiss: Option<DismissHandler>,
 }
 
 impl BranchSelector {
@@ -44,6 +46,7 @@ impl BranchSelector {
             on_toggle: None,
             on_select: None,
             on_action: None,
+            on_dismiss: None,
         }
     }
 
@@ -81,6 +84,11 @@ impl BranchSelector {
         self
     }
 
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Rc::new(handler));
+        self
+    }
+
     pub fn selected_label(&self) -> &str {
         self.branches
             .iter()
@@ -96,6 +104,7 @@ impl RenderOnce for BranchSelector {
         let selected_key = self.selected_key;
         let select_handler = self.on_select;
         let action_handler = self.on_action;
+        let dismiss_handler = self.on_dismiss;
         let trigger_handler = self.on_toggle;
         let mut root = div().id(self.id).relative().flex().items_center().child(
             div()
@@ -154,6 +163,7 @@ impl RenderOnce for BranchSelector {
                 self.actions,
                 select_handler,
                 action_handler,
+                dismiss_handler,
             ));
         }
 
