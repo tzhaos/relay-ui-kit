@@ -1,4 +1,4 @@
-use gpui::{App, Corner, ElementId, IntoElement, RenderOnce, Window};
+use gpui::{Anchor, App, ElementId, IntoElement, RenderOnce, Window};
 
 use super::{Menu, MenuItem, overlay};
 
@@ -10,7 +10,7 @@ pub struct ContextMenu {
     min_width: f32,
     left: f32,
     top: f32,
-    corner: Corner,
+    anchor: Anchor,
 }
 
 impl ContextMenu {
@@ -21,7 +21,7 @@ impl ContextMenu {
             min_width: 180.0,
             left: 0.0,
             top: 0.0,
-            corner: Corner::TopLeft,
+            anchor: Anchor::TopLeft,
         }
     }
 
@@ -36,8 +36,8 @@ impl ContextMenu {
         self
     }
 
-    pub fn anchor(mut self, corner: Corner) -> Self {
-        self.corner = corner;
+    pub fn anchor(mut self, anchor: Anchor) -> Self {
+        self.anchor = anchor;
         self
     }
 }
@@ -45,7 +45,7 @@ impl ContextMenu {
 impl RenderOnce for ContextMenu {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         overlay(Menu::new(self.id, self.items).min_width(self.min_width))
-            .anchor(self.corner)
+            .anchor(self.anchor)
             .offset(self.left, self.top)
     }
 }

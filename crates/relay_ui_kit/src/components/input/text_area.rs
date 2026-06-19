@@ -126,8 +126,8 @@ impl RenderOnce for TextArea {
                     cx.stop_propagation();
                 })
             })
-            .on_click(move |_, window, _| {
-                window.focus(&focus_for_click);
+            .on_click(move |_, window, cx| {
+                window.focus(&focus_for_click, cx);
             })
     }
 }

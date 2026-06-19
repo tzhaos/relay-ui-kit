@@ -205,6 +205,7 @@ mod tests {
                 ..Default::default()
             },
             is_held: false,
+            prefer_character_input: false,
         }
     }
 

@@ -113,8 +113,8 @@ impl RenderOnce for SearchField {
                     }
                 })
             })
-            .on_click(move |_: &ClickEvent, window, _| {
-                window.focus(&focus_for_click);
+            .on_click(move |_: &ClickEvent, window, cx| {
+                window.focus(&focus_for_click, cx);
             })
     }
 }

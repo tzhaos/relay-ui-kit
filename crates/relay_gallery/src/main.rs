@@ -27,10 +27,10 @@ mod gallery;
 mod workbench_demo;
 
 use gpui::{
-    AnyElement, AnyView, App, AppContext, Application, Bounds, Context, IntoElement, ParentElement,
-    Render, StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div,
-    px, size,
+    AnyElement, AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
+    StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
+use gpui_platform::application;
 use relay_ui_kit::{
     ActiveTheme, IconName, KitAssets, NavRow, TitleBar, WorkspaceBreadcrumb, theme,
 };
@@ -234,23 +234,21 @@ fn cached_scene(scene: impl Into<AnyView>) -> AnyElement {
 }
 
 fn main() {
-    Application::new()
-        .with_assets(KitAssets)
-        .run(|cx: &mut App| {
-            theme::init(cx);
-            let bounds = Bounds::centered(None, size(px(1440.0), px(900.0)), cx);
-            cx.open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: None,
-                    window_decorations: Some(WindowDecorations::Client),
-                    window_min_size: Some(size(px(1180.0), px(780.0))),
-                    app_id: Some("relay-gallery".to_string()),
-                    ..Default::default()
-                },
-                |_, cx| cx.new(GalleryApp::new),
-            )
-            .expect("open gallery window");
-            cx.activate(true);
-        });
+    application().with_assets(KitAssets).run(|cx: &mut App| {
+        theme::init(cx);
+        let bounds = Bounds::centered(None, size(px(1440.0), px(900.0)), cx);
+        cx.open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: None,
+                window_decorations: Some(WindowDecorations::Client),
+                window_min_size: Some(size(px(1180.0), px(780.0))),
+                app_id: Some("relay-gallery".to_string()),
+                ..Default::default()
+            },
+            |_, cx| cx.new(GalleryApp::new),
+        )
+        .expect("open gallery window");
+        cx.activate(true);
+    });
 }

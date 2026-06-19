@@ -1,5 +1,5 @@
 use gpui::{
-    AnyElement, App, Corner, IntoElement, ParentElement, RenderOnce, Styled, Window, anchored,
+    Anchor, AnyElement, App, IntoElement, ParentElement, RenderOnce, Styled, Window, anchored,
     deferred, div, px,
 };
 
@@ -11,7 +11,7 @@ pub struct Overlay {
     content: AnyElement,
     top: f32,
     left: f32,
-    corner: Corner,
+    anchor: Anchor,
     on_dismiss: Option<DismissHandler>,
 }
 
@@ -21,7 +21,7 @@ pub fn overlay(content: impl IntoElement) -> Overlay {
         content: content.into_any_element(),
         top: 0.0,
         left: 0.0,
-        corner: Corner::TopLeft,
+        anchor: Anchor::TopLeft,
         on_dismiss: None,
     }
 }
@@ -34,8 +34,8 @@ impl Overlay {
         self
     }
 
-    pub fn anchor(mut self, corner: Corner) -> Self {
-        self.corner = corner;
+    pub fn anchor(mut self, anchor: Anchor) -> Self {
+        self.anchor = anchor;
         self
     }
 
@@ -51,7 +51,7 @@ impl RenderOnce for Overlay {
         deferred(
             anchored()
                 .snap_to_window_with_margin(px(8.0))
-                .anchor(self.corner)
+                .anchor(self.anchor)
                 .child(
                     div()
                         .absolute()
