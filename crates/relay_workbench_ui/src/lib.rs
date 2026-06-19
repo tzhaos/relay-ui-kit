@@ -1,17 +1,11 @@
-//! Facade crate for the Relay UI layers.
+//! Relay workbench UI compositions.
 //!
-//! New code can depend on the specific layer it needs:
-//! `relay_ui_primitives`, `relay_ui_components`, or `relay_workbench_ui`.
-//! This crate keeps the historic `relay_ui_kit::*` import surface intact for the
-//! gallery and downstream callers while the implementation is physically split.
+//! This layer is allowed to speak in Relay product terms such as terminals,
+//! agents, git branches, launchers, and read-only file viewers.
 
-pub mod prelude;
+pub mod workbench;
 
-pub use relay_ui_components::{
-    AppShell, KeyValue, ListSection, Pane, PaneSurface, PaneToolbar, PaneWidth, ScrollSurface,
-    SplitAxis, SplitPane, SplitPaneState, StatusBar, StatusItem, Tab, Tabs, TitleBar, TopToolbar,
-    WindowControls, WorkspaceBreadcrumb, layout, shell, structure,
-};
+pub use relay_ui_components::{layout, shell, structure};
 pub use relay_ui_primitives::{
     ActiveTheme, Badge, BadgeStyle, Banner, Button, ButtonVariant, Callout, Checkbox, ColorField,
     ColorPicker, ColorPreset, ColorSwatch, CommandPalette, CommandRow, ConfirmDialog, ContextMenu,
@@ -28,10 +22,17 @@ pub use relay_ui_primitives::{
     components, controls, display, feedback, form, icon, input, interaction, list, motion, overlay,
     radius, row, space, styles, theme, tone,
 };
-pub use relay_workbench_ui::{
-    AgentQuickLaunch, BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction,
-    BranchSelector, CodeView, Composer, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind,
-    FileView, LauncherItem, LauncherItemKind, LauncherMenu, MarkdownView, TerminalLine,
-    TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab,
-    TerminalToolbar, TerminalTranscript, composer, git, launcher, terminal, viewer, workbench,
+pub use workbench::{composer, git, launcher, terminal, viewer};
+
+pub use composer::Composer;
+pub use git::{
+    BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
+};
+pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
+pub use terminal::{
+    AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
+    TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
+};
+pub use viewer::{
+    CodeView, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView, MarkdownView,
 };

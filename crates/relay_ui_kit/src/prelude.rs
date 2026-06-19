@@ -5,7 +5,7 @@ pub use gpui::{
     Styled, Window, div, px, relative,
 };
 
-pub use crate::components::*;
-pub use crate::layout::*;
-pub use crate::styles::*;
-pub use crate::workbench::*;
+pub use relay_ui_components::layout::*;
+pub use relay_ui_primitives::components::*;
+pub use relay_ui_primitives::styles::*;
+pub use relay_workbench_ui::workbench::*;
