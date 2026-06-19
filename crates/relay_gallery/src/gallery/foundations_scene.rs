@@ -2,7 +2,8 @@ use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::Fl
 use relay_ui_kit::{
     Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, Icon, IconButton,
     IconName, Label, LabelSize, ListItem, NavRow, SectionedList, SectionedListGroup, Segment,
-    SegmentedControl, Tab, Tabs, TaskRow, TaskRowData, Theme, Tone, TreeNode, TreeRow, TreeView,
+    SegmentedControl, Tab, Tabs, TaskRow, TaskRowData, Theme, Tone, ToolbarGroup, TreeNode,
+    TreeRow, TreeView,
 };
 
 use super::{
@@ -191,37 +192,40 @@ fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
 fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
-            IconButton::new("ib-filter", IconName::ListFilter).on_click({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.seg_tab = "files";
-                        cx.notify();
-                    });
-                }
-            }),
-        )
-        .child(
-            IconButton::new("ib-refresh", IconName::RefreshCw).on_click({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.search_input.clear();
-                        cx.notify();
-                    });
-                }
-            }),
-        )
-        .child(
-            IconButton::new("ib-settings", IconName::Settings).on_click({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.launcher_choice = "settings";
-                        cx.notify();
-                    });
-                }
-            }),
+            ToolbarGroup::new("foundation-toolbar-group")
+                .child(
+                    IconButton::new("ib-filter", IconName::ListFilter).on_click({
+                        let host = host.clone();
+                        move |_event, _window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.seg_tab = "files";
+                                cx.notify();
+                            });
+                        }
+                    }),
+                )
+                .child(
+                    IconButton::new("ib-refresh", IconName::RefreshCw).on_click({
+                        let host = host.clone();
+                        move |_event, _window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.search_input.clear();
+                                cx.notify();
+                            });
+                        }
+                    }),
+                )
+                .child(
+                    IconButton::new("ib-settings", IconName::Settings).on_click({
+                        let host = host.clone();
+                        move |_event, _window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.launcher_choice = "settings";
+                                cx.notify();
+                            });
+                        }
+                    }),
+                ),
         )
         .child(IconButton::new("ib-active", IconName::PanelLeft).active(true))
 }

@@ -1,6 +1,7 @@
 //! Feedback components for loading, progress, errors, and transient notices.
 
 mod banner;
+mod callout;
 mod inline_error;
 mod loading_spinner;
 mod progress_bar;
@@ -9,6 +10,7 @@ mod skeleton;
 mod toast;
 
 pub use banner::Banner;
+pub use callout::Callout;
 pub use inline_error::InlineError;
 pub use loading_spinner::LoadingSpinner;
 pub use progress_bar::ProgressBar;

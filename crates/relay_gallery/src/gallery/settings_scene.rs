@@ -1,8 +1,8 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px};
 use relay_ui_kit::{
-    Badge, Banner, Button, Checkbox, ColorField, EmptyState, IconName, InlineError, LoadingSpinner,
-    NumberInput, ProgressBar, Select, SelectOption, SettingsRow, SettingsSection, Skeleton, Slider,
-    Theme, Toast, Toggle, Tone,
+    Badge, Banner, Button, Callout, Checkbox, ColorField, EmptyState, IconName, InlineError,
+    LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow, SettingsSection,
+    Skeleton, Slider, Theme, Toast, Toggle, Tone,
 };
 
 use super::{
@@ -113,6 +113,11 @@ pub(super) fn render(
                                 }
                             }),
                         ),
+                )
+                .child(
+                    Callout::new("Shell path will be validated by the host")
+                        .detail("The UI kit only renders the state; Relay should perform the actual command lookup before spawning a terminal.")
+                        .tone(Tone::Info),
                 )
                 .child(
                     strip()

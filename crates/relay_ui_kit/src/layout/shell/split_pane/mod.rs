@@ -1,17 +1,22 @@
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, AppContext, DragMoveEvent, Empty, Entity, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
+    Window, div, prelude::FluentBuilder, px,
 };
 
+mod drag;
 mod geometry;
+mod handle;
+mod handlers;
 mod state;
 
 use crate::theme::{ActiveTheme, space};
 
-use geometry::{clamp_split_size, should_emit_resize, snap_split_size};
+use drag::{DraggedSplitPane, split_size_from_drag};
+use geometry::{should_emit_resize, snap_split_size};
+use handle::render_split_handle;
+use handlers::{ResizeEndHandler, ResizeHandler, resize_end_handler, resize_handler};
 pub use state::SplitPaneState;
 
 /// Split direction for [`SplitPane`].
@@ -20,14 +25,6 @@ pub enum SplitAxis {
     Horizontal,
     Vertical,
 }
-
-#[derive(Clone)]
-struct DraggedSplitPane {
-    id: &'static str,
-}
-
-type ResizeHandler = Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
-type ResizeEndHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
 /// A two-pane layout with a draggable divider.
 #[derive(IntoElement)]
@@ -93,7 +90,7 @@ impl SplitPane {
 }
 
 impl RenderOnce for SplitPane {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let id = self.id;
         let axis = self.axis;
@@ -107,7 +104,7 @@ impl RenderOnce for SplitPane {
         let first_size = snap_split_size(state_first_size);
         let handler = resize_handler(state.clone(), self.on_resize);
         let resize_end = resize_end_handler(state, self.on_resize_end);
-        let handle = split_handle(id, axis, handler.clone());
+        let handle = render_split_handle(id, axis, handler.is_some(), window, cx);
 
         let first = match axis {
             SplitAxis::Horizontal => div()
@@ -157,110 +154,4 @@ impl RenderOnce for SplitPane {
                 })
             })
     }
-}
-
-fn resize_handler(
-    state: Option<Entity<SplitPaneState>>,
-    external: Option<ResizeHandler>,
-) -> Option<ResizeHandler> {
-    if state.is_none() && external.is_none() {
-        return None;
-    }
-
-    Some(Rc::new(move |next, window, cx| {
-        if let Some(state) = &state {
-            state.update(cx, |state, cx| {
-                if state.preview_resize_to(next) {
-                    cx.notify();
-                }
-            });
-        }
-        if let Some(external) = &external {
-            external(next, window, cx);
-        }
-    }))
-}
-
-fn resize_end_handler(
-    state: Option<Entity<SplitPaneState>>,
-    external: Option<ResizeEndHandler>,
-) -> Option<ResizeEndHandler> {
-    if state.is_none() && external.is_none() {
-        return None;
-    }
-
-    Some(Rc::new(move |window, cx| {
-        if let Some(state) = &state {
-            state.update(cx, |state, cx| {
-                if state.commit_resize() {
-                    cx.notify();
-                }
-            });
-        }
-        if let Some(external) = &external {
-            external(window, cx);
-        }
-    }))
-}
-
-fn split_size_from_drag(
-    event: &DragMoveEvent<DraggedSplitPane>,
-    axis: SplitAxis,
-    min_first: f32,
-    min_second: f32,
-) -> f32 {
-    let total = match axis {
-        SplitAxis::Horizontal => f32::from(event.bounds.size.width),
-        SplitAxis::Vertical => f32::from(event.bounds.size.height),
-    };
-    let raw = match axis {
-        SplitAxis::Horizontal => f32::from(event.event.position.x - event.bounds.left()),
-        SplitAxis::Vertical => f32::from(event.event.position.y - event.bounds.top()),
-    };
-    snap_split_size(clamp_split_size(raw, total, min_first, min_second))
-}
-
-fn split_handle(id: &'static str, axis: SplitAxis, handler: Option<ResizeHandler>) -> gpui::Div {
-    let divider = match axis {
-        SplitAxis::Horizontal => div().w(px(1.0)).h_full(),
-        SplitAxis::Vertical => div().h(px(1.0)).w_full(),
-    };
-    let interactive = match axis {
-        SplitAxis::Horizontal => div()
-            .id((id, 0usize))
-            .absolute()
-            .left(px(-3.0))
-            .top_0()
-            .w(px(7.0))
-            .h_full()
-            .cursor_col_resize(),
-        SplitAxis::Vertical => div()
-            .id((id, 0usize))
-            .absolute()
-            .top(px(-3.0))
-            .left_0()
-            .h(px(7.0))
-            .w_full()
-            .cursor_row_resize(),
-    };
-
-    divider
-        .relative()
-        .flex_shrink_0()
-        .bg(gpui::transparent_black())
-        .child(
-            interactive
-                .when_some(handler, |this, _handler| {
-                    this.on_mouse_down(MouseButton::Left, |_, _, cx| {
-                        cx.stop_propagation();
-                    })
-                    .on_drag(DraggedSplitPane { id }, |_, _, _window, cx| {
-                        cx.new(|_| Empty)
-                    })
-                    .on_drop::<DraggedSplitPane>(|_, _, cx| {
-                        cx.stop_propagation();
-                    })
-                })
-                .hover(move |style| style.bg(gpui::black().opacity(0.08))),
-        )
 }

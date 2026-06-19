@@ -41,12 +41,12 @@ pub use components::overlay::{
 pub use composer::Composer;
 pub use controls::{
     ColorField, ColorSwatch, Disclosure, PanelHeader, SearchField, Segment, SegmentedControl,
-    Select, SelectOption, Slider,
+    Select, SelectOption, Slider, ToolbarGroup,
 };
 pub use display::{
     Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
 };
-pub use feedback::{Banner, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
+pub use feedback::{Banner, Callout, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
 pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use git::{
     BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
