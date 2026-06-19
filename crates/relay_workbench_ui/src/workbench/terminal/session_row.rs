@@ -5,13 +5,12 @@ use gpui::{
 
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
+    interaction::ClickHandler,
     theme::{ActiveTheme, radius},
     tone::Tone,
 };
 
 use super::TerminalStatusBadge;
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// One row in the terminal/session history panel.
 #[derive(IntoElement)]

@@ -6,13 +6,11 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::ClickHandler,
+    interaction::{ClickHandler, KeyHandler},
     theme::{ActiveTheme, radius},
 };
 
 use super::TextInputState;
-
-type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) + 'static>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberInputLayout {

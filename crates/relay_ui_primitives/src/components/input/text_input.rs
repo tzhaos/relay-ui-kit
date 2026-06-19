@@ -6,12 +6,11 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::KeyHandler,
     theme::{ActiveTheme, radius},
 };
 
 use super::TextInputState;
-
-type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) + 'static>;
 
 /// A single-line text input view. The host owns the editable state.
 #[derive(IntoElement)]

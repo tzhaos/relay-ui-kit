@@ -3,7 +3,10 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
+use crate::{
+    interaction::SelectHandler,
+    theme::{ActiveTheme, radius},
+};
 
 /// One labelled segment in a [`SegmentedControl`].
 pub struct Segment {
@@ -16,8 +19,6 @@ impl Segment {
         Self { key, label }
     }
 }
-
-type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// A pill-grouped segmented control.
 #[derive(IntoElement)]

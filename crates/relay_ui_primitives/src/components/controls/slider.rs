@@ -8,11 +8,9 @@ use std::rc::Rc;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::{ClickHandler, SharedChangeHandler},
     theme::{ActiveTheme, radius},
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
-type ChangeHandler = Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
 
 /// A compact horizontal slider with optional step callbacks.
 #[derive(IntoElement)]
@@ -23,7 +21,7 @@ pub struct Slider {
     max: f32,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
-    on_change: Option<ChangeHandler>,
+    on_change: Option<SharedChangeHandler<f32>>,
 }
 
 impl Slider {

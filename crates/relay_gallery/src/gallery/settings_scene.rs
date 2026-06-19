@@ -304,10 +304,11 @@ fn font_size_input(
                         .ui_font_size_input
                         .handle_integer_key(event, false)
                     {
-                        TextInputAction::Edited | TextInputAction::Submit => {
+                        TextInputAction::Changed | TextInputAction::Submit => {
                             sync_font_size_from_input(&mut this.state);
                             cx.notify();
                         }
+                        TextInputAction::CursorMoved => cx.notify(),
                         TextInputAction::Cancel => {
                             sync_font_size_text(&mut this.state);
                             cx.notify();

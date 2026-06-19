@@ -11,12 +11,15 @@ mod handle;
 mod handlers;
 mod state;
 
-use relay_ui_primitives::theme::{ActiveTheme, space};
+use relay_ui_primitives::{
+    interaction::{SharedChangeHandler, SharedDismissHandler},
+    theme::{ActiveTheme, space},
+};
 
 use drag::{DraggedSplitPane, split_size_from_drag};
 use geometry::{should_emit_resize, snap_split_size};
 use handle::render_split_handle;
-use handlers::{ResizeEndHandler, ResizeHandler, resize_end_handler, resize_handler};
+use handlers::{resize_end_handler, resize_handler};
 pub use state::SplitPaneState;
 
 /// Split direction for [`SplitPane`].
@@ -37,8 +40,8 @@ pub struct SplitPane {
     state: Option<Entity<SplitPaneState>>,
     min_first: f32,
     min_second: f32,
-    on_resize: Option<ResizeHandler>,
-    on_resize_end: Option<ResizeEndHandler>,
+    on_resize: Option<SharedChangeHandler<f32>>,
+    on_resize_end: Option<SharedDismissHandler>,
 }
 
 impl SplitPane {

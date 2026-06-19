@@ -3,7 +3,7 @@ use gpui::{
     Window, anchored, deferred, div, prelude::FluentBuilder, px,
 };
 
-type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
+use crate::interaction::DismissHandler;
 
 /// Anchored floating content with window-edge snapping.
 #[derive(IntoElement)]

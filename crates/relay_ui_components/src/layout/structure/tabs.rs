@@ -5,6 +5,7 @@ use gpui::{
 
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
+    interaction::SelectHandler,
     theme::ActiveTheme,
 };
 
@@ -36,8 +37,6 @@ impl Tab {
         self
     }
 }
-
-type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// An underline tab bar.
 #[derive(IntoElement)]

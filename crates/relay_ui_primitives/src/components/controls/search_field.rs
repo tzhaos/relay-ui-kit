@@ -6,10 +6,9 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::KeyCaptureHandler,
     theme::{ActiveTheme, radius},
 };
-
-type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) -> bool + 'static>;
 
 /// A focusable search/filter well with a leading magnifier icon.
 #[derive(IntoElement)]
@@ -19,7 +18,7 @@ pub struct SearchField {
     value: String,
     placeholder: String,
     key_context: &'static str,
-    on_key: Option<KeyHandler>,
+    on_key: Option<KeyCaptureHandler>,
 }
 
 impl SearchField {

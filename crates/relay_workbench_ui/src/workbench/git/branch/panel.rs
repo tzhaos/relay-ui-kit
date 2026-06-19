@@ -6,22 +6,20 @@ use gpui::{
 use relay_ui_primitives::{
     components::overlay::overlay,
     icon::{Icon, IconName, IconSize},
+    interaction::{SharedDismissHandler, SharedSelectHandler},
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, radius, space},
 };
 
-use super::{
-    selector::{DismissHandler, SelectHandler},
-    types::{BranchOption, BranchPickerAction},
-};
+use super::types::{BranchOption, BranchPickerAction};
 
 pub(super) fn branch_picker_panel(
     selected_key: &'static str,
     branches: Vec<BranchOption>,
     actions: Vec<BranchPickerAction>,
-    select_handler: Option<SelectHandler>,
-    action_handler: Option<SelectHandler>,
-    dismiss_handler: Option<DismissHandler>,
+    select_handler: Option<SharedSelectHandler>,
+    action_handler: Option<SharedSelectHandler>,
+    dismiss_handler: Option<SharedDismissHandler>,
 ) -> impl IntoElement {
     let panel = overlay(
         BranchPickerPanel {
@@ -47,8 +45,8 @@ struct BranchPickerPanel {
     selected_key: &'static str,
     branches: Vec<BranchOption>,
     actions: Vec<BranchPickerAction>,
-    select_handler: Option<SelectHandler>,
-    action_handler: Option<SelectHandler>,
+    select_handler: Option<SharedSelectHandler>,
+    action_handler: Option<SharedSelectHandler>,
 }
 
 impl RenderOnce for BranchPickerPanel {

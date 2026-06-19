@@ -5,11 +5,10 @@ use gpui::{
 
 use relay_ui_primitives::{
     display::StatusDot,
+    interaction::ClickHandler,
     theme::{ActiveTheme, radius},
     tone::Tone,
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// A terminal tab in a session tab strip.
 #[derive(IntoElement)]

@@ -1,19 +1,18 @@
-use std::rc::Rc;
-
 use gpui::{App, ElementId, IntoElement, RenderOnce, Window};
 
-use relay_ui_primitives::components::overlay::{Menu, MenuItem};
+use relay_ui_primitives::{
+    components::overlay::{Menu, MenuItem},
+    interaction::SharedActionHandler,
+};
 
 use super::types::BranchActionKind;
-
-type ActionHandler = Rc<dyn Fn(BranchActionKind, &mut Window, &mut App) + 'static>;
 
 /// Context menu for branch management actions.
 #[derive(IntoElement)]
 pub struct BranchActionsMenu {
     id: ElementId,
     actions: Vec<BranchActionKind>,
-    on_select: Option<ActionHandler>,
+    on_select: Option<SharedActionHandler<BranchActionKind>>,
 }
 
 impl BranchActionsMenu {
@@ -39,7 +38,7 @@ impl BranchActionsMenu {
         mut self,
         handler: impl Fn(BranchActionKind, &mut Window, &mut App) + 'static,
     ) -> Self {
-        self.on_select = Some(Rc::new(handler));
+        self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 }

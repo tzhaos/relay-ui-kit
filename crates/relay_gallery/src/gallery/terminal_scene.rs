@@ -60,12 +60,12 @@ fn composer_sample(
             move |event, _window, cx| {
                 host.update(cx, |this, cx| {
                     match this.state.composer_input.handle_multiline_key(event) {
-                        TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
                         TextInputAction::Cancel => {
                             this.state.composer_input.clear();
                             cx.notify();
                         }
-                        TextInputAction::Ignored => {}
+                        action if action.should_notify() => cx.notify(),
+                        _ => {}
                     }
                 });
             }

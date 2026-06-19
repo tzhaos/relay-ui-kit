@@ -1,16 +1,14 @@
 use std::rc::Rc;
 
-use gpui::{App, Entity, Window};
+use gpui::Entity;
+use relay_ui_primitives::interaction::{SharedChangeHandler, SharedDismissHandler};
 
 use super::state::SplitPaneState;
 
-pub(super) type ResizeHandler = Rc<dyn Fn(f32, &mut Window, &mut App) + 'static>;
-pub(super) type ResizeEndHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
-
 pub(super) fn resize_handler(
     state: Option<Entity<SplitPaneState>>,
-    external: Option<ResizeHandler>,
-) -> Option<ResizeHandler> {
+    external: Option<SharedChangeHandler<f32>>,
+) -> Option<SharedChangeHandler<f32>> {
     if state.is_none() && external.is_none() {
         return None;
     }
@@ -33,8 +31,8 @@ pub(super) fn resize_handler(
 
 pub(super) fn resize_end_handler(
     state: Option<Entity<SplitPaneState>>,
-    external: Option<ResizeEndHandler>,
-) -> Option<ResizeEndHandler> {
+    external: Option<SharedDismissHandler>,
+) -> Option<SharedDismissHandler> {
     if state.is_none() && external.is_none() {
         return None;
     }

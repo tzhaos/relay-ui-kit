@@ -3,8 +3,8 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 use relay_ui_primitives::{
-    ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputAction,
-    TextInputState, Theme, Tone, overlay, radius, space,
+    ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
+    Tone, overlay, radius, space,
 };
 use relay_workbench_ui::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
 
@@ -68,11 +68,9 @@ pub(super) fn text_input_field(
                 } else {
                     &mut this.state.search_input
                 };
-                match target.handle_key(event) {
-                    TextInputAction::Edited | TextInputAction::Submit | TextInputAction::Cancel => {
-                        cx.notify()
-                    }
-                    TextInputAction::Ignored => {}
+                let action = target.handle_key(event);
+                if action.should_notify() {
+                    cx.notify();
                 }
             });
         });

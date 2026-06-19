@@ -7,15 +7,12 @@ use gpui::{
 
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
+    interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
     theme::{ActiveTheme, radius},
 };
 
 use super::panel::{branch_picker_panel, default_picker_actions};
 use super::types::{BranchOption, BranchPickerAction};
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
-pub(super) type DismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
-pub(super) type SelectHandler = Rc<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// Compact branch selector for title bars and pane toolbars.
 #[derive(IntoElement)]
@@ -26,9 +23,9 @@ pub struct BranchSelector {
     actions: Vec<BranchPickerAction>,
     open: bool,
     on_toggle: Option<ClickHandler>,
-    on_select: Option<SelectHandler>,
-    on_action: Option<SelectHandler>,
-    on_dismiss: Option<DismissHandler>,
+    on_select: Option<SharedSelectHandler>,
+    on_action: Option<SharedSelectHandler>,
+    on_dismiss: Option<SharedDismissHandler>,
 }
 
 impl BranchSelector {

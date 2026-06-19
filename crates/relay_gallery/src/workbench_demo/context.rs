@@ -129,8 +129,8 @@ fn files_tab(
                                     this.state.filter.clear();
                                     cx.notify();
                                 }
-                                TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
-                                TextInputAction::Ignored => {}
+                                action if action.should_notify() => cx.notify(),
+                                _ => {}
                             }
                         });
                     }),

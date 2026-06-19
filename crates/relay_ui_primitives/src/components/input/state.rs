@@ -9,12 +9,31 @@ pub struct TextInputState {
 }
 
 /// What a keystroke did to the model.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextInputAction {
-    Edited,
+    Changed,
+    CursorMoved,
     Submit,
     Cancel,
     Ignored,
+}
+
+impl TextInputAction {
+    pub fn changes_text(self) -> bool {
+        matches!(self, Self::Changed)
+    }
+
+    pub fn should_notify(self) -> bool {
+        !matches!(self, Self::Ignored)
+    }
+
+    pub fn is_submit(self) -> bool {
+        matches!(self, Self::Submit)
+    }
+
+    pub fn is_cancel(self) -> bool {
+        matches!(self, Self::Cancel)
+    }
 }
 
 impl TextInputState {
@@ -59,28 +78,28 @@ impl TextInputState {
             "escape" => TextInputAction::Cancel,
             "backspace" => {
                 if self.delete_grapheme_before() {
-                    TextInputAction::Edited
+                    TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored
                 }
             }
             "delete" => {
                 if self.delete_grapheme_after() {
-                    TextInputAction::Edited
+                    TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored
                 }
             }
             "left" => {
                 if self.move_left() {
-                    TextInputAction::Edited
+                    TextInputAction::CursorMoved
                 } else {
                     TextInputAction::Ignored
                 }
             }
             "right" => {
                 if self.move_right() {
-                    TextInputAction::Edited
+                    TextInputAction::CursorMoved
                 } else {
                     TextInputAction::Ignored
                 }
@@ -88,7 +107,7 @@ impl TextInputState {
             "home" => {
                 if self.cursor != 0 {
                     self.cursor = 0;
-                    TextInputAction::Edited
+                    TextInputAction::CursorMoved
                 } else {
                     TextInputAction::Ignored
                 }
@@ -96,7 +115,7 @@ impl TextInputState {
             "end" => {
                 if self.cursor != self.value.len() {
                     self.cursor = self.value.len();
-                    TextInputAction::Edited
+                    TextInputAction::CursorMoved
                 } else {
                     TextInputAction::Ignored
                 }
@@ -109,7 +128,7 @@ impl TextInputState {
                 {
                     Some(text) => {
                         self.insert(text);
-                        TextInputAction::Edited
+                        TextInputAction::Changed
                     }
                     None => TextInputAction::Ignored,
                 }
@@ -138,14 +157,14 @@ impl TextInputState {
                 {
                     Some(text) if text.chars().all(|c| c.is_ascii_digit()) => {
                         self.insert(text);
-                        TextInputAction::Edited
+                        TextInputAction::Changed
                     }
                     Some(text) if allow_negative && text == "-" && self.cursor == 0 => {
                         if self.value.starts_with('-') {
                             TextInputAction::Ignored
                         } else {
                             self.insert(text);
-                            TextInputAction::Edited
+                            TextInputAction::Changed
                         }
                     }
                     _ => TextInputAction::Ignored,
@@ -163,7 +182,7 @@ impl TextInputState {
             "enter" if mods.control || mods.platform => TextInputAction::Submit,
             "enter" => {
                 self.insert("\n");
-                TextInputAction::Edited
+                TextInputAction::Changed
             }
             _ => self.handle_key(event),
         }
@@ -249,7 +268,7 @@ mod tests {
     #[test]
     fn typing_inserts_at_cursor() {
         let mut s = TextInputState::new();
-        assert_eq!(s.handle_key(&key("h", Some("h"))), TextInputAction::Edited);
+        assert_eq!(s.handle_key(&key("h", Some("h"))), TextInputAction::Changed);
         s.handle_key(&key("i", Some("i")));
         assert_eq!(s.value(), "hi");
     }
@@ -259,7 +278,7 @@ mod tests {
         let mut s = TextInputState::with_text("hi");
         assert_eq!(
             s.handle_key(&key("backspace", None)),
-            TextInputAction::Edited
+            TextInputAction::Changed
         );
         assert_eq!(s.value(), "h");
     }
@@ -267,9 +286,20 @@ mod tests {
     #[test]
     fn arrows_move_cursor_and_insert_lands_mid_string() {
         let mut s = TextInputState::with_text("ac");
-        assert_eq!(s.handle_key(&key("left", None)), TextInputAction::Edited);
+        assert_eq!(
+            s.handle_key(&key("left", None)),
+            TextInputAction::CursorMoved
+        );
         s.handle_key(&key("b", Some("b")));
         assert_eq!(s.value(), "abc");
+    }
+
+    #[test]
+    fn action_helpers_distinguish_text_changes_from_cursor_motion() {
+        assert!(TextInputAction::Changed.changes_text());
+        assert!(!TextInputAction::CursorMoved.changes_text());
+        assert!(TextInputAction::CursorMoved.should_notify());
+        assert!(!TextInputAction::Ignored.should_notify());
     }
 
     #[test]
@@ -285,7 +315,7 @@ mod tests {
 
         assert_eq!(
             s.handle_multiline_key(&key("enter", None)),
-            TextInputAction::Edited
+            TextInputAction::Changed
         );
         assert_eq!(s.value(), "a\n");
     }
@@ -303,9 +333,15 @@ mod tests {
     #[test]
     fn home_end_jump_to_edges() {
         let mut s = TextInputState::with_text("abc");
-        assert_eq!(s.handle_key(&key("home", None)), TextInputAction::Edited);
+        assert_eq!(
+            s.handle_key(&key("home", None)),
+            TextInputAction::CursorMoved
+        );
         assert_eq!(s.cursor(), 0);
-        assert_eq!(s.handle_key(&key("end", None)), TextInputAction::Edited);
+        assert_eq!(
+            s.handle_key(&key("end", None)),
+            TextInputAction::CursorMoved
+        );
         assert_eq!(s.cursor(), 3);
     }
 
@@ -334,7 +370,7 @@ mod tests {
 
         assert_eq!(
             s.handle_integer_key(&key("1", Some("1")), false),
-            TextInputAction::Edited
+            TextInputAction::Changed
         );
         assert_eq!(s.value(), "1");
     }
@@ -356,7 +392,7 @@ mod tests {
 
         assert_eq!(
             s.handle_integer_key(&key("-", Some("-")), true),
-            TextInputAction::Edited
+            TextInputAction::Changed
         );
         assert_eq!(
             s.handle_integer_key(&key("-", Some("-")), true),

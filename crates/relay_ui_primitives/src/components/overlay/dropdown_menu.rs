@@ -3,9 +3,9 @@ use gpui::{
     Window, div, prelude::FluentBuilder,
 };
 
-use super::{Menu, MenuItem, overlay};
+use crate::interaction::DismissHandler;
 
-type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
+use super::{Menu, MenuItem, overlay};
 
 #[derive(IntoElement)]
 pub struct DropdownMenu {

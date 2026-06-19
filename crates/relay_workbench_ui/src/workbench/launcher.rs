@@ -11,6 +11,7 @@ use gpui::{
 
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
+    interaction::SelectHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, radius, space},
 };
@@ -70,8 +71,6 @@ impl LauncherItem {
         self
     }
 }
-
-type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// A compact launcher panel for terminal profiles and CLI agents.
 #[derive(IntoElement)]

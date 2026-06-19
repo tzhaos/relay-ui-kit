@@ -5,12 +5,11 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::SelectHandler,
     theme::{ActiveTheme, radius},
 };
 
 use super::KeyboardShortcut;
-
-type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
 /// One command row inside a command palette or launcher.
 #[derive(IntoElement)]

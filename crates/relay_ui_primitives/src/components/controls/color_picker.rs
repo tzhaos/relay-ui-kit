@@ -8,11 +8,9 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::{ColorSelectHandler, SharedColorSelectHandler},
     theme::{ActiveTheme, radius},
 };
-
-type ColorSelectHandler = Box<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
-type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
 
 /// A selectable color preset for [`ColorPicker`].
 #[derive(Clone)]

@@ -4,11 +4,12 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
+use crate::{
+    interaction::KeyHandler,
+    theme::{ActiveTheme, radius},
+};
 
 use super::TextInputState;
-
-type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) + 'static>;
 
 /// A multi-line text area view. The host owns the editable state.
 #[derive(IntoElement)]

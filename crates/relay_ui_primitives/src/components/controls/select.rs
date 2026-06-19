@@ -8,12 +8,9 @@ use gpui::{
 use crate::{
     components::overlay::{Menu, MenuItem, overlay},
     icon::{Icon, IconName, IconSize},
+    interaction::{ClickHandler, DismissHandler, SelectHandler},
     theme::{ActiveTheme, radius},
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
-type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
-type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 
 /// One option in a [`Select`].
 pub struct SelectOption {

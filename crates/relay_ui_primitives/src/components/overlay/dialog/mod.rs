@@ -9,14 +9,13 @@ use gpui::{
 
 use crate::{
     icon::IconName,
+    interaction::ClickHandler,
     theme::{ActiveTheme, space},
 };
 
 use panel::DialogPanel;
 
 pub use confirm::ConfirmDialog;
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// A centered dialog surface with an optional backdrop dismiss action.
 #[derive(IntoElement)]

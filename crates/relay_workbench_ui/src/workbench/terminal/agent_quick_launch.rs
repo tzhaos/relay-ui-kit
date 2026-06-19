@@ -5,10 +5,9 @@ use gpui::{
 
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
+    interaction::ClickHandler,
     theme::{ActiveTheme, radius},
 };
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 /// Compact shortcut for launching a CLI agent into a terminal.
 #[derive(IntoElement)]

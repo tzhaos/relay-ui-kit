@@ -232,8 +232,8 @@ pub(super) fn command_sample(
                                 this.state.search_input.clear();
                                 cx.notify();
                             }
-                            TextInputAction::Edited | TextInputAction::Submit => cx.notify(),
-                            TextInputAction::Ignored => {}
+                            action if action.should_notify() => cx.notify(),
+                            _ => {}
                         }
                     });
                 }
