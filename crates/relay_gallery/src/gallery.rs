@@ -72,6 +72,7 @@ pub struct GalleryState {
     pub command_context_open: bool,
     pub confirm_dialog_open: bool,
     pub overlay_event: String,
+    pub foundations_disclosure_open: bool,
 }
 
 impl GalleryState {
@@ -100,6 +101,7 @@ impl GalleryState {
             command_context_open: false,
             confirm_dialog_open: false,
             overlay_event: "No overlay action yet".into(),
+            foundations_disclosure_open: true,
         }
     }
 }

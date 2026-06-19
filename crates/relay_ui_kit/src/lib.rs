@@ -40,10 +40,12 @@ pub use components::overlay::{
 };
 pub use composer::Composer;
 pub use controls::{
-    ColorField, ColorSwatch, PanelHeader, SearchField, Segment, SegmentedControl, Select,
-    SelectOption, Slider,
+    ColorField, ColorSwatch, Disclosure, PanelHeader, SearchField, Segment, SegmentedControl,
+    Select, SelectOption, Slider,
 };
-pub use display::{Badge, BadgeStyle, Divider, EmptyState, StatusDot};
+pub use display::{
+    Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
+};
 pub use feedback::{Banner, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
 pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use git::{

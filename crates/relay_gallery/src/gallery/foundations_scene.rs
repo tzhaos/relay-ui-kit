@@ -1,8 +1,8 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div};
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
 use relay_ui_kit::{
-    Button, ButtonVariant, Divider, EmptyState, Icon, IconButton, IconName, ListItem, NavRow,
-    SectionedList, SectionedListGroup, Segment, SegmentedControl, Tab, Tabs, TaskRow, TaskRowData,
-    Theme, Tone, TreeNode, TreeRow, TreeView,
+    Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, Icon, IconButton,
+    IconName, Label, LabelSize, ListItem, NavRow, SectionedList, SectionedListGroup, Segment,
+    SegmentedControl, Tab, Tabs, TaskRow, TaskRowData, Theme, Tone, TreeNode, TreeRow, TreeView,
 };
 
 use super::{
@@ -48,6 +48,11 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
+            "Labels, badges, disclosure",
+            label_badge_samples(state, host),
+        ))
+        .child(section(
+            cx,
             "Navigation rows",
             div()
                 .flex()
@@ -68,6 +73,69 @@ pub(super) fn render(
             "Tabs and empty state",
             tab_samples(state, host),
         ))
+}
+
+fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(
+            strip()
+                .child(Label::new("Primary label").strong())
+                .child(Label::new("Secondary metadata").secondary())
+                .child(Label::new("Muted caption").muted().size(LabelSize::XSmall))
+                .child(Label::new("Accent state").tone(Tone::Accent).strong()),
+        )
+        .child(
+            strip()
+                .child(Badge::new("running").tone(Tone::Accent).soft())
+                .child(
+                    Badge::new("review")
+                        .tone(Tone::Info)
+                        .icon(IconName::FileDiff),
+                )
+                .child(CountBadge::new(12).tone(Tone::Secondary))
+                .child(CountBadge::new(128).max(99).tone(Tone::Warning)),
+        )
+        .child(
+            div()
+                .w(gpui::px(360.0))
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(
+                    Disclosure::new(
+                        "foundation-disclosure",
+                        "Recent terminal sessions",
+                        state.foundations_disclosure_open,
+                    )
+                    .detail("host-owned state")
+                    .count(3)
+                    .on_toggle({
+                        let host = host.clone();
+                        move |_event, _window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.foundations_disclosure_open =
+                                    !this.state.foundations_disclosure_open;
+                                cx.notify();
+                            });
+                        }
+                    }),
+                )
+                .when(state.foundations_disclosure_open, |this| {
+                    this.child(
+                        div()
+                            .ml_6()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(Label::new("PowerShell").secondary())
+                            .child(Label::new("Codex attached").tone(Tone::Accent))
+                            .child(Label::new("Diff review").muted()),
+                    )
+                }),
+        )
 }
 
 fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
