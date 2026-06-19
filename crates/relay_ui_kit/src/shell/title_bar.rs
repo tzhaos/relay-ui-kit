@@ -234,9 +234,7 @@ fn window_control_button(
         .window_control_area(area)
         .hover(move |style| {
             if kind.is_close() {
-                style
-                    .bg(theme.danger.opacity(0.08))
-                    .text_color(theme.danger)
+                style.bg(theme.danger).text_color(gpui::white())
             } else {
                 style.bg(theme.hover).text_color(theme.text_secondary)
             }
