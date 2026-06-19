@@ -1,8 +1,9 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px};
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
 use relay_ui_kit::{
-    Badge, Banner, Button, Callout, Checkbox, ColorField, EmptyState, IconName, InlineError,
-    LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow, SettingsSection,
-    Skeleton, Slider, Theme, Toast, Toggle, Tone,
+    Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
+    InlineError, LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow,
+    SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle,
+    Tone,
 };
 
 use super::{
@@ -54,17 +55,13 @@ pub(super) fn render(
             SettingsSection::new("Appearance")
                 .row(
                     SettingsRow::new("Theme")
-                        .description("Select follows the host-owned open/value state")
-                        .control(theme_select(state, host)),
+                        .description("Preview cards and select share the same host state")
+                        .control(theme_controls(state, host)),
                 )
                 .row(
                     SettingsRow::new("Accent color")
-                        .description("Color fields use a stable swatch plus value layout")
-                        .control(ColorField::new(
-                            "accent-color-field",
-                            theme.accent,
-                            "#339CFF",
-                        )),
+                        .description("Preset picker emits the selected key and color")
+                        .control(accent_picker(state, host)),
                 )
                 .row(
                     SettingsRow::new("UI font size")
@@ -197,6 +194,80 @@ fn theme_select(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl I
             host.update(cx, |this, cx| {
                 this.state.theme_choice = key;
                 this.state.settings_select_open = false;
+                cx.notify();
+            });
+        }
+    })
+}
+
+fn theme_controls(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    div()
+        .flex()
+        .items_start()
+        .gap_2()
+        .child(
+            div()
+                .flex()
+                .gap_2()
+                .child(theme_card(
+                    "settings-theme-system",
+                    ThemePreviewKind::System,
+                    state,
+                    host,
+                ))
+                .child(theme_card(
+                    "settings-theme-light",
+                    ThemePreviewKind::Light,
+                    state,
+                    host,
+                ))
+                .child(theme_card(
+                    "settings-theme-dark",
+                    ThemePreviewKind::Dark,
+                    state,
+                    host,
+                )),
+        )
+        .child(theme_select(state, host))
+}
+
+fn theme_card(
+    id: &'static str,
+    kind: ThemePreviewKind,
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+) -> impl IntoElement {
+    ThemePreviewCard::new(id, kind)
+        .selected(state.theme_choice == kind.key())
+        .on_click({
+            let host = host.clone();
+            move |_event, _window, cx| {
+                host.update(cx, |this, cx| {
+                    this.state.theme_choice = kind.key();
+                    this.state.settings_select_open = false;
+                    cx.notify();
+                });
+            }
+        })
+}
+
+fn accent_picker(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    ColorPicker::new(
+        "settings-accent-picker",
+        state.accent_choice,
+        vec![
+            ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
+            ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
+            ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
+            ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
+            ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
+        ],
+    )
+    .on_select({
+        let host = host.clone();
+        move |key, _color, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.accent_choice = key;
                 cx.notify();
             });
         }

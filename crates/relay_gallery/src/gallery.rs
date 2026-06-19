@@ -71,6 +71,7 @@ pub struct GalleryState {
     pub command_popover_open: bool,
     pub command_context_open: bool,
     pub confirm_dialog_open: bool,
+    pub accent_choice: &'static str,
     pub overlay_event: String,
     pub foundations_disclosure_open: bool,
 }
@@ -100,6 +101,7 @@ impl GalleryState {
             command_popover_open: false,
             command_context_open: false,
             confirm_dialog_open: false,
+            accent_choice: "green",
             overlay_event: "No overlay action yet".into(),
             foundations_disclosure_open: true,
         }

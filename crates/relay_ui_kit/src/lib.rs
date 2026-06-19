@@ -40,8 +40,9 @@ pub use components::overlay::{
 };
 pub use composer::Composer;
 pub use controls::{
-    ColorField, ColorSwatch, Disclosure, FilterBar, FilterChip, PanelHeader, SearchField, Segment,
-    SegmentedControl, Select, SelectOption, Slider, Stepper, ToolbarGroup,
+    ColorField, ColorPicker, ColorPreset, ColorSwatch, Disclosure, FilterBar, FilterChip,
+    PanelHeader, SearchField, Segment, SegmentedControl, Select, SelectOption, Slider, Stepper,
+    ThemePreviewCard, ThemePreviewKind, ToolbarGroup,
 };
 pub use display::{
     Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
