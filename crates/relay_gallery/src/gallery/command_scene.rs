@@ -1,6 +1,6 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
 use relay_ui_kit::{
-    Button, CommandRow, ConfirmDialog, ContextMenu, IconButton, IconName, KeybindingRow,
+    Button, CommandRow, ConfirmDialog, DropdownMenu, IconButton, IconName, KeybindingRow,
     KeybindingTable, KeyboardShortcut, MenuItem, Popover, Theme, overlay,
 };
 
@@ -143,28 +143,7 @@ fn overlay_sample(
                             this.child(session_popover(theme))
                         }),
                 )
-                .child(
-                    div()
-                        .relative()
-                        .child(
-                            Button::new("overlay-context", "Terminal Menu")
-                                .icon(IconName::Ellipsis)
-                                .on_click({
-                                    let host = host.clone();
-                                    move |_event, _window, cx| {
-                                        host.update(cx, |this, cx| {
-                                            this.state.command_context_open =
-                                                !this.state.command_context_open;
-                                            this.state.command_popover_open = false;
-                                            cx.notify();
-                                        });
-                                    }
-                                }),
-                        )
-                        .when(state.command_context_open, |this| {
-                            this.child(terminal_context_menu(host))
-                        }),
-                )
+                .child(terminal_dropdown_menu(state.command_context_open, host))
                 .child(
                     Button::new("overlay-confirm", "Close Terminal")
                         .danger()
@@ -213,16 +192,36 @@ fn session_popover(theme: Theme) -> impl IntoElement {
     .offset(0.0, 34.0)
 }
 
-fn terminal_context_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    ContextMenu::new(
+fn terminal_dropdown_menu(open: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    DropdownMenu::new(
         "terminal-context-menu",
+        Button::new("overlay-context", "Terminal Menu")
+            .icon(IconName::Ellipsis)
+            .on_click({
+                let host = host.clone();
+                move |_event, _window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.command_context_open = !this.state.command_context_open;
+                        this.state.command_popover_open = false;
+                        cx.notify();
+                    });
+                }
+            }),
         vec![
-            menu_action(host, "Split terminal", IconName::PanelLeft),
+            MenuItem::header("Terminal"),
+            MenuItem::new("Split terminal")
+                .icon(IconName::PanelLeft)
+                .submenu_items(vec![
+                    menu_action(host, "Split right", IconName::ArrowRight),
+                    menu_action(host, "Split down", IconName::ChevronDown),
+                ])
+                .submenu_open(true),
             menu_action(host, "Rename session", IconName::Settings),
             MenuItem::separator(),
             menu_action(host, "Close session", IconName::Archive).danger(),
         ],
     )
+    .open(open)
     .min_width(220.0)
     .offset(0.0, 34.0)
 }

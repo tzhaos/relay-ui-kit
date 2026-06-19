@@ -3,9 +3,10 @@ use gpui::{
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
-
-type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
+use crate::{
+    interaction::ClickHandler,
+    theme::{ActiveTheme, radius},
+};
 
 /// A compact numeric input with optional stepper callbacks.
 #[derive(IntoElement)]
@@ -56,12 +57,10 @@ impl RenderOnce for NumberInput {
         div()
             .id(self.id)
             .h(px(30.0))
-            .min_w(px(96.0))
+            .min_w(px(108.0))
             .pl_2()
-            .pr_1()
             .flex()
             .items_center()
-            .gap_2()
             .rounded(px(radius::MD))
             .bg(theme.panel)
             .border_1()
@@ -75,20 +74,38 @@ impl RenderOnce for NumberInput {
                     .child(self.value.to_string()),
             )
             .when_some(self.suffix, |this, suffix| {
-                this.child(div().text_xs().text_color(theme.text_muted).child(suffix))
+                this.child(
+                    div()
+                        .px_1()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(suffix),
+                )
             })
-            .child(stepper(
-                "number-decrement",
-                "-",
-                self.on_decrement,
-                theme.hover,
-            ))
-            .child(stepper(
-                "number-increment",
-                "+",
-                self.on_increment,
-                theme.hover,
-            ))
+            .child(
+                div()
+                    .h_full()
+                    .ml_1()
+                    .border_l_1()
+                    .border_color(theme.border)
+                    .flex()
+                    .items_center()
+                    .child(stepper(
+                        "number-decrement",
+                        "-",
+                        self.on_decrement,
+                        theme.hover,
+                        theme.text_muted,
+                    ))
+                    .child(div().h(px(16.0)).w(px(1.0)).bg(theme.border.opacity(0.7)))
+                    .child(stepper(
+                        "number-increment",
+                        "+",
+                        self.on_increment,
+                        theme.hover,
+                        theme.text_muted,
+                    )),
+            )
     }
 }
 
@@ -97,16 +114,18 @@ fn stepper(
     label: &'static str,
     handler: Option<ClickHandler>,
     hover_bg: gpui::Hsla,
+    color: gpui::Hsla,
 ) -> impl IntoElement {
     div()
         .id(id)
-        .size(px(18.0))
+        .w(px(24.0))
+        .h(px(28.0))
         .flex()
         .items_center()
         .justify_center()
-        .rounded(px(radius::SM))
         .text_size(px(11.0))
         .font_weight(FontWeight::SEMIBOLD)
+        .text_color(color)
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
@@ -116,4 +135,16 @@ fn stepper(
                 })
         })
         .child(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn number_input_keeps_optional_suffix() {
+        let input = NumberInput::new("number", 14).suffix("px");
+
+        assert_eq!(input.suffix.as_deref(), Some("px"));
+    }
 }

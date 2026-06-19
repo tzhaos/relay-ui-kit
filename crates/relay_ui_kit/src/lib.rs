@@ -35,7 +35,8 @@ pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
 pub use command::{CommandPalette, CommandRow, KeybindingRow, KeybindingTable, KeyboardShortcut};
 pub use components::overlay::{
-    ConfirmDialog, ContextMenu, Dialog, Menu, MenuItem, Overlay, Popover, TooltipBody, overlay,
+    ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,
+    TooltipBody, overlay,
 };
 pub use composer::Composer;
 pub use controls::{

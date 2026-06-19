@@ -6,11 +6,12 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::ClickHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, radius, space},
 };
 
-type MenuClick = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
+use super::overlay;
 
 /// One row in a [`Menu`].
 pub struct MenuItem {
@@ -22,8 +23,11 @@ pub struct MenuItem {
     danger: bool,
     disabled: bool,
     separator: bool,
+    header: bool,
     submenu: bool,
-    on_click: Option<MenuClick>,
+    submenu_items: Vec<MenuItem>,
+    submenu_open: bool,
+    on_click: Option<ClickHandler>,
 }
 
 impl MenuItem {
@@ -37,7 +41,10 @@ impl MenuItem {
             danger: false,
             disabled: false,
             separator: false,
+            header: false,
             submenu: false,
+            submenu_items: Vec::new(),
+            submenu_open: false,
             on_click: None,
         }
     }
@@ -53,7 +60,28 @@ impl MenuItem {
             danger: false,
             disabled: false,
             separator: true,
+            header: false,
             submenu: false,
+            submenu_items: Vec::new(),
+            submenu_open: false,
+            on_click: None,
+        }
+    }
+
+    pub fn header(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            detail: None,
+            icon: None,
+            trailing: None,
+            checked: false,
+            danger: false,
+            disabled: true,
+            separator: false,
+            header: true,
+            submenu: false,
+            submenu_items: Vec::new(),
+            submenu_open: false,
             on_click: None,
         }
     }
@@ -91,6 +119,17 @@ impl MenuItem {
 
     pub fn submenu(mut self) -> Self {
         self.submenu = true;
+        self
+    }
+
+    pub fn submenu_items(mut self, items: Vec<MenuItem>) -> Self {
+        self.submenu = true;
+        self.submenu_items = items;
+        self
+    }
+
+    pub fn submenu_open(mut self, open: bool) -> Self {
+        self.submenu_open = open;
         self
     }
 
@@ -144,25 +183,42 @@ impl RenderOnce for Menu {
             .occlude();
 
         for (index, item) in self.items.into_iter().enumerate() {
-            if item.separator {
+            let MenuItem {
+                label,
+                detail,
+                icon,
+                trailing,
+                checked,
+                danger,
+                disabled,
+                separator,
+                header,
+                submenu,
+                submenu_items,
+                submenu_open,
+                on_click,
+            } = item;
+
+            if separator {
                 panel = panel.child(div().my(px(space::XS)).h(px(1.0)).w_full().bg(theme.border));
                 continue;
             }
+            if header {
+                panel = panel.child(menu_header(label, theme.text_muted));
+                continue;
+            }
 
-            let fg = if item.danger {
-                theme.danger
-            } else {
-                theme.text
-            };
-            let icon_color = if item.danger {
+            let fg = if danger { theme.danger } else { theme.text };
+            let icon_color = if danger {
                 theme.danger
             } else {
                 theme.text_muted
             };
-            let disabled = item.disabled;
-            let row = div()
+            let has_submenu = submenu || !submenu_items.is_empty();
+            let submenu_visible = submenu_open && !submenu_items.is_empty();
+            let row_content = div()
                 .id(("menu-item", index))
-                .min_h(px(if item.detail.is_some() { 38.0 } else { 28.0 }))
+                .min_h(px(if detail.is_some() { 38.0 } else { 28.0 }))
                 .px_2()
                 .py_1()
                 .flex()
@@ -175,26 +231,30 @@ impl RenderOnce for Menu {
                 .when(!disabled, |this| {
                     this.cursor_pointer().hover(move |s| s.bg(theme.hover))
                 })
-                .child(menu_leading_icon(
-                    item.checked,
-                    item.icon,
-                    icon_color,
-                    theme.accent,
-                ))
-                .child(menu_label(item.label, item.detail, theme.text_muted))
-                .when_some(item.trailing, |this, trailing| this.child(trailing))
-                .when(item.submenu, |this| {
+                .child(menu_leading_icon(checked, icon, icon_color, theme.accent))
+                .child(menu_label(label, detail, theme.text_muted))
+                .when_some(trailing, |this, trailing| this.child(trailing))
+                .when(has_submenu, |this| {
                     this.child(
                         Icon::new(IconName::ChevronRight)
                             .size(IconSize::XSmall)
                             .color(theme.text_muted),
                     )
                 })
-                .when_some(item.on_click.filter(|_| !disabled), |this, handler| {
+                .when_some(on_click.filter(|_| !disabled), |this, handler| {
                     this.on_click(move |event, window, cx| {
                         handler(event, window, cx);
                         cx.stop_propagation();
                     })
+                });
+            let row = div()
+                .relative()
+                .child(row_content)
+                .when(submenu_visible, |this| {
+                    this.child(
+                        overlay(Menu::new(("submenu", index), submenu_items).min_width(180.0))
+                            .offset(self.min_width - 4.0, 0.0),
+                    )
                 });
             panel = panel.child(row);
         }
@@ -250,4 +310,36 @@ fn menu_label(label: String, detail: Option<String>, detail_color: gpui::Hsla) -
                     .child(detail),
             )
         })
+}
+
+fn menu_header(label: String, color: gpui::Hsla) -> impl IntoElement {
+    div()
+        .min_h(px(24.0))
+        .px_2()
+        .flex()
+        .items_center()
+        .text_size(px(11.0))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(color)
+        .child(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn submenu_items_mark_item_as_submenu() {
+        let item = MenuItem::new("Open With").submenu_items(vec![MenuItem::new("Shell")]);
+
+        assert!(item.submenu);
+    }
+
+    #[test]
+    fn menu_header_is_not_interactive() {
+        let item = MenuItem::header("Actions");
+
+        assert!(item.header);
+        assert!(item.disabled);
+    }
 }
