@@ -4,11 +4,11 @@ use relay_ui_components::{
     WorkspaceBreadcrumb,
 };
 use relay_ui_primitives::{
-    Button, CommandPalette, CommandRow, IconName, KeyboardShortcut, NavRow, PanelHeader, TextInput,
+    Button, CommandPalette, CommandRow, IconName, KeybindingShortcut, NavRow, PanelHeader, TextInput,
     TextInputAction, Theme, Tone, TreeRow, radius,
 };
 use relay_workbench_ui::{
-    AgentQuickLaunch, LauncherItem, LauncherItemKind, LauncherMenu, TerminalLine,
+    TerminalAgentQuickLaunch, LauncherItem, LauncherItemKind, LauncherMenu, TerminalLine,
     TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab,
     TerminalToolbar, TerminalTranscript,
 };
@@ -157,11 +157,11 @@ pub(super) fn terminal_sample(
                 .items_center()
                 .gap_2()
                 .child(
-                    AgentQuickLaunch::new("sample-codex", "Codex", "codex")
+                    TerminalAgentQuickLaunch::new("sample-codex", "Codex", "codex")
                         .on_click(set_session("codex", host)),
                 )
                 .child(
-                    AgentQuickLaunch::new("sample-claude", "Claude", "claude")
+                    TerminalAgentQuickLaunch::new("sample-claude", "Claude", "claude")
                         .on_click(set_session("claude", host)),
                 ),
         )
@@ -243,7 +243,7 @@ pub(super) fn command_sample(
             CommandRow::new("cmd-terminal", "terminal:new", "New Terminal")
                 .detail("Open a shell session in the active workspace")
                 .icon(IconName::Terminal)
-                .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
+                .shortcut(KeybindingShortcut::new(["Ctrl", "Shift", "T"]))
                 .selected(state.launcher_choice == "terminal:new")
                 .on_select(command_handler_a),
         )
@@ -251,7 +251,7 @@ pub(super) fn command_sample(
             CommandRow::new("cmd-codex", "agent:codex", "Launch Codex")
                 .detail("Attach Codex to the selected task terminal")
                 .icon(IconName::Bot)
-                .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
+                .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
                 .selected(state.launcher_choice == "agent:codex")
                 .on_select(command_handler_b),
         )

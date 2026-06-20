@@ -4,7 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    command::KeyboardShortcut,
+    command::KeybindingShortcut,
     theme::{ActiveTheme, radius, space},
 };
 
@@ -12,7 +12,7 @@ use crate::{
 pub struct KeybindingRow {
     command: String,
     description: Option<String>,
-    shortcut: Option<KeyboardShortcut>,
+    shortcut: Option<KeybindingShortcut>,
     action: Option<AnyElement>,
 }
 
@@ -31,7 +31,7 @@ impl KeybindingRow {
         self
     }
 
-    pub fn shortcut(mut self, shortcut: KeyboardShortcut) -> Self {
+    pub fn shortcut(mut self, shortcut: KeybindingShortcut) -> Self {
         self.shortcut = Some(shortcut);
         self
     }

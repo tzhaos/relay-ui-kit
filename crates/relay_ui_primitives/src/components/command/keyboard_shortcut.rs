@@ -4,11 +4,11 @@ use crate::theme::{ActiveTheme, radius, space};
 
 /// A visual keyboard shortcut hint, rendered as compact keycaps.
 #[derive(Clone, Debug, PartialEq, Eq, IntoElement)]
-pub struct KeyboardShortcut {
+pub struct KeybindingShortcut {
     keys: Vec<String>,
 }
 
-impl KeyboardShortcut {
+impl KeybindingShortcut {
     pub fn new(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
             keys: keys.into_iter().map(Into::into).collect(),
@@ -20,7 +20,7 @@ impl KeyboardShortcut {
     }
 }
 
-impl RenderOnce for KeyboardShortcut {
+impl RenderOnce for KeybindingShortcut {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         div()
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn shortcut_preserves_key_order() {
-        let shortcut = KeyboardShortcut::new(["Ctrl", "K"]);
+        let shortcut = KeybindingShortcut::new(["Ctrl", "K"]);
         assert_eq!(shortcut.keys(), ["Ctrl", "K"]);
     }
 }

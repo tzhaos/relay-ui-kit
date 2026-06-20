@@ -14,4 +14,6 @@ pub use command_palette::CommandPalette;
 pub use command_row::CommandRow;
 pub use keybinding_actions::{KeybindingActionKind, KeybindingActions};
 pub use keybinding_table::{KeybindingRow, KeybindingTable};
-pub use keyboard_shortcut::KeyboardShortcut;
+pub use keyboard_shortcut::KeybindingShortcut;
+#[deprecated(note = "use KeybindingShortcut")]
+pub type KeyboardShortcut = KeybindingShortcut;

@@ -10,7 +10,7 @@ use crate::{
     theme::{ActiveTheme, radius, DISABLED_OPACITY},
 };
 
-use super::KeyboardShortcut;
+use super::KeybindingShortcut;
 
 /// One command row inside a command palette or launcher.
 #[derive(IntoElement)]
@@ -20,7 +20,7 @@ pub struct CommandRow {
     label: String,
     detail: Option<String>,
     icon: Option<IconName>,
-    shortcut: Option<KeyboardShortcut>,
+    shortcut: Option<KeybindingShortcut>,
     selected: bool,
     disabled: bool,
     on_select: Option<SelectHandler>,
@@ -51,7 +51,7 @@ impl CommandRow {
         self
     }
 
-    pub fn shortcut(mut self, shortcut: KeyboardShortcut) -> Self {
+    pub fn shortcut(mut self, shortcut: KeybindingShortcut) -> Self {
         self.shortcut = Some(shortcut);
         self
     }

@@ -21,7 +21,7 @@ pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
 pub use command::{
     CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
-    KeybindingTable, KeyboardShortcut,
+    KeybindingTable, KeybindingShortcut, KeyboardShortcut,
 };
 pub use components::overlay::{
     ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,

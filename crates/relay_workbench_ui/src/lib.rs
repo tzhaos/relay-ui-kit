@@ -13,7 +13,7 @@ pub use git::{
 };
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use terminal::{
-    AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
+    TerminalAgentQuickLaunch, AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
     TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
 };
 pub use viewer::{

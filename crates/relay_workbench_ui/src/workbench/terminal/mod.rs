@@ -12,7 +12,9 @@ mod tab;
 mod toolbar;
 mod transcript;
 
-pub use agent_quick_launch::AgentQuickLaunch;
+pub use agent_quick_launch::TerminalAgentQuickLaunch;
+#[deprecated(note = "use TerminalAgentQuickLaunch")]
+pub type AgentQuickLaunch = TerminalAgentQuickLaunch;
 pub use line::{TerminalLine, TerminalLineStyle};
 pub use session_row::TerminalSessionRow;
 pub use status_badge::TerminalStatusBadge;

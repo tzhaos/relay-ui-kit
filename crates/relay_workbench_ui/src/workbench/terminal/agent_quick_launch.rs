@@ -11,7 +11,7 @@ use relay_ui_primitives::{
 
 /// Compact shortcut for launching a CLI agent into a terminal.
 #[derive(IntoElement)]
-pub struct AgentQuickLaunch {
+pub struct TerminalAgentQuickLaunch {
     id: ElementId,
     label: String,
     command: String,
@@ -19,7 +19,7 @@ pub struct AgentQuickLaunch {
     on_click: Option<ClickHandler>,
 }
 
-impl AgentQuickLaunch {
+impl TerminalAgentQuickLaunch {
     pub fn new(
         id: impl Into<ElementId>,
         label: impl Into<String>,
@@ -48,7 +48,7 @@ impl AgentQuickLaunch {
     }
 }
 
-impl RenderOnce for AgentQuickLaunch {
+impl RenderOnce for TerminalAgentQuickLaunch {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let handler = self.on_click;

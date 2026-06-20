@@ -1,7 +1,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
 use relay_ui_primitives::{
     Button, CommandRow, ConfirmDialog, DropdownMenu, IconName, KeybindingActions, KeybindingRow,
-    KeybindingTable, KeyboardShortcut, MenuItem, Popover, Theme, overlay,
+    KeybindingTable, KeybindingShortcut, MenuItem, Popover, Theme, overlay,
 };
 
 use super::{
@@ -76,14 +76,14 @@ pub(super) fn render(
                     CommandRow::new("cmd-row-terminal", "terminal:new", "New Terminal")
                         .detail("Open a shell session")
                         .icon(IconName::Terminal)
-                        .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
+                        .shortcut(KeybindingShortcut::new(["Ctrl", "Shift", "T"]))
                         .selected(state.launcher_choice == "terminal:new"),
                 )
                 .child(
                     CommandRow::new("cmd-row-agent", "agent:codex", "Launch Codex")
                         .detail("Attach Codex to the active terminal")
                         .icon(IconName::Bot)
-                        .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
+                        .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
                         .selected(state.launcher_choice == "agent:codex"),
                 ),
         ));
@@ -99,15 +99,15 @@ fn shortcuts_table(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     KeybindingTable::new(vec![
         KeybindingRow::new("New terminal")
             .description("Open a shell session")
-            .shortcut(KeyboardShortcut::new(["Ctrl", "Shift", "T"]))
+            .shortcut(KeybindingShortcut::new(["Ctrl", "Shift", "T"]))
             .action(keybinding_actions(host, "New terminal")),
         KeybindingRow::new("Launch Codex")
             .description("Attach an agent to the active terminal")
-            .shortcut(KeyboardShortcut::new(["Ctrl", "K"]))
+            .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
             .action(keybinding_actions(host, "Launch Codex")),
         KeybindingRow::new("Filter files")
             .description("Focus the active panel search field")
-            .shortcut(KeyboardShortcut::new(["Ctrl", "F"]))
+            .shortcut(KeybindingShortcut::new(["Ctrl", "F"]))
             .action(keybinding_actions(host, "Filter files")),
     ])
 }

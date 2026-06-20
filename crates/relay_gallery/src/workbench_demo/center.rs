@@ -4,7 +4,7 @@ use relay_ui_primitives::{
     Button, IconButton, IconName, PanelHeader, Segment, SegmentedControl, Theme, theme,
 };
 use relay_workbench_ui::{
-    AgentQuickLaunch, FileKind, FileView, LauncherItem, LauncherItemKind, LauncherMenu,
+    TerminalAgentQuickLaunch, FileKind, FileView, LauncherItem, LauncherItemKind, LauncherMenu,
     MarkdownView, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
     TerminalTranscript,
 };
@@ -232,10 +232,10 @@ fn agent_quick_launches(host: &Entity<WorkbenchApp>, theme: Theme) -> impl IntoE
         .items_center()
         .gap_2()
         .child(
-            AgentQuickLaunch::new("quick-codex", "Codex", "codex").on_click(launch("codex", host)),
+            TerminalAgentQuickLaunch::new("quick-codex", "Codex", "codex").on_click(launch("codex", host)),
         )
         .child(
-            AgentQuickLaunch::new("quick-claude", "Claude", "claude")
+            TerminalAgentQuickLaunch::new("quick-claude", "Claude", "claude")
                 .on_click(launch("claude", host)),
         )
         .child(
