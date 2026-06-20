@@ -86,6 +86,31 @@ pub const STATE_RULES: &[StateRule] = &[
         layer: Layer::Workbench,
         ownership: StateOwnership::HostOwned,
     },
+    StateRule {
+        component: "Radio",
+        layer: Layer::Primitive,
+        ownership: StateOwnership::HostOwned,
+    },
+    StateRule {
+        component: "Slider",
+        layer: Layer::Primitive,
+        ownership: StateOwnership::HostOwned,
+    },
+    StateRule {
+        component: "ColorPicker",
+        layer: Layer::Primitive,
+        ownership: StateOwnership::HostOwned,
+    },
+    StateRule {
+        component: "Disclosure",
+        layer: Layer::Primitive,
+        ownership: StateOwnership::HostOwned,
+    },
+    StateRule {
+        component: "SearchField",
+        layer: Layer::Primitive,
+        ownership: StateOwnership::HostOwned,
+    },
 ];
 
 pub fn state_rule(component: &str) -> Option<&'static StateRule> {
@@ -108,5 +133,22 @@ mod tests {
         let rule = state_rule("ScrollSurface").unwrap();
 
         assert_eq!(rule.ownership, StateOwnership::WindowKeyed);
+    }
+
+    #[test]
+    fn all_primitives_with_state_are_recorded() {
+        let components: Vec<&str> = STATE_RULES
+            .iter()
+            .filter(|r| r.layer == Layer::Primitive)
+            .map(|r| r.component)
+            .collect();
+
+        for name in &["Radio", "Slider", "ColorPicker", "Disclosure", "SearchField"] {
+            assert!(
+                components.contains(name),
+                "{} should be registered in STATE_RULES",
+                name
+            );
+        }
     }
 }

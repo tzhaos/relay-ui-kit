@@ -1,11 +1,9 @@
-use std::time::Duration;
-
 use gpui::{
     Animation, AnimationExt, App, ElementId, IntoElement, ParentElement, RenderOnce, Styled,
     Transformation, Window, div, percentage, prelude::FluentBuilder, px, svg,
 };
 
-use crate::{icon::IconName, theme::ActiveTheme, tone::Tone};
+use crate::{contract::MotionDuration, icon::IconName, theme::ActiveTheme, tone::Tone};
 
 /// An inline spinner for indeterminate work.
 #[derive(IntoElement)]
@@ -46,7 +44,7 @@ impl RenderOnce for LoadingSpinner {
             .text_color(fg)
             .with_animation(
                 (id, "loading-spinner"),
-                Animation::new(Duration::from_millis(800)).repeat(),
+                Animation::new(MotionDuration::Slow.duration()).repeat(),
                 |this, delta| this.with_transformation(Transformation::rotate(percentage(delta))),
             );
 
