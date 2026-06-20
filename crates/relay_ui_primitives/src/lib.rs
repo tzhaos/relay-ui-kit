@@ -6,7 +6,6 @@
 
 pub(crate) mod component_prelude;
 pub mod components;
-pub mod contract;
 pub mod interaction;
 pub mod structure;
 pub mod styles;
@@ -39,10 +38,52 @@ pub use feedback::{Banner, Callout, InlineError, LoadingSpinner, ProgressBar, Sk
 pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use icon::{Icon, IconName, IconSize, KitAssets};
 pub use input::{
-    NumberInput, NumberInputLayout, TextArea, TextInput, TextInputAction, TextInputState,
+    InputActionKind, InputValueKind, NumberInput, NumberInputLayout, TextArea, TextInput,
+    TextInputAction, TextInputState, ValidationState,
 };
 pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
-pub use motion::MotionExt;
+pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
 pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
 pub use theme::{ActiveTheme, Theme, radius, space};
 pub use tone::Tone;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn crate_dependencies_follow_layer_direction() {
+        let primitives_cargo = read_crate_toml("relay_ui_primitives");
+        let components_cargo = read_crate_toml("relay_ui_components");
+        let workbench_cargo = read_crate_toml("relay_workbench_ui");
+        let gallery_cargo = read_crate_toml("relay_gallery");
+
+        // Primitives must not depend on higher layers
+        assert!(!primitives_cargo.contains("relay_ui_components"));
+        assert!(!primitives_cargo.contains("relay_workbench_ui"));
+
+        // Components: depends on primitives, not on workbench
+        assert!(components_cargo.contains("relay_ui_primitives.workspace"));
+        assert!(!components_cargo.contains("relay_workbench_ui"));
+
+        // Workbench: depends on primitives and components
+        assert!(workbench_cargo.contains("relay_ui_primitives.workspace"));
+        assert!(workbench_cargo.contains("relay_ui_components.workspace"));
+
+        // Gallery: the consumer — depends on workbench
+        assert!(gallery_cargo.contains("relay_workbench_ui.workspace"));
+    }
+
+    /// Read a crate's `Cargo.toml` at test time using `CARGO_MANIFEST_DIR`.
+    fn read_crate_toml(crate_name: &str) -> String {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let workspace_root = manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("workspace root");
+        let path = workspace_root
+            .join("crates")
+            .join(crate_name)
+            .join("Cargo.toml");
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e))
+    }
+}

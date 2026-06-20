@@ -234,6 +234,13 @@ pub mod space {
 }
 
 // ---------------------------------------------------------------------------
+// Layout constants
+// ---------------------------------------------------------------------------
+
+/// 1px hairline border width.
+pub const BORDER_WIDTH: f32 = 1.0;
+
+// ---------------------------------------------------------------------------
 // Radius scale
 // ---------------------------------------------------------------------------
 
@@ -241,12 +248,23 @@ pub mod space {
 /// selected rows.
 pub mod radius {
     /// 4px — chips, badges, tight controls.
-    pub const SM: f32 = crate::contract::RADIUS_SM;
+    pub const SM: f32 = 4.0;
     /// 6px — buttons, rows, inputs.
-    pub const MD: f32 = crate::contract::RADIUS_MD;
+    pub const MD: f32 = 6.0;
     /// 8px — cards, popovers.
-    pub const LG: f32 = crate::contract::RADIUS_LG;
+    pub const LG: f32 = 8.0;
 }
+
+// ---------------------------------------------------------------------------
+// Overlay
+// ---------------------------------------------------------------------------
+
+/// Margin between overlay and window edge.
+pub const OVERLAY_WINDOW_MARGIN: f32 = 8.0;
+/// Floating overlay (menu, tooltip) render priority.
+pub const OVERLAY_PRIORITY_FLOATING: usize = 1;
+/// Dialog overlay render priority — always above floating.
+pub const OVERLAY_PRIORITY_DIALOG: usize = 2;
 
 // ---------------------------------------------------------------------------
 // Typography

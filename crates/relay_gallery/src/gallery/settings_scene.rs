@@ -1,10 +1,9 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
-use relay_ui_primitives::contract::{InputActionKind, InputValueKind};
 use relay_ui_primitives::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
-    InlineError, LoadingSpinner, NumberInput, ProgressBar, Select, SelectOption, SettingsRow,
-    SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle,
-    Tone,
+    InlineError, InputActionKind, InputValueKind, LoadingSpinner, NumberInput, ProgressBar, Select,
+    SelectOption, SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard,
+    ThemePreviewKind, Toast, Toggle, Tone,
 };
 
 use super::{

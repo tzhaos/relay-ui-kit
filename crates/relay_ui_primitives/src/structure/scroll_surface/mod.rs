@@ -6,10 +6,10 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
-    contract,
-    theme::{ActiveTheme, space},
-};
+use crate::theme::{ActiveTheme, space};
+
+/// Width of the reserved scrollbar gutter area.
+const SCROLL_GUTTER_WIDTH: f32 = 10.0;
 
 use state::{ScrollSurfaceState, schedule_scroll_decay, schedule_smooth_scroll};
 use thumb::{THUMB_WIDTH, scroll_rail};
@@ -120,7 +120,7 @@ impl RenderOnce for ScrollSurface {
                 });
             })
             .when(self.reserve_gutter, |this| {
-                this.scrollbar_width(px(contract::SCROLL_GUTTER_WIDTH))
+                this.scrollbar_width(px(SCROLL_GUTTER_WIDTH))
                     .pr(px(space::SM))
             })
             .child(self.content);

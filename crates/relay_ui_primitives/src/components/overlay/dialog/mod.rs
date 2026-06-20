@@ -8,10 +8,9 @@ use gpui::{
 };
 
 use crate::{
-    contract,
     icon::IconName,
     interaction::ClickHandler,
-    theme::{ActiveTheme, space},
+    theme::{self, ActiveTheme, space},
 };
 
 use panel::DialogPanel;
@@ -123,7 +122,7 @@ impl RenderOnce for Dialog {
                 .border_1()
                 .border_color(theme.border),
         )
-        .with_priority(contract::OVERLAY_PRIORITY_DIALOG)
+        .with_priority(theme::OVERLAY_PRIORITY_DIALOG)
     }
 }
 

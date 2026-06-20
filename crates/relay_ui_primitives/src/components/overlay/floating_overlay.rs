@@ -3,7 +3,7 @@ use gpui::{
     Window, anchored, deferred, div, px,
 };
 
-use crate::{contract, interaction::DismissHandler};
+use crate::{interaction::DismissHandler, theme};
 
 /// Anchored floating content with window-edge snapping.
 #[derive(IntoElement)]
@@ -50,7 +50,7 @@ impl RenderOnce for Overlay {
         let on_dismiss = self.on_dismiss;
         deferred(
             anchored()
-                .snap_to_window_with_margin(px(contract::OVERLAY_WINDOW_MARGIN))
+                .snap_to_window_with_margin(px(theme::OVERLAY_WINDOW_MARGIN))
                 .anchor(self.anchor)
                 .child({
                     let mut container = div()
@@ -77,6 +77,6 @@ impl RenderOnce for Overlay {
                     container
                 }),
         )
-        .with_priority(contract::OVERLAY_PRIORITY_FLOATING)
+        .with_priority(theme::OVERLAY_PRIORITY_FLOATING)
     }
 }

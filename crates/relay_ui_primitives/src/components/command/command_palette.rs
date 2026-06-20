@@ -4,10 +4,9 @@ use gpui::{
 };
 
 use crate::{
-    contract::MotionDirection,
     display::EmptyState,
     icon::IconName,
-    motion::MotionExt,
+    motion::{MotionDirection, MotionExt},
     structure::ScrollSurface,
     theme::{ActiveTheme, radius, space},
 };
