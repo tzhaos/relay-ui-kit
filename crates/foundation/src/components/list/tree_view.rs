@@ -61,9 +61,21 @@ impl TreeView {
         }
     }
 
-    crate::shared_callback_builder!(on_select, on_select, &'static str);
+    pub fn on_select(
+        mut self,
+        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_select = Some(std::rc::Rc::new(handler));
+        self
+    }
 
-    crate::shared_callback_builder!(on_toggle, on_toggle, &'static str);
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(std::rc::Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for TreeView {
