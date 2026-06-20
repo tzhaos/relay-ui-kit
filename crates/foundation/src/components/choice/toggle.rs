@@ -1,11 +1,12 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
-    StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
     interaction::ClickHandler,
-    theme::{ActiveTheme, space},
+    theme::{ActiveTheme, DISABLED_OPACITY, space},
 };
 
 /// A sliding on/off switch. The host owns `on` and flips it in `on_click`.
@@ -39,7 +40,13 @@ impl Toggle {
         self
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Toggle {
@@ -73,8 +80,13 @@ impl RenderOnce for Toggle {
             .gap_2()
             .role(Role::Switch)
             .aria_toggled(Toggled::from(self.on))
-            .when(disabled, |this| this.opacity(0.5))
-            .when(!disabled, |this| this.cursor_pointer())
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .child(track)
             .when_some(self.label, |this, label| {
                 this.child(div().text_sm().text_color(theme.text).child(label))

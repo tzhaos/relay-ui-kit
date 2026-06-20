@@ -1,9 +1,13 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
-use crate::{interaction::ClickHandler, theme::ActiveTheme};
+use crate::{
+    interaction::ClickHandler,
+    theme::{ActiveTheme, DISABLED_OPACITY},
+};
 
 /// A labelled radio option. The host renders a group and tracks the selection.
 #[derive(IntoElement)]
@@ -31,7 +35,13 @@ impl Radio {
         self
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Radio {
@@ -51,8 +61,13 @@ impl RenderOnce for Radio {
             .items_center()
             .gap_2()
             .role(Role::RadioButton)
-            .when(disabled, |this| this.opacity(0.5))
-            .when(!disabled, |this| this.cursor_pointer())
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .child(
                 div()
                     .size(px(16.0))

@@ -1,12 +1,13 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
-    StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 /// A labelled checkbox. The host owns `checked` and toggles it in `on_click`.
@@ -40,7 +41,13 @@ impl Checkbox {
         self
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Checkbox {
@@ -61,8 +68,13 @@ impl RenderOnce for Checkbox {
             .gap_2()
             .role(Role::CheckBox)
             .aria_toggled(Toggled::from(self.checked))
-            .when(disabled, |this| this.opacity(0.5))
-            .when(!disabled, |this| this.cursor_pointer())
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .child(
                 div()
                     .size(px(16.0))
