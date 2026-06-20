@@ -93,7 +93,7 @@ pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &
 ///
 /// Usage inside a component `impl` block:
 /// ```ignore
-/// callback_builder!(on_click, on_click, &ClickEvent);
+/// callback_builder!(on_click, on_click, ClickEvent);
 /// ```
 ///
 /// Expands to:
@@ -106,19 +106,22 @@ pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &
 ///     self
 /// }
 /// ```
+///
+/// **Note:** The type arguments are passed WITHOUT reference sigils — the macro
+/// adds `&` automatically.  Use `gpui::ClickEvent`, not `&ClickEvent`.
 #[macro_export]
 macro_rules! callback_builder {
     ($method:ident, $field:ident, $($arg:ty),+ $(,)?) => {
         #[doc = concat!(
-            "Attach a handler that receives `(",
-            $(stringify!($arg), ", ",)+
-            "&mut Window, &mut App)`."
+            "Attach a handler that receives `(&",
+            $(stringify!($arg), ", &",)+
+            "mut Window, &mut App)`."
         )]
         pub fn $method(
             mut self,
-            handler: impl Fn($($arg,)+ &mut ::gpui::Window, &mut ::gpui::App) + 'static,
+            handler: impl Fn($(&$arg,)+ &mut ::gpui::Window, &mut ::gpui::App) + 'static,
         ) -> Self {
-            self.$field = Some(Box::new(handler));
+            self.$field = Some(::std::boxed::Box::new(handler));
             self
         }
     };
