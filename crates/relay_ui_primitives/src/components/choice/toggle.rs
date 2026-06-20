@@ -3,7 +3,10 @@ use gpui::{
     StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{interaction::ClickHandler, theme::{ActiveTheme, space}};
+use crate::{
+    interaction::ClickHandler,
+    theme::{ActiveTheme, space},
+};
 
 /// A sliding on/off switch. The host owns `on` and flips it in `on_click`.
 #[derive(IntoElement)]

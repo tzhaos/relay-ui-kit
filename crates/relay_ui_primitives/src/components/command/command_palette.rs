@@ -8,7 +8,7 @@ use crate::{
     icon::IconName,
     motion::{MotionDirection, MotionExt},
     structure::ScrollSurface,
-    theme::{ActiveTheme, space, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 /// A floating command palette panel.

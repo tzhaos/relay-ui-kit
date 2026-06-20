@@ -6,7 +6,7 @@ use gpui::{
 use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius},
     tone::Tone,
 };
 

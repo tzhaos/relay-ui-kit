@@ -4,7 +4,7 @@ use gpui::{
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use relay_ui_primitives::{theme::{ActiveTheme, Theme, mono_family, radius, BORDER_WIDTH}};
+use relay_ui_primitives::theme::{ActiveTheme, BORDER_WIDTH, Theme, mono_family, radius};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum MarkdownBlock {

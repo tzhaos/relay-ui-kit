@@ -7,7 +7,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, KeyHandler},
-    theme::{ActiveTheme, radius, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius},
 };
 
 use super::TextInputState;
@@ -168,7 +168,12 @@ impl RenderOnce for NumberInput {
                         .flex()
                         .items_center()
                         .child(decrement)
-                        .child(div().h(px(16.0)).w(px(BORDER_WIDTH)).bg(theme.border.opacity(0.7)))
+                        .child(
+                            div()
+                                .h(px(16.0))
+                                .w(px(BORDER_WIDTH))
+                                .bg(theme.border.opacity(0.7)),
+                        )
                         .child(increment),
                 ),
             })

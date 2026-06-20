@@ -13,7 +13,7 @@ use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
     motion::{MotionDirection, MotionExt},
-    theme::{ActiveTheme, radius, space, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius, space},
 };
 
 /// Category shown on the right edge of a launcher row.

@@ -6,7 +6,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    theme::{Theme, radius, space, BORDER_WIDTH},
+    theme::{BORDER_WIDTH, Theme, radius, space},
 };
 
 pub(super) struct DialogPanel {

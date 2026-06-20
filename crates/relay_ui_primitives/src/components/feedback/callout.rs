@@ -4,7 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    theme::{ActiveTheme, radius, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius},
     tone::Tone,
 };
 

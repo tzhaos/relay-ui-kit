@@ -6,7 +6,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, Theme, radius, DISABLED_OPACITY, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, Theme, radius},
 };
 
 /// Standard actions for editing a keybinding row.

@@ -8,7 +8,7 @@ use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
     motion::{MotionDirection, MotionExt},
-    theme::{ActiveTheme, radius, space, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius, space},
 };
 
 use super::types::{BranchOption, BranchPickerAction};
@@ -164,7 +164,13 @@ impl RenderOnce for BranchPickerPanel {
         }
 
         if !self.actions.is_empty() {
-            panel = panel.child(div().my(px(space::XS)).h(px(BORDER_WIDTH)).w_full().bg(theme.border));
+            panel = panel.child(
+                div()
+                    .my(px(space::XS))
+                    .h(px(BORDER_WIDTH))
+                    .w_full()
+                    .bg(theme.border),
+            );
         }
 
         for (index, action) in self.actions.into_iter().enumerate() {

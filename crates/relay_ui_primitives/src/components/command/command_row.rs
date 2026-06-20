@@ -6,7 +6,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
-    theme::{ActiveTheme, radius, DISABLED_OPACITY, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius},
 };
 
 use super::KeybindingShortcut;

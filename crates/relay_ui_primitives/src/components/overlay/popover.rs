@@ -6,7 +6,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    theme::{ActiveTheme, space, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 /// A compact elevated panel for inline details and small action groups.

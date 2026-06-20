@@ -1,4 +1,3 @@
-
 use gpui::{
     AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
     Window, div, prelude::FluentBuilder, px,

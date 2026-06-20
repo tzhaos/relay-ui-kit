@@ -12,12 +12,12 @@ pub use git::{
     BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
 };
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
-pub use terminal::{
-    TerminalAgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
-    TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
-};
 #[allow(deprecated)]
 pub use terminal::AgentQuickLaunch;
+pub use terminal::{
+    TerminalAgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow,
+    TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
+};
 pub use viewer::{
     CodeView, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView, MarkdownView,
 };

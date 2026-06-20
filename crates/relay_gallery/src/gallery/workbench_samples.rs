@@ -4,11 +4,11 @@ use relay_ui_components::{
     WorkspaceBreadcrumb,
 };
 use relay_ui_primitives::{
-    Button, CommandPalette, CommandRow, IconName, KeybindingShortcut, NavRow, PanelHeader, TextInput,
-    TextInputAction, Theme, Tone, TreeRow, radius,
+    Button, CommandPalette, CommandRow, IconName, KeybindingShortcut, NavRow, PanelHeader,
+    TextInput, TextInputAction, Theme, Tone, TreeRow, radius,
 };
 use relay_workbench_ui::{
-    TerminalAgentQuickLaunch, LauncherItem, LauncherItemKind, LauncherMenu, TerminalLine,
+    LauncherItem, LauncherItemKind, LauncherMenu, TerminalAgentQuickLaunch, TerminalLine,
     TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge, TerminalSurface, TerminalTab,
     TerminalToolbar, TerminalTranscript,
 };

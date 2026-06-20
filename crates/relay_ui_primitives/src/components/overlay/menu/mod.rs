@@ -10,7 +10,7 @@ pub use item::MenuItem;
 use crate::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    theme::{ActiveTheme, radius, space, DISABLED_OPACITY, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius, space},
 };
 
 use super::overlay;
@@ -73,7 +73,13 @@ impl RenderOnce for Menu {
             } = item;
 
             if separator {
-                panel = panel.child(div().my(px(space::XS)).h(px(BORDER_WIDTH)).w_full().bg(theme.border));
+                panel = panel.child(
+                    div()
+                        .my(px(space::XS))
+                        .h(px(BORDER_WIDTH))
+                        .w_full()
+                        .bg(theme.border),
+                );
                 continue;
             }
             if header {
