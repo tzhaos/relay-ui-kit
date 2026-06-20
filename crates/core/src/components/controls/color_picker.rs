@@ -151,13 +151,13 @@ impl RenderOnce for ColorPicker {
                                         div()
                                             .text_xs()
                                             .font_weight(FontWeight::MEDIUM)
-                                            .text_color(theme.text)
+                                            .text_color(gpui::white())
                                             .child(selected_label),
                                     )
                                     .child(
                                         div()
                                             .text_size(px(11.0))
-                                            .text_color(theme.text_muted)
+                                            .text_color(gpui::white().opacity(0.82))
                                             .child(selected_value),
                                     ),
                             )

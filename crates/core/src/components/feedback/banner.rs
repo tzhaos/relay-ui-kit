@@ -62,6 +62,7 @@ impl RenderOnce for Banner {
             .border_color(self.tone.soft_border(&theme))
             .bg(self.tone.soft_bg(&theme))
             .items_start()
+            .max_w_full()
             .child(feedback_icon(tone_icon(self.tone), fg))
             .child(
                 div()
@@ -72,6 +73,8 @@ impl RenderOnce for Banner {
                     .gap(px(BORDER_WIDTH))
                     .child(
                         div()
+                            .min_w_0()
+                            .w_full()
                             .text_sm()
                             .line_height(px(18.0))
                             .font_weight(FontWeight::MEDIUM)
@@ -81,6 +84,8 @@ impl RenderOnce for Banner {
                     .when_some(self.detail, |this, detail| {
                         this.child(
                             div()
+                                .min_w_0()
+                                .w_full()
                                 .text_xs()
                                 .line_height(px(16.0))
                                 .text_color(theme.text_muted)

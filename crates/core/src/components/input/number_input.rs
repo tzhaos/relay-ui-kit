@@ -271,6 +271,9 @@ fn editable_number_value(
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
             window.focus(&focus_for_mouse_down, cx);
         })
+        .on_mouse_down_out(|_, window, _cx| {
+            window.blur();
+        })
         .on_click(move |_, window, cx| {
             window.focus(&focus_for_click, cx);
         })

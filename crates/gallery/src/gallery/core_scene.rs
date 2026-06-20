@@ -6,6 +6,7 @@ use relay_ui_core::{
     Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 use relay_ui_patterns::navigation::{Tab, Tabs};
+use relay_ui_patterns::overlay::{DropdownMenu, MenuItem};
 use relay_workbench::{TaskRow, TaskRowData};
 
 use super::{
@@ -200,18 +201,18 @@ fn input_choice_samples(
                 .child(
                     Radio::new(
                         "core-radio-system",
-                        state.theme_choice == "system",
+                        state.radio_choice == "system",
                         "System",
                     )
-                    .on_click(set_theme_choice(host, "system")),
+                    .on_click(set_radio_choice(host, "system")),
                 )
                 .child(
-                    Radio::new("core-radio-light", state.theme_choice == "light", "Light")
-                        .on_click(set_theme_choice(host, "light")),
+                    Radio::new("core-radio-light", state.radio_choice == "light", "Light")
+                        .on_click(set_radio_choice(host, "light")),
                 )
                 .child(
-                    Radio::new("core-radio-dark", state.theme_choice == "dark", "Dark")
-                        .on_click(set_theme_choice(host, "dark")),
+                    Radio::new("core-radio-dark", state.radio_choice == "dark", "Dark")
+                        .on_click(set_radio_choice(host, "dark")),
                 ),
         )
         .child(
@@ -234,14 +235,14 @@ fn input_choice_samples(
         )
 }
 
-fn set_theme_choice(
+fn set_radio_choice(
     host: &Entity<GalleryScenesApp>,
     key: &'static str,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
     let host = host.clone();
     move |_event, _window, cx| {
         host.update(cx, |this, cx| {
-            this.state.theme_choice = key;
+            this.state.radio_choice = key;
             cx.notify();
         });
     }
@@ -348,51 +349,23 @@ fn stepper_filter_samples(
         .gap_3()
         .child(
             FilterBar::new("core-filter-bar")
-                .child(
-                    FilterChip::new("filter-all-sessions", "All sessions")
-                        .icon(IconName::ListFilter)
-                        .count(4)
-                        .selected(state.theme_choice == "system")
-                        .dropdown(true)
-                        .on_click({
-                            let host = host.clone();
-                            move |_event, _window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.theme_choice = "system";
-                                    cx.notify();
-                                });
-                            }
-                        }),
-                )
+                .child(session_filter_menu(state, host))
                 .child(
                     FilterChip::new("filter-running", "Running")
                         .icon(IconName::CircleDot)
-                        .selected(state.theme_choice == "light")
+                        .selected(state.filter_choice == "running")
                         .on_click({
                             let host = host.clone();
                             move |_event, _window, cx| {
                                 host.update(cx, |this, cx| {
-                                    this.state.theme_choice = "light";
+                                    this.state.filter_choice = "running";
+                                    this.state.filter_menu_open = "";
                                     cx.notify();
                                 });
                             }
                         }),
                 )
-                .child(
-                    FilterChip::new("filter-projects", "All projects")
-                        .icon(IconName::Folder)
-                        .selected(state.theme_choice == "dark")
-                        .dropdown(true)
-                        .on_click({
-                            let host = host.clone();
-                            move |_event, _window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.theme_choice = "dark";
-                                    cx.notify();
-                                });
-                            }
-                        }),
-                ),
+                .child(project_filter_menu(state, host)),
         )
         .child(
             Stepper::new(
@@ -427,6 +400,126 @@ fn stepper_filter_samples(
                 }
             }),
         )
+}
+
+fn session_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    let open = state.filter_menu_open == "sessions";
+    DropdownMenu::new(
+        "core-session-filter-menu",
+        FilterChip::new(
+            "filter-all-sessions",
+            match state.filter_choice {
+                "running" => "Running",
+                "failed" => "Failed",
+                _ => "All sessions",
+            },
+        )
+        .icon(IconName::ListFilter)
+        .count(4)
+        .selected(state.filter_choice != "all")
+        .open(open)
+        .dropdown(true)
+        .on_click(toggle_filter_menu(host, "sessions", open)),
+        vec![
+            filter_action(host, "all", "All sessions", IconName::ListFilter),
+            filter_action(host, "running", "Running", IconName::CircleDot),
+            filter_action(host, "failed", "Failed", IconName::Archive),
+        ],
+    )
+    .open(open)
+    .min_width(190.0)
+    .offset(0.0, 34.0)
+    .on_dismiss(close_filter_menu(host))
+}
+
+fn project_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    let open = state.filter_menu_open == "projects";
+    DropdownMenu::new(
+        "core-project-filter-menu",
+        FilterChip::new(
+            "filter-projects",
+            match state.project_filter_choice {
+                "relay" => "Relay",
+                "gallery" => "Gallery",
+                _ => "All projects",
+            },
+        )
+        .icon(IconName::Folder)
+        .selected(state.project_filter_choice != "all-projects")
+        .open(open)
+        .dropdown(true)
+        .on_click(toggle_filter_menu(host, "projects", open)),
+        vec![
+            project_filter_action(host, "all-projects", "All projects"),
+            project_filter_action(host, "relay", "Relay"),
+            project_filter_action(host, "gallery", "Gallery"),
+        ],
+    )
+    .open(open)
+    .min_width(180.0)
+    .offset(0.0, 34.0)
+    .on_dismiss(close_filter_menu(host))
+}
+
+fn toggle_filter_menu(
+    host: &Entity<GalleryScenesApp>,
+    menu: &'static str,
+    open: bool,
+) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+    let host = host.clone();
+    move |_event, _window, cx| {
+        host.update(cx, |this, cx| {
+            this.state.filter_menu_open = if open { "" } else { menu };
+            cx.notify();
+        });
+    }
+}
+
+fn close_filter_menu(
+    host: &Entity<GalleryScenesApp>,
+) -> impl Fn(&mut gpui::Window, &mut gpui::App) + 'static {
+    let host = host.clone();
+    move |_window, cx| {
+        host.update(cx, |this, cx| {
+            this.state.filter_menu_open = "";
+            cx.notify();
+        });
+    }
+}
+
+fn filter_action(
+    host: &Entity<GalleryScenesApp>,
+    key: &'static str,
+    label: &'static str,
+    icon: IconName,
+) -> MenuItem {
+    MenuItem::new(label).icon(icon).on_click({
+        let host = host.clone();
+        move |_event, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.filter_choice = key;
+                this.state.filter_menu_open = "";
+                cx.notify();
+            });
+        }
+    })
+}
+
+fn project_filter_action(
+    host: &Entity<GalleryScenesApp>,
+    key: &'static str,
+    label: &'static str,
+) -> MenuItem {
+    MenuItem::new(label).icon(IconName::Folder).on_click({
+        let host = host.clone();
+        move |_event, _window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.project_filter_choice = key;
+                this.state.filter_menu_open = "";
+                cx.notify();
+            });
+        }
+    })
 }
 
 fn nav_rows_sample() -> impl IntoElement {
@@ -561,6 +654,7 @@ fn list_core_samples(
                         .count(2)
                         .child(
                             ListItem::new("recent-terminal")
+                                .height(gpui::px(48.0))
                                 .selected(selected == "recent:terminal")
                                 .start_slot(Icon::new(IconName::Terminal))
                                 .on_click(select_core_item(host, "recent:terminal"))
@@ -572,6 +666,7 @@ fn list_core_samples(
                         )
                         .child(
                             ListItem::new("recent-diff")
+                                .height(gpui::px(48.0))
                                 .selected(selected == "recent:diff")
                                 .start_slot(Icon::new(IconName::FileDiff))
                                 .on_click(select_core_item(host, "recent:diff"))
@@ -579,6 +674,7 @@ fn list_core_samples(
                         ),
                     SectionedListGroup::new("Pinned").child(
                         ListItem::new("pinned-command")
+                            .height(gpui::px(48.0))
                             .start_slot(Icon::new(IconName::Zap))
                             .selected(selected == "pinned:command")
                             .on_click(select_core_item(host, "pinned:command"))

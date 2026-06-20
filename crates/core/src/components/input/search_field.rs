@@ -1,6 +1,6 @@
 use gpui::{
     App, ClickEvent, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 
@@ -72,6 +72,7 @@ impl RenderOnce for SearchField {
             theme.text
         };
         let focus_for_click = self.focus.clone();
+        let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
 
         div()
@@ -111,6 +112,10 @@ impl RenderOnce for SearchField {
                         cx.stop_propagation();
                     }
                 })
+            })
+            .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                window.focus(&focus_for_mouse_down, cx);
+                window.prevent_default();
             })
             .on_click(move |_: &ClickEvent, window, cx| {
                 window.focus(&focus_for_click, cx);

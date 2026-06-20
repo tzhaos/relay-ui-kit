@@ -1,11 +1,14 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
+use gpui::{
+    Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px,
+    rgb,
+};
 use relay_ui_core::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, InputActionKind, InputValueKind, LoadingSpinner, NumberInput, ProgressBar,
     SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind,
     Toast, Toggle, Tone,
 };
-use relay_ui_patterns::overlay::{Select, SelectOption};
+use relay_ui_patterns::overlay::{Select, SelectOption, overlay};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -92,7 +95,9 @@ pub(super) fn render(
             cx,
             "Feedback",
             div()
-                .max_w(px(520.0))
+                .relative()
+                .w_full()
+                .max_w(px(720.0))
                 .flex()
                 .flex_col()
                 .gap_3()
@@ -158,10 +163,69 @@ pub(super) fn render(
                     .icon(IconName::Bot),
                 )
                 .child(
-                    Toast::new("feedback-toast", "Terminal session restored")
-                        .detail("codex on ui-kit/branch-controls")
-                        .tone(Tone::Accent),
+                    strip()
+                        .child(
+                            Button::new(
+                                "feedback-show-toast",
+                                if state.feedback_toast_open {
+                                    "Replay toast"
+                                } else {
+                                    "Open toast"
+                                },
+                            )
+                            .icon(IconName::MessageSquareText)
+                            .on_click({
+                                let host = host.clone();
+                                move |_event, _window, cx| {
+                                    host.update(cx, |this, cx| {
+                                        this.state.feedback_toast_open = true;
+                                        this.state.feedback_toast_serial =
+                                            this.state.feedback_toast_serial.wrapping_add(1);
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                        )
+                        .child(
+                            Button::new("feedback-hide-toast", "Hide")
+                                .ghost()
+                                .disabled(!state.feedback_toast_open)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.state.feedback_toast_open = false;
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        ),
                 )
+                .when(state.feedback_toast_open, |this| {
+                    this.child(
+                        overlay(
+                            Toast::new(
+                                format!(
+                                    "feedback-floating-toast-{}",
+                                    state.feedback_toast_serial
+                                ),
+                                "Terminal session restored",
+                            )
+                                .detail("codex on ui-kit/branch-controls")
+                                .tone(Tone::Accent),
+                        )
+                        .offset(368.0, 8.0)
+                        .on_dismiss({
+                            let host = host.clone();
+                            move |_window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.feedback_toast_open = false;
+                                    cx.notify();
+                                });
+                            }
+                        }),
+                    )
+                })
                 .child(div().text_xs().text_color(theme.text_muted).child(format!(
                     "Current launcher choice: {}",
                     state.launcher_choice
