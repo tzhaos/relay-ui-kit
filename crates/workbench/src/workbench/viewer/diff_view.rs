@@ -4,7 +4,7 @@ use gpui::{
 };
 use similar::{ChangeTag, TextDiff};
 
-use relay_foundation::theme::{ActiveTheme, Theme, mono_family, radius};
+use relay_ui_core::theme::{ActiveTheme, Theme, mono_family, radius};
 
 /// Visual classification for a diff line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

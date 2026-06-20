@@ -1,5 +1,5 @@
 use gpui::Hsla;
-use relay_foundation::Theme;
+use relay_ui_core::Theme;
 
 /// Visual treatment for one terminal output row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

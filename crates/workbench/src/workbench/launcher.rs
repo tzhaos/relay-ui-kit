@@ -9,7 +9,7 @@ use gpui::{
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_foundation::{
+use relay_ui_core::{
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
     motion::{MotionDirection, MotionExt},

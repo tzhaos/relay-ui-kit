@@ -1,10 +1,10 @@
 use gpui::{Entity, FontWeight, IntoElement, ParentElement, Styled, div, px};
-use relay_composites::{Pane, PaneSurface, PaneWidth};
-use relay_foundation::{
-    Divider, IconButton, IconName, NavRow, PanelHeader, TaskRow, TaskRowData, Theme, TreeRow,
+use relay_ui_core::{
+    Divider, IconButton, IconName, NavRow, PanelHeader, Theme, TreeRow,
     theme::{radius, space},
 };
-use relay_workbench::TerminalStatusBadge;
+use relay_ui_patterns::{Pane, PaneSurface, PaneWidth};
+use relay_workbench::{TaskRow, TaskRowData, TerminalStatusBadge};
 
 use super::{
     WorkbenchApp, WorkbenchState,

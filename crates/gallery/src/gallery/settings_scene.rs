@@ -1,11 +1,11 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, rgb};
-use relay_composites::{Select, SelectOption};
-use relay_foundation::{
+use relay_ui_core::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, InputActionKind, InputValueKind, LoadingSpinner, NumberInput, ProgressBar,
     SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind,
     Toast, Toggle, Tone,
 };
+use relay_ui_patterns::overlay::{Select, SelectOption};
 
 use super::{
     GalleryScenesApp, GalleryState,

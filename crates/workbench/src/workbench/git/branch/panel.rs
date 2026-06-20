@@ -3,13 +3,13 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_composites::overlay;
-use relay_foundation::{
+use relay_ui_core::{
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, radius, space},
 };
+use relay_ui_patterns::overlay;
 
 use super::types::{BranchOption, BranchPickerAction};
 

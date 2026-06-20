@@ -1,5 +1,5 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
-use relay_foundation::{Segment, SegmentedControl};
+use relay_ui_core::{Segment, SegmentedControl};
 use relay_workbench::{CodeView, DiffView, FileKind, FileView, MarkdownView};
 
 use super::{GalleryScenesApp, GalleryState};

@@ -1,9 +1,10 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
-use relay_foundation::{
+use relay_ui_core::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
     theme::{ActiveTheme, radius},
@@ -55,13 +56,34 @@ impl BranchSelector {
         self
     }
 
-    relay_foundation::callback_builder!(on_toggle, on_toggle, ClickEvent);
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Box::new(handler));
+        self
+    }
 
-    relay_foundation::shared_callback_builder!(on_select, on_select, &'static str);
+    pub fn on_select(
+        mut self,
+        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_select = Some(std::rc::Rc::new(handler));
+        self
+    }
 
-    relay_foundation::shared_callback_builder!(on_action, on_action, &'static str);
+    pub fn on_action(
+        mut self,
+        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_action = Some(std::rc::Rc::new(handler));
+        self
+    }
 
-    relay_foundation::shared_callback_builder!(on_dismiss, on_dismiss,);
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(std::rc::Rc::new(handler));
+        self
+    }
 
     pub fn selected_label(&self) -> &str {
         self.branches
@@ -80,6 +102,7 @@ impl RenderOnce for BranchSelector {
         let action_handler = self.on_action;
         let dismiss_handler = self.on_dismiss;
         let trigger_handler = self.on_toggle;
+        let trigger_clickable = trigger_handler.is_some();
         let mut root = div().id(self.id).relative().flex().items_center().child(
             div()
                 .id("branch-selector-trigger")
@@ -102,8 +125,13 @@ impl RenderOnce for BranchSelector {
                     theme.panel
                 })
                 .text_color(theme.text_secondary)
-                .cursor_pointer()
-                .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                .when(trigger_clickable, |this| {
+                    this.cursor_pointer()
+                        .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
+                })
                 .child(
                     Icon::new(IconName::GitBranch)
                         .size(IconSize::Small)
@@ -122,12 +150,15 @@ impl RenderOnce for BranchSelector {
                         .size(IconSize::XSmall)
                         .color(theme.text_muted),
                 )
-                .when_some(trigger_handler, |this, handler| {
-                    this.on_click(move |event, window, cx| {
-                        handler(event, window, cx);
-                        cx.stop_propagation();
-                    })
-                }),
+                .when_some(
+                    trigger_handler.filter(|_| trigger_clickable),
+                    |this, handler| {
+                        this.on_click(move |event, window, cx| {
+                            handler(event, window, cx);
+                            cx.stop_propagation();
+                        })
+                    },
+                ),
         );
 
         if self.open {

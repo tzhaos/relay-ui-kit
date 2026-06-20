@@ -1,8 +1,8 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
-use relay_composites::{Pane, PaneSurface, PaneWidth};
-use relay_foundation::{
+use relay_ui_core::{
     Button, IconButton, IconName, PanelHeader, Segment, SegmentedControl, Theme, theme,
 };
+use relay_ui_patterns::{Pane, PaneSurface, PaneWidth};
 use relay_workbench::{
     FileKind, FileView, LauncherItem, LauncherItemKind, LauncherMenu, MarkdownView,
     TerminalAgentQuickLaunch, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,

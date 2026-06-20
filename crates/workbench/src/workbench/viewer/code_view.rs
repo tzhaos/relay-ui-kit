@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_foundation::theme::{ActiveTheme, BORDER_WIDTH, Theme, mono_family, radius};
+use relay_ui_core::theme::{ActiveTheme, BORDER_WIDTH, Theme, mono_family, radius};
 
 /// A lightweight read-only code/file text surface.
 #[derive(IntoElement)]

@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_foundation::theme::{ActiveTheme, Theme, mono_family, space};
+use relay_ui_core::theme::{ActiveTheme, Theme, mono_family, space};
 
 /// A terminal frame that hosts a real terminal/PTY projection.
 #[derive(IntoElement)]

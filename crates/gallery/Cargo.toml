@@ -15,6 +15,6 @@ path = "src/main.rs"
 [dependencies]
 gpui.workspace = true
 gpui_platform.workspace = true
-relay_composites.workspace = true
-relay_foundation.workspace = true
+relay_ui_patterns.workspace = true
+relay_ui_core.workspace = true
 relay_workbench.workspace = true

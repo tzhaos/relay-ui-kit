@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/foundation",
-    "crates/composites",
+    "crates/core",
+    "crates/patterns",
     "crates/workbench",
     "crates/gallery",
 ]
@@ -58,8 +58,8 @@ anyhow = "1"
 gpui = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui_platform" }
 pulldown-cmark = "0.13.4"
-relay_foundation = { path = "crates/foundation" }
-relay_composites = { path = "crates/composites" }
+relay_ui_core = { path = "crates/core" }
+relay_ui_patterns = { path = "crates/patterns" }
 relay_workbench = { path = "crates/workbench" }
 similar = "2"
 unicode-segmentation = "1.13"

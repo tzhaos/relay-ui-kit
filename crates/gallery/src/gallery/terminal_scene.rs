@@ -1,5 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div};
-use relay_foundation::{Button, IconButton, IconName, TextArea, TextInputAction, Theme};
+use relay_ui_core::{Button, IconButton, IconName, TextArea, TextInputAction, Theme};
 use relay_workbench::Composer;
 
 use super::{

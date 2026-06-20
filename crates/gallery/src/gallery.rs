@@ -7,11 +7,11 @@ use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
     Styled, Window, div, px,
 };
-use relay_composites::{ScrollSurface, SplitPaneState};
-use relay_foundation::{ActiveTheme, TextInputState, space};
+use relay_ui_core::{ActiveTheme, TextInputState, space};
+use relay_ui_patterns::{ScrollSurface, SplitPaneState};
 
 mod command_scene;
-mod foundations_scene;
+mod core_scene;
 mod review_scene;
 mod settings_scene;
 mod shared;
@@ -26,7 +26,7 @@ pub enum GallerySurface {
     Review,
     Command,
     Settings,
-    Foundations,
+    Core,
     Stress,
 }
 
@@ -78,10 +78,10 @@ pub struct GalleryState {
     pub confirm_dialog_open: bool,
     pub accent_choice: &'static str,
     pub overlay_event: String,
-    pub foundations_disclosure_open: bool,
-    pub foundations_tree_src_open: bool,
-    pub foundations_tree_components_open: bool,
-    pub foundations_tree_list_open: bool,
+    pub core_disclosure_open: bool,
+    pub core_tree_src_open: bool,
+    pub core_tree_components_open: bool,
+    pub core_tree_list_open: bool,
 }
 
 impl GalleryState {
@@ -115,10 +115,10 @@ impl GalleryState {
             confirm_dialog_open: false,
             accent_choice: "green",
             overlay_event: "No overlay action yet".into(),
-            foundations_disclosure_open: true,
-            foundations_tree_src_open: true,
-            foundations_tree_components_open: true,
-            foundations_tree_list_open: true,
+            core_disclosure_open: true,
+            core_tree_src_open: true,
+            core_tree_components_open: true,
+            core_tree_list_open: true,
         }
     }
 }
@@ -149,9 +149,7 @@ fn render_surface(
         GallerySurface::Settings => {
             settings_scene::render(state, host, window, theme, cx).into_any_element()
         }
-        GallerySurface::Foundations => {
-            foundations_scene::render(state, host, theme, cx).into_any_element()
-        }
+        GallerySurface::Core => core_scene::render(state, host, theme, cx).into_any_element(),
         GallerySurface::Stress => stress_scene::render(state, host, theme, cx).into_any_element(),
     };
 

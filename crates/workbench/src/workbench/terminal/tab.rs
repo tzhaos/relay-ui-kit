@@ -1,9 +1,10 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
-use relay_foundation::{
+use relay_ui_core::{
     display::StatusDot,
     interaction::ClickHandler,
     theme::{ActiveTheme, radius},
@@ -41,13 +42,20 @@ impl TerminalTab {
         self
     }
 
-    relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for TerminalTab {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let handler = self.on_click;
+        let clickable = handler.is_some();
 
         div()
             .id(self.id)
@@ -74,9 +82,14 @@ impl RenderOnce for TerminalTab {
             } else {
                 theme.text_secondary
             })
-            .when(!self.active, |this| {
-                this.cursor_pointer()
-                    .hover(move |style| style.bg(theme.hover))
+            .when(clickable, |this| this.cursor_pointer())
+            .when(clickable && !self.active, |this| {
+                this.hover(move |style| style.bg(theme.hover))
+            })
+            .when(clickable, |this| {
+                this.on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
             })
             .child(StatusDot::new(self.status).size(6.0))
             .child(
@@ -87,7 +100,7 @@ impl RenderOnce for TerminalTab {
                     .font_weight(FontWeight::MEDIUM)
                     .child(self.label),
             )
-            .when_some(handler, |this, handler| {
+            .when_some(handler.filter(|_| clickable), |this, handler| {
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();

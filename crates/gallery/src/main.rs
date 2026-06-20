@@ -13,7 +13,7 @@
 //! - **Review** — file tree, Markdown/code preview, and diff review surfaces.
 //! - **Command Center** — command palette, launcher, shortcuts, and menus.
 //! - **Settings** — forms, choices, dropdowns, and feedback states.
-//! - **Foundations** — buttons, icons, badges, rows, tabs, and empty states.
+//! - **Core Lab** — buttons, icons, badges, rows, tabs, and empty states.
 //! - **Stress Lab** — long labels, dense rows, disabled states, and overflow.
 //!
 //! Interactivity pattern: components carry view-free callbacks
@@ -34,8 +34,8 @@ use gpui::{
     StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
-use relay_composites::{TitleBar, WorkspaceBreadcrumb};
-use relay_foundation::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
+use relay_ui_core::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
+use relay_ui_patterns::{TitleBar, WorkspaceBreadcrumb};
 
 /// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,7 +45,7 @@ pub enum Page {
     Review,
     Command,
     Settings,
-    Foundations,
+    Core,
     Stress,
 }
 
@@ -94,7 +94,7 @@ impl GalleryApp {
             Page::Review => "Review Desk",
             Page::Command => "Command Center",
             Page::Settings => "Settings",
-            Page::Foundations => "Foundation Lab",
+            Page::Core => "Core Lab",
             Page::Stress => "Stress Lab",
         }
     }
@@ -106,7 +106,7 @@ impl GalleryApp {
             Page::Review => IconName::FileDiff,
             Page::Command => IconName::Zap,
             Page::Settings => IconName::Settings,
-            Page::Foundations => IconName::LayoutGrid,
+            Page::Core => IconName::LayoutGrid,
             Page::Stress => IconName::ListChecks,
         }
     }
@@ -139,7 +139,7 @@ impl GalleryApp {
             .child(self.catalog_row(Page::Review, cx))
             .child(self.catalog_row(Page::Command, cx))
             .child(self.catalog_row(Page::Settings, cx))
-            .child(self.catalog_row(Page::Foundations, cx))
+            .child(self.catalog_row(Page::Core, cx))
             .child(self.catalog_row(Page::Stress, cx))
             .child(div().flex_1())
             .child(self.theme_toggle(cx))
@@ -192,7 +192,7 @@ impl GalleryApp {
             Page::Review => "studio-review",
             Page::Command => "studio-command",
             Page::Settings => "studio-settings",
-            Page::Foundations => "studio-foundations",
+            Page::Core => "studio-core",
             Page::Stress => "studio-stress",
         }
     }
@@ -204,7 +204,7 @@ impl GalleryApp {
             Page::Review => "Review Desk",
             Page::Command => "Command Center",
             Page::Settings => "Settings",
-            Page::Foundations => "Foundation Lab",
+            Page::Core => "Core Lab",
             Page::Stress => "Stress Lab",
         }
     }
@@ -219,7 +219,7 @@ impl Render for GalleryApp {
             | Page::Review
             | Page::Command
             | Page::Settings
-            | Page::Foundations
+            | Page::Core
             | Page::Stress => cached_scene(self.gallery.clone()),
         };
 
@@ -250,7 +250,7 @@ impl Page {
             Page::Review => Some(gallery::GallerySurface::Review),
             Page::Command => Some(gallery::GallerySurface::Command),
             Page::Settings => Some(gallery::GallerySurface::Settings),
-            Page::Foundations => Some(gallery::GallerySurface::Foundations),
+            Page::Core => Some(gallery::GallerySurface::Core),
             Page::Stress => Some(gallery::GallerySurface::Stress),
         }
     }
