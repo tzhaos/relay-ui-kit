@@ -4299,41 +4299,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "relay_gallery"
+name = "relay_uikit"
 version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui_platform",
- "relay_ui_core",
- "relay_ui_patterns",
- "relay_workbench",
-]
-
-[[package]]
-name = "relay_ui_core"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "relay_ui_patterns"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "relay_ui_core",
-]
-
-[[package]]
-name = "relay_workbench"
-version = "0.1.0"
-dependencies = [
- "gpui",
  "pulldown-cmark",
- "relay_ui_core",
- "relay_ui_patterns",
  "similar",
+ "unicode-segmentation",
 ]
 
 [[package]]

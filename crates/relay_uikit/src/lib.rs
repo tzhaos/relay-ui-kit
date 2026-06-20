@@ -1,0 +1,79 @@
+//! Relay UIKit for GPUI.
+//!
+//! This crate groups Relay's GPUI visual tokens, controls, reusable interaction
+//! patterns, workbench compositions, and gallery binary into one UI package.
+
+pub(crate) mod component_prelude;
+pub mod components;
+pub mod interaction;
+pub mod patterns;
+pub mod styles;
+pub mod workbench;
+
+pub use components::{button, choice, controls, display, feedback, form, icon, input, list, row};
+pub use patterns::{command, layout, navigation, scroll_surface, shell};
+pub use styles::{motion, theme, tone};
+pub use workbench::{composer, git, launcher, terminal, viewer};
+
+pub use button::{Button, ButtonVariant, IconButton};
+pub use choice::{Checkbox, Radio, Toggle};
+pub use command::{
+    CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
+    KeybindingShortcut, KeybindingTable,
+};
+pub use controls::{
+    ColorField, ColorPicker, ColorPreset, ColorSwatch, Disclosure, FilterBar, FilterChip,
+    PanelHeader, Segment, SegmentedControl, Slider, Stepper, ThemePreviewCard, ThemePreviewKind,
+    ToolbarGroup,
+};
+pub use display::{
+    Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
+};
+pub use feedback::{Banner, Callout, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
+pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
+pub use icon::{Icon, IconName, IconSize, KitAssets};
+pub use input::{
+    InputActionKind, InputValueKind, NumberInput, NumberInputLayout, SearchField, TextArea,
+    TextInput, TextInputAction, TextInputState, ValidationState,
+};
+pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
+pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
+pub use patterns::overlay::{
+    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,
+    Popover, Select, SelectOption, TooltipBody, overlay,
+};
+pub use row::{NavRow, TreeRow};
+pub use scroll_surface::ScrollSurface;
+pub use shell::{
+    AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, SplitPaneState,
+    StatusBar, StatusItem, TitleBar, TopToolbar, WindowControls, WorkspaceBreadcrumb,
+};
+pub use theme::{ActiveTheme, Theme, radius, space};
+pub use tone::Tone;
+#[allow(deprecated)]
+pub use workbench::AgentQuickLaunch;
+pub use workbench::{
+    BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
+    CodeView, Composer, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView,
+    LauncherItem, LauncherItemKind, LauncherMenu, MarkdownView, TaskRow, TaskRowData,
+    TerminalAgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow,
+    TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
+};
+
+/// Core controls, tokens, and interaction types.
+pub mod core {
+    pub use crate::{
+        ActiveTheme, Badge, BadgeStyle, Banner, Button, ButtonVariant, Callout, Checkbox,
+        ColorField, ColorPicker, ColorPreset, ColorSwatch, CountBadge, Disclosure, Divider,
+        EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton,
+        IconName, IconSize, InlineError, InputActionKind, InputValueKind, KitAssets, Label,
+        LabelColor, LabelSize, ListItem, ListItemSpacing, LoadingSpinner, MotionDirection,
+        MotionDuration, MotionExt, MotionPolicy, NavRow, NumberInput, NumberInputLayout,
+        PanelHeader, ProgressBar, Radio, SearchField, SectionedList, SectionedListGroup, Segment,
+        SegmentedControl, SettingsRow, SettingsSection, Skeleton, Slider, StatusDot, Stepper,
+        TextArea, TextInput, TextInputAction, TextInputState, Theme, ThemePreviewCard,
+        ThemePreviewKind, Toast, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
+        ValidationState, button, choice, components, controls, display, feedback, form, icon,
+        input, interaction, list, motion, radius, row, space, styles, theme, tone,
+    };
+}

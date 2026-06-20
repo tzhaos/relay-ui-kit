@@ -2,12 +2,9 @@
 resolver = "2"
 members = [
     "crates/relay",
-    "crates/core",
-    "crates/patterns",
-    "crates/workbench",
-    "crates/gallery",
+    "crates/relay_uikit",
 ]
-default-members = ["crates/gallery"]
+default-members = ["crates/relay_uikit"]
 
 [workspace.package]
 edition = "2024"
@@ -60,8 +57,6 @@ gpui = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b546
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui_platform" }
 pulldown-cmark = "0.13.4"
 relay = { path = "crates/relay" }
-relay_ui_core = { path = "crates/core" }
-relay_ui_patterns = { path = "crates/patterns" }
-relay_workbench = { path = "crates/workbench" }
+relay_uikit = { path = "crates/relay_uikit" }
 similar = "2"
 unicode-segmentation = "1.13"

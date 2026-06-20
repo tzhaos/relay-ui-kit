@@ -1,0 +1,23 @@
+[package]
+name = "relay_uikit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "relay_gallery"
+path = "src/bin/relay_gallery/main.rs"
+
+[dependencies]
+gpui.workspace = true
+gpui_platform.workspace = true
+pulldown-cmark.workspace = true
+similar.workspace = true
+unicode-segmentation.workspace = true
