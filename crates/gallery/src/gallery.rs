@@ -22,11 +22,9 @@ mod workbench_samples;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GallerySurface {
-    Terminal,
-    Review,
-    Command,
-    Settings,
     Core,
+    Patterns,
+    Workbench,
     Stress,
 }
 
@@ -38,7 +36,7 @@ pub struct GalleryScenesApp {
 impl GalleryScenesApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
-            surface: GallerySurface::Terminal,
+            surface: GallerySurface::Core,
             state: GalleryState::new(cx),
         }
     }
@@ -139,17 +137,23 @@ fn render_surface(
 ) -> AnyElement {
     let theme = *cx.theme();
     let content: AnyElement = match surface {
-        GallerySurface::Terminal => {
-            terminal_scene::render(state, host, window, theme, cx).into_any_element()
+        GallerySurface::Core => div()
+            .flex()
+            .flex_col()
+            .gap(px(space::XL))
+            .child(core_scene::render(state, host, theme, cx))
+            .child(settings_scene::render(state, host, window, theme, cx))
+            .into_any_element(),
+        GallerySurface::Patterns => {
+            command_scene::render(state, host, theme, cx).into_any_element()
         }
-        GallerySurface::Review => {
-            review_scene::render(state, host, window, theme, cx).into_any_element()
-        }
-        GallerySurface::Command => command_scene::render(state, host, theme, cx).into_any_element(),
-        GallerySurface::Settings => {
-            settings_scene::render(state, host, window, theme, cx).into_any_element()
-        }
-        GallerySurface::Core => core_scene::render(state, host, theme, cx).into_any_element(),
+        GallerySurface::Workbench => div()
+            .flex()
+            .flex_col()
+            .gap(px(space::XL))
+            .child(terminal_scene::render(state, host, window, theme, cx))
+            .child(review_scene::render(state, host, window, theme, cx))
+            .into_any_element(),
         GallerySurface::Stress => stress_scene::render(state, host, theme, cx).into_any_element(),
     };
 

@@ -6,14 +6,12 @@
 //! launches several small app-shaped scenes so components appear in the kind of
 //! surface where Relay will use them:
 //!
-//! - **Workbench** — the Orca three-column shell (left rail / center terminal /
+//! - **Product Workbench** — the Orca three-column shell (left rail / center terminal /
 //!   right context). Click tasks to activate them, switch Files/Diff/Review and
 //!   Terminal/Preview, filter the file tree, open the row context menu.
-//! - **Terminal Hub** — terminal tabs, agent quick launch, and session UI.
-//! - **Review** — file tree, Markdown/code preview, and diff review surfaces.
-//! - **Command Center** — command palette, launcher, shortcuts, and menus.
-//! - **Settings** — forms, choices, dropdowns, and feedback states.
-//! - **Core Lab** — buttons, icons, badges, rows, tabs, and empty states.
+//! - **Core Kit** — primitives, inputs, forms, choices, feedback, lists, and rows.
+//! - **Patterns Kit** — command, navigation, layout, overlay, and scroll patterns.
+//! - **Workbench Kit** — terminal, agent, branch, viewer, composer, and task components.
 //! - **Stress Lab** — long labels, dense rows, disabled states, and overflow.
 //!
 //! Interactivity pattern: components carry view-free callbacks
@@ -40,12 +38,10 @@ use relay_ui_patterns::{TitleBar, WorkspaceBreadcrumb};
 /// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
-    Workbench,
-    Terminal,
-    Review,
-    Command,
-    Settings,
+    Product,
     Core,
+    Patterns,
+    Workbench,
     Stress,
 }
 
@@ -59,7 +55,7 @@ pub struct GalleryApp {
 impl GalleryApp {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
-            page: Page::Workbench,
+            page: Page::Product,
             dark_mode: Rc::new(Cell::new(false)),
             gallery: cx.new(gallery::GalleryScenesApp::new),
             workbench: cx.new(workbench_demo::WorkbenchApp::new),
@@ -89,32 +85,29 @@ impl GalleryApp {
 
     fn page_label(&self) -> &'static str {
         match self.page {
-            Page::Workbench => "Workbench",
-            Page::Terminal => "Terminal Hub",
-            Page::Review => "Review Desk",
-            Page::Command => "Command Center",
-            Page::Settings => "Settings",
-            Page::Core => "Core Lab",
+            Page::Product => "Product Workbench",
+            Page::Core => "Core Kit",
+            Page::Patterns => "Patterns Kit",
+            Page::Workbench => "Workbench Kit",
             Page::Stress => "Stress Lab",
         }
     }
 
     fn page_icon(page: Page) -> IconName {
         match page {
-            Page::Workbench => IconName::PanelLeft,
-            Page::Terminal => IconName::Terminal,
-            Page::Review => IconName::FileDiff,
-            Page::Command => IconName::Zap,
-            Page::Settings => IconName::Settings,
+            Page::Product => IconName::PanelLeft,
             Page::Core => IconName::LayoutGrid,
+            Page::Patterns => IconName::Zap,
+            Page::Workbench => IconName::Terminal,
             Page::Stress => IconName::ListChecks,
         }
     }
 
     fn page_count(page: Page) -> Option<usize> {
         match page {
-            Page::Review => Some(3),
-            Page::Command => Some(4),
+            Page::Core => Some(6),
+            Page::Patterns => Some(5),
+            Page::Workbench => Some(6),
             Page::Stress => Some(9),
             _ => None,
         }
@@ -134,12 +127,10 @@ impl GalleryApp {
             .border_r_1()
             .border_color(theme.border)
             .bg(theme.chrome)
-            .child(self.catalog_row(Page::Workbench, cx))
-            .child(self.catalog_row(Page::Terminal, cx))
-            .child(self.catalog_row(Page::Review, cx))
-            .child(self.catalog_row(Page::Command, cx))
-            .child(self.catalog_row(Page::Settings, cx))
+            .child(self.catalog_row(Page::Product, cx))
             .child(self.catalog_row(Page::Core, cx))
+            .child(self.catalog_row(Page::Patterns, cx))
+            .child(self.catalog_row(Page::Workbench, cx))
             .child(self.catalog_row(Page::Stress, cx))
             .child(div().flex_1())
             .child(self.theme_toggle(cx))
@@ -187,24 +178,20 @@ impl GalleryApp {
 
     fn page_key(page: Page) -> &'static str {
         match page {
-            Page::Workbench => "studio-workbench",
-            Page::Terminal => "studio-terminal",
-            Page::Review => "studio-review",
-            Page::Command => "studio-command",
-            Page::Settings => "studio-settings",
+            Page::Product => "studio-product",
             Page::Core => "studio-core",
+            Page::Patterns => "studio-patterns",
+            Page::Workbench => "studio-workbench-kit",
             Page::Stress => "studio-stress",
         }
     }
 
     fn page_label_for(&self, page: Page) -> &'static str {
         match page {
-            Page::Workbench => "Workbench",
-            Page::Terminal => "Terminal Hub",
-            Page::Review => "Review Desk",
-            Page::Command => "Command Center",
-            Page::Settings => "Settings",
-            Page::Core => "Core Lab",
+            Page::Product => "Product Workbench",
+            Page::Core => "Core Kit",
+            Page::Patterns => "Patterns Kit",
+            Page::Workbench => "Workbench Kit",
             Page::Stress => "Stress Lab",
         }
     }
@@ -214,13 +201,10 @@ impl Render for GalleryApp {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
         let body = match self.page {
-            Page::Workbench => cached_scene(self.workbench.clone()),
-            Page::Terminal
-            | Page::Review
-            | Page::Command
-            | Page::Settings
-            | Page::Core
-            | Page::Stress => cached_scene(self.gallery.clone()),
+            Page::Product => cached_scene(self.workbench.clone()),
+            Page::Core | Page::Patterns | Page::Workbench | Page::Stress => {
+                cached_scene(self.gallery.clone())
+            }
         };
 
         div()
@@ -245,12 +229,10 @@ impl Render for GalleryApp {
 impl Page {
     fn gallery_surface(self) -> Option<gallery::GallerySurface> {
         match self {
-            Page::Workbench => None,
-            Page::Terminal => Some(gallery::GallerySurface::Terminal),
-            Page::Review => Some(gallery::GallerySurface::Review),
-            Page::Command => Some(gallery::GallerySurface::Command),
-            Page::Settings => Some(gallery::GallerySurface::Settings),
+            Page::Product => None,
             Page::Core => Some(gallery::GallerySurface::Core),
+            Page::Patterns => Some(gallery::GallerySurface::Patterns),
+            Page::Workbench => Some(gallery::GallerySurface::Workbench),
             Page::Stress => Some(gallery::GallerySurface::Stress),
         }
     }
