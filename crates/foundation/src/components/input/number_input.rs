@@ -103,9 +103,21 @@ impl NumberInput {
         self
     }
 
-    crate::callback_builder!(on_decrement, on_decrement, ClickEvent);
+    pub fn on_decrement(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_decrement = Some(Box::new(handler));
+        self
+    }
 
-    crate::callback_builder!(on_increment, on_increment, ClickEvent);
+    pub fn on_increment(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_increment = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for NumberInput {
@@ -281,6 +293,9 @@ fn stepper(
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
+                .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
                 .on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();

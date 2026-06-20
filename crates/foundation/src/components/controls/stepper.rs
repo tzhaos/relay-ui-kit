@@ -1,6 +1,7 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -34,11 +35,29 @@ impl Stepper {
         &self.value
     }
 
-    crate::callback_builder!(on_decrement, on_decrement, ClickEvent);
+    pub fn on_decrement(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_decrement = Some(Box::new(handler));
+        self
+    }
 
-    crate::callback_builder!(on_increment, on_increment, ClickEvent);
+    pub fn on_increment(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_increment = Some(Box::new(handler));
+        self
+    }
 
-    crate::callback_builder!(on_reset, on_reset, ClickEvent);
+    pub fn on_reset(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_reset = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Stepper {
@@ -92,6 +111,9 @@ impl RenderOnce for Stepper {
                         .cursor_pointer()
                         .hover(move |style| style.bg(theme.hover).text_color(theme.text))
                         .child(Icon::new(IconName::RefreshCw).size(IconSize::XSmall))
+                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
                         .on_click(move |event, window, cx| {
                             handler(event, window, cx);
                             cx.stop_propagation();
@@ -118,6 +140,9 @@ fn stepper_button(
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
+                .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
                 .on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();

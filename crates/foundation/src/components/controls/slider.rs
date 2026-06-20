@@ -1,7 +1,7 @@
 use gpui::{
     App, AppContext as _, ClickEvent, DragMoveEvent, ElementId, Empty, InteractiveElement,
-    IntoElement, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px, relative,
+    IntoElement, MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px, relative,
 };
 
 use crate::{
@@ -35,11 +35,26 @@ impl Slider {
         }
     }
 
-    crate::callback_builder!(on_decrement, on_decrement, ClickEvent);
+    pub fn on_decrement(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_decrement = Some(Box::new(handler));
+        self
+    }
 
-    crate::callback_builder!(on_increment, on_increment, ClickEvent);
+    pub fn on_increment(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_increment = Some(Box::new(handler));
+        self
+    }
 
-    crate::shared_callback_builder!(on_change, on_change, f32);
+    pub fn on_change(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
+        self.on_change = Some(std::rc::Rc::new(handler));
+        self
+    }
 
     pub fn ratio(&self) -> f32 {
         slider_ratio(self.value, self.min, self.max)
@@ -81,7 +96,6 @@ impl RenderOnce for Slider {
                     .h(px(16.0))
                     .flex()
                     .items_center()
-                    .cursor_pointer()
                     .child(
                         div()
                             .h(px(3.0))
@@ -110,7 +124,11 @@ impl RenderOnce for Slider {
                     )
                     .when_some(on_change.clone(), |this, handler| {
                         let drag_for_start = drag.clone();
-                        this.on_drag(drag_for_start, move |_, _, _window, cx| cx.new(|_| Empty))
+                        this.cursor_pointer()
+                            .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                                window.prevent_default();
+                            })
+                            .on_drag(drag_for_start, move |_, _, _window, cx| cx.new(|_| Empty))
                             .on_drag_move::<DraggedSlider>(move |event, window, cx| {
                                 if event.drag(cx).id != drag.id {
                                     return;
@@ -152,6 +170,9 @@ fn step_button(
         .when_some(handler, |this, handler| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
+                .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
                 .on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
