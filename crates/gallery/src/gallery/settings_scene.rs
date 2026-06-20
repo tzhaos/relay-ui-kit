@@ -5,7 +5,7 @@ use relay_ui_core::{
     SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind,
     Toast, Toggle, Tone,
 };
-use relay_ui_patterns::{Select, SelectOption};
+use relay_ui_patterns::overlay::{Select, SelectOption};
 
 use super::{
     GalleryScenesApp, GalleryState,

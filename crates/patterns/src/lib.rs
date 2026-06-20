@@ -8,7 +8,6 @@ pub mod command;
 pub mod layout;
 pub mod overlay;
 pub mod scroll_surface;
-pub mod select;
 
 pub use command::{
     CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
@@ -20,7 +19,6 @@ pub use overlay::{
     TooltipBody, overlay,
 };
 pub use scroll_surface::ScrollSurface;
-pub use select::{Select, SelectOption};
 pub use shell::{
     AppShell, Pane, PaneSurface, PaneToolbar, PaneWidth, SplitAxis, SplitPane, SplitPaneState,
     StatusBar, StatusItem, TitleBar, TopToolbar, WindowControls, WorkspaceBreadcrumb,
