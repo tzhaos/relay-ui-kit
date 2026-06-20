@@ -1,4 +1,4 @@
-use gpui::{AnyElement, App, ClickEvent, IntoElement, Window};
+use gpui::{AnyElement, ClickEvent, IntoElement};
 
 use crate::{icon::IconName, interaction::ClickHandler};
 
@@ -122,13 +122,7 @@ impl MenuItem {
         self
     }
 
-    pub fn on_click(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_click = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_click, on_click, ClickEvent);
 }
 
 #[cfg(test)]

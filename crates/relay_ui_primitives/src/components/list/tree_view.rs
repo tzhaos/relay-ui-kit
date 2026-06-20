@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{
     component_prelude::*,
     icon::{Icon, IconName, IconSize},
@@ -63,21 +61,9 @@ impl TreeView {
         }
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_select = Some(Rc::new(handler));
-        self
-    }
+    crate::shared_callback_builder!(on_select, on_select, &'static str);
 
-    pub fn on_toggle(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_toggle = Some(Rc::new(handler));
-        self
-    }
+    crate::shared_callback_builder!(on_toggle, on_toggle, &'static str);
 }
 
 impl RenderOnce for TreeView {

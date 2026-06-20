@@ -82,13 +82,7 @@ impl Select {
         self
     }
 
-    pub fn on_toggle(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_toggle = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_toggle, on_toggle, ClickEvent);
 
     pub fn on_select(
         mut self,
@@ -98,10 +92,7 @@ impl Select {
         self
     }
 
-    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        self.on_dismiss = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_dismiss, on_dismiss,);
 
     pub fn selected_label(&self) -> &str {
         self.options

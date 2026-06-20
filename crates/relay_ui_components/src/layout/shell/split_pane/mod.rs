@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
@@ -93,15 +92,9 @@ impl SplitPane {
         self
     }
 
-    pub fn on_resize(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
-        self.on_resize = Some(Rc::new(handler));
-        self
-    }
+    relay_ui_primitives::shared_callback_builder!(on_resize, on_resize, f32);
 
-    pub fn on_resize_end(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        self.on_resize_end = Some(Rc::new(handler));
-        self
-    }
+    relay_ui_primitives::shared_callback_builder!(on_resize_end, on_resize_end,);
 }
 
 impl RenderOnce for SplitPane {

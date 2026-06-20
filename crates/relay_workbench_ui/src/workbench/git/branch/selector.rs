@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
@@ -57,34 +56,13 @@ impl BranchSelector {
         self
     }
 
-    pub fn on_toggle(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_toggle = Some(Box::new(handler));
-        self
-    }
+    relay_ui_primitives::callback_builder!(on_toggle, on_toggle, ClickEvent);
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_select = Some(Rc::new(handler));
-        self
-    }
+    relay_ui_primitives::shared_callback_builder!(on_select, on_select, &'static str);
 
-    pub fn on_action(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_action = Some(Rc::new(handler));
-        self
-    }
+    relay_ui_primitives::shared_callback_builder!(on_action, on_action, &'static str);
 
-    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
-        self.on_dismiss = Some(Rc::new(handler));
-        self
-    }
+    relay_ui_primitives::shared_callback_builder!(on_dismiss, on_dismiss,);
 
     pub fn selected_label(&self) -> &str {
         self.branches

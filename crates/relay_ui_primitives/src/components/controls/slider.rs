@@ -4,8 +4,6 @@ use gpui::{
     prelude::FluentBuilder, px, relative,
 };
 
-use std::rc::Rc;
-
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, SharedChangeHandler},
@@ -37,26 +35,11 @@ impl Slider {
         }
     }
 
-    pub fn on_decrement(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_decrement = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_decrement, on_decrement, ClickEvent);
 
-    pub fn on_increment(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_increment = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_increment, on_increment, ClickEvent);
 
-    pub fn on_change(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
-        self.on_change = Some(Rc::new(handler));
-        self
-    }
+    crate::shared_callback_builder!(on_change, on_change, f32);
 
     pub fn ratio(&self) -> f32 {
         slider_ratio(self.value, self.min, self.max)

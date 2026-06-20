@@ -149,6 +149,19 @@ macro_rules! callback_builder {
 /// ```
 #[macro_export]
 macro_rules! shared_callback_builder {
+    // Zero-arg variant
+    ($method:ident, $field:ident,) => {
+        #[doc = concat!(
+            "Attach a shared handler that receives `(&mut Window, &mut App)`."
+        )]
+        pub fn $method(
+            mut self,
+            handler: impl Fn(&mut ::gpui::Window, &mut ::gpui::App) + 'static,
+        ) -> Self {
+            self.$field = Some(::std::rc::Rc::new(handler));
+            self
+        }
+    };
     ($method:ident, $field:ident, $($arg:ty),+ $(,)?) => {
         #[doc = concat!(
             "Attach a shared handler that receives `(",

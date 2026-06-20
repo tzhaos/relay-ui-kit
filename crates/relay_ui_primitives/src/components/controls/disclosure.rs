@@ -44,13 +44,7 @@ impl Disclosure {
         self
     }
 
-    pub fn on_toggle(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_toggle = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_toggle, on_toggle, ClickEvent);
 }
 
 impl RenderOnce for Disclosure {

@@ -34,29 +34,11 @@ impl Stepper {
         &self.value
     }
 
-    pub fn on_decrement(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_decrement = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_decrement, on_decrement, ClickEvent);
 
-    pub fn on_increment(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_increment = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_increment, on_increment, ClickEvent);
 
-    pub fn on_reset(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_reset = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_reset, on_reset, ClickEvent);
 }
 
 impl RenderOnce for Stepper {
