@@ -17,8 +17,8 @@ pub use command::{
 };
 pub use layout::shell;
 pub use overlay::{
-    ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,
-    TooltipBody, overlay,
+    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,
+    Popover, TooltipBody, overlay,
 };
 pub use scroll_surface::ScrollSurface;
 pub use shell::{

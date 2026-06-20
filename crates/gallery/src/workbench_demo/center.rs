@@ -1,8 +1,10 @@
-use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
+use gpui::{
+    Anchor, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px,
+};
 use relay_ui_core::{
     Button, IconButton, IconName, PanelHeader, Segment, SegmentedControl, Theme, theme,
 };
-use relay_ui_patterns::{Pane, PaneSurface, PaneWidth};
+use relay_ui_patterns::{AnchoredOverlay, Pane, PaneSurface, PaneWidth};
 use relay_workbench::{
     FileKind, FileView, LauncherItem, LauncherItemKind, LauncherMenu, MarkdownView,
     TerminalAgentQuickLaunch, TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar,
@@ -142,22 +144,37 @@ fn terminal_toolbar(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl
 
 fn terminal_actions(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
     div()
-        .relative()
         .flex()
         .items_center()
         .gap_1()
         .child(
-            Button::new("terminal-new", "New")
-                .icon(IconName::Plus)
-                .on_click({
-                    let host = host.clone();
-                    move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.launcher_open = !this.state.launcher_open;
-                            cx.notify();
-                        });
-                    }
-                }),
+            AnchoredOverlay::new(
+                "terminal-launcher-overlay",
+                Button::new("terminal-new", "New")
+                    .icon(IconName::Plus)
+                    .on_click({
+                        let host = host.clone();
+                        move |_event, _window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.launcher_open = !this.state.launcher_open;
+                                cx.notify();
+                            });
+                        }
+                    }),
+                launcher_menu(host),
+            )
+            .open(state.launcher_open)
+            .anchor(Anchor::TopRight)
+            .attach(Anchor::BottomRight)
+            .on_dismiss({
+                let host = host.clone();
+                move |_window, cx| {
+                    host.update(cx, |this, cx| {
+                        this.state.launcher_open = false;
+                        cx.notify();
+                    });
+                }
+            }),
         )
         .child(
             IconButton::new("terminal-refresh", IconName::RefreshCw).on_click({
@@ -170,15 +187,6 @@ fn terminal_actions(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl
                 }
             }),
         )
-        .when(state.launcher_open, |this| {
-            this.child(
-                div()
-                    .absolute()
-                    .top(px(34.0))
-                    .right(px(0.0))
-                    .child(launcher_menu(host)),
-            )
-        })
 }
 
 fn launcher_menu(host: &Entity<WorkbenchApp>) -> impl IntoElement {

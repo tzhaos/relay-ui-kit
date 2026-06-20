@@ -12,7 +12,7 @@ use relay_ui_core::{
     theme::{ActiveTheme, radius},
 };
 
-use crate::{Menu, MenuItem, overlay};
+use super::{AnchoredOverlay, Menu, MenuItem};
 
 /// One option in a [`Select`].
 pub struct SelectOption {
@@ -123,87 +123,86 @@ impl RenderOnce for Select {
         let id = self.id.clone();
         let toggle_handler = self.on_toggle;
         let trigger_clickable = toggle_handler.is_some();
-        let mut root = div().id(self.id).relative().flex().items_center().child(
-            div()
-                .id((id.clone(), "trigger"))
-                .h(px(30.0))
-                .min_w(px(180.0))
-                .max_w(px(280.0))
-                .px_2()
-                .flex()
-                .items_center()
-                .gap_2()
-                .rounded(px(radius::MD))
-                .border_1()
-                .border_color(if self.open {
-                    theme.border_strong
-                } else {
-                    theme.border
-                })
-                .bg(if self.open {
-                    theme.panel_alt
-                } else {
-                    theme.panel
-                })
-                .text_color(theme.text)
-                .when(trigger_clickable, |this| {
-                    this.cursor_pointer()
-                        .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
-                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
-                            window.prevent_default();
-                        })
-                })
-                .child(
-                    div()
-                        .min_w_0()
-                        .flex_1()
-                        .truncate()
-                        .text_sm()
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(label),
-                )
-                .child(
-                    Icon::new(IconName::ChevronDown)
-                        .size(IconSize::XSmall)
-                        .color(theme.text_muted),
-                )
-                .when_some(
-                    toggle_handler.filter(|_| trigger_clickable),
-                    |this, handler| {
-                        this.on_click(move |event, window, cx| {
-                            handler(event, window, cx);
-                            cx.stop_propagation();
-                        })
-                    },
-                ),
-        );
-
-        if self.open {
-            let mut items = Vec::with_capacity(self.options.len());
-            for option in self.options {
-                let key = option.key;
-                let mut item = MenuItem::new(option.label).checked(key == selected_key);
-                if let Some(detail) = option.detail {
-                    item = item.detail(detail);
-                }
-                if let Some(icon) = option.icon {
-                    item = item.icon(icon);
-                }
-                if let Some(handler) = select_handler.clone() {
-                    item = item.on_click(move |_event, window, cx| handler(key, window, cx));
-                }
-                items.push(item);
-            }
-            let menu = overlay(Menu::new((id, "menu"), items).min_width(220.0)).offset(0.0, 32.0);
-            let menu = if let Some(dismiss_handler) = dismiss_handler {
-                menu.on_dismiss(dismiss_handler)
+        let trigger = div()
+            .id((id.clone(), "trigger"))
+            .h(px(30.0))
+            .min_w(px(180.0))
+            .max_w(px(280.0))
+            .px_2()
+            .flex()
+            .items_center()
+            .gap_2()
+            .rounded(px(radius::MD))
+            .border_1()
+            .border_color(if self.open {
+                theme.border_strong
             } else {
-                menu
-            };
-            root = root.child(menu);
+                theme.border
+            })
+            .bg(if self.open {
+                theme.panel_alt
+            } else {
+                theme.panel
+            })
+            .text_color(theme.text)
+            .when(trigger_clickable, |this| {
+                this.cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
+            .child(
+                div()
+                    .min_w_0()
+                    .flex_1()
+                    .truncate()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(label),
+            )
+            .child(
+                Icon::new(IconName::ChevronDown)
+                    .size(IconSize::XSmall)
+                    .color(theme.text_muted),
+            )
+            .when_some(
+                toggle_handler.filter(|_| trigger_clickable),
+                |this, handler| {
+                    this.on_click(move |event, window, cx| {
+                        handler(event, window, cx);
+                        cx.stop_propagation();
+                    })
+                },
+            );
+
+        let mut items = Vec::with_capacity(self.options.len());
+        for option in self.options {
+            let key = option.key;
+            let mut item = MenuItem::new(option.label).checked(key == selected_key);
+            if let Some(detail) = option.detail {
+                item = item.detail(detail);
+            }
+            if let Some(icon) = option.icon {
+                item = item.icon(icon);
+            }
+            if let Some(handler) = select_handler.clone() {
+                item = item.on_click(move |_event, window, cx| handler(key, window, cx));
+            }
+            items.push(item);
         }
 
-        root
+        let mut overlay = AnchoredOverlay::new(
+            id.clone(),
+            trigger,
+            Menu::new((id, "menu"), items).min_width(220.0),
+        )
+        .open(self.open);
+        if let Some(dismiss_handler) = dismiss_handler {
+            overlay = overlay.on_dismiss(dismiss_handler);
+        }
+
+        overlay
     }
 }
 

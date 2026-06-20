@@ -1,5 +1,6 @@
 //! Floating overlay primitives.
 
+mod anchored_overlay;
 mod context_menu;
 mod dialog;
 mod dropdown_menu;
@@ -9,6 +10,7 @@ mod popover;
 mod select;
 mod tooltip_body;
 
+pub use anchored_overlay::AnchoredOverlay;
 pub use context_menu::ContextMenu;
 pub use dialog::{ConfirmDialog, Dialog};
 pub use dropdown_menu::DropdownMenu;

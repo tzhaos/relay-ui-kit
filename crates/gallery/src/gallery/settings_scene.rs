@@ -167,59 +167,63 @@ pub(super) fn render(
                         .child(
                             Button::new(
                                 "feedback-show-toast",
-                                if state.feedback_toast_open {
-                                    "Replay toast"
-                                } else {
-                                    "Open toast"
-                                },
+                                "Add toast",
                             )
                             .icon(IconName::MessageSquareText)
                             .on_click({
                                 let host = host.clone();
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
-                                        this.state.feedback_toast_open = true;
                                         this.state.feedback_toast_serial =
                                             this.state.feedback_toast_serial.wrapping_add(1);
+                                        let next = this.state.feedback_toast_serial;
+                                        this.state.feedback_toasts.push(next);
+                                        if this.state.feedback_toasts.len() > 4 {
+                                            this.state.feedback_toasts.remove(0);
+                                        }
                                         cx.notify();
                                     });
                                 }
                             }),
                         )
                         .child(
-                            Button::new("feedback-hide-toast", "Hide")
+                            Button::new("feedback-hide-toast", "Clear")
                                 .ghost()
-                                .disabled(!state.feedback_toast_open)
+                                .disabled(state.feedback_toasts.is_empty())
                                 .on_click({
                                     let host = host.clone();
                                     move |_event, _window, cx| {
                                         host.update(cx, |this, cx| {
-                                            this.state.feedback_toast_open = false;
+                                            this.state.feedback_toasts.clear();
                                             cx.notify();
                                         });
                                     }
                                 }),
                         ),
                 )
-                .when(state.feedback_toast_open, |this| {
+                .when(!state.feedback_toasts.is_empty(), |this| {
                     this.child(
                         overlay(
-                            Toast::new(
-                                format!(
-                                    "feedback-floating-toast-{}",
-                                    state.feedback_toast_serial
-                                ),
-                                "Terminal session restored",
-                            )
-                                .detail("codex on ui-kit/branch-controls")
-                                .tone(Tone::Accent),
+                            div()
+                                .flex()
+                                .flex_col()
+                                .items_end()
+                                .gap_2()
+                                .children(state.feedback_toasts.iter().map(|serial| {
+                                    Toast::new(
+                                        format!("feedback-floating-toast-{serial}"),
+                                        format!("Terminal session restored #{serial}"),
+                                    )
+                                    .detail("codex on ui-kit/branch-controls")
+                                    .tone(Tone::Accent)
+                                })),
                         )
                         .window_corner(Anchor::BottomRight, 16.0)
                         .on_dismiss({
                             let host = host.clone();
                             move |_window, cx| {
                                 host.update(cx, |this, cx| {
-                                    this.state.feedback_toast_open = false;
+                                    this.state.feedback_toasts.clear();
                                     cx.notify();
                                 });
                             }

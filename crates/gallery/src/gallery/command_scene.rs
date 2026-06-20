@@ -1,8 +1,8 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_core::{Button, IconName, Theme};
 use relay_ui_patterns::{
-    CommandRow, ConfirmDialog, DropdownMenu, KeybindingActions, KeybindingRow, KeybindingShortcut,
-    KeybindingTable, MenuItem, Popover, overlay,
+    AnchoredOverlay, CommandRow, ConfirmDialog, DropdownMenu, KeybindingActions, KeybindingRow,
+    KeybindingShortcut, KeybindingTable, MenuItem, Popover,
 };
 
 use super::{
@@ -152,26 +152,33 @@ fn overlay_sample(
                 .gap_2()
                 .flex_wrap()
                 .child(
-                    div()
-                        .relative()
-                        .child(
-                            Button::new("overlay-popover", "Session Info")
-                                .icon(IconName::MessageSquareText)
-                                .on_click({
-                                    let host = host.clone();
-                                    move |_event, _window, cx| {
-                                        host.update(cx, |this, cx| {
-                                            this.state.command_popover_open =
-                                                !this.state.command_popover_open;
-                                            this.state.command_context_open = false;
-                                            cx.notify();
-                                        });
-                                    }
-                                }),
-                        )
-                        .when(state.command_popover_open, |this| {
-                            this.child(session_popover(theme))
-                        }),
+                    AnchoredOverlay::new(
+                        "session-popover-overlay",
+                        Button::new("overlay-popover", "Session Info")
+                            .icon(IconName::MessageSquareText)
+                            .on_click({
+                                let host = host.clone();
+                                move |_event, _window, cx| {
+                                    host.update(cx, |this, cx| {
+                                        this.state.command_popover_open =
+                                            !this.state.command_popover_open;
+                                        this.state.command_context_open = false;
+                                        cx.notify();
+                                    });
+                                }
+                            }),
+                        session_popover(theme),
+                    )
+                    .open(state.command_popover_open)
+                    .on_dismiss({
+                        let host = host.clone();
+                        move |_window, cx| {
+                            host.update(cx, |this, cx| {
+                                this.state.command_popover_open = false;
+                                cx.notify();
+                            });
+                        }
+                    }),
                 )
                 .child(terminal_dropdown_menu(state.command_context_open, host))
                 .child(
@@ -200,26 +207,23 @@ fn overlay_sample(
 }
 
 fn session_popover(theme: Theme) -> impl IntoElement {
-    overlay(
-        Popover::new("session-popover")
-            .title("Active terminal")
-            .icon(IconName::Terminal)
-            .width(300.0)
-            .child(
-                div()
-                    .text_sm()
-                    .line_height(px(18.0))
-                    .text_color(theme.text_secondary)
-                    .child("The selected terminal owns the shell state and agent attachment."),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(theme.text_muted)
-                    .child("Popover content is anchored, elevated, and dismissible by host state."),
-            ),
-    )
-    .offset(0.0, 34.0)
+    Popover::new("session-popover")
+        .title("Active terminal")
+        .icon(IconName::Terminal)
+        .width(300.0)
+        .child(
+            div()
+                .text_sm()
+                .line_height(px(18.0))
+                .text_color(theme.text_secondary)
+                .child("The selected terminal owns the shell state and agent attachment."),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(theme.text_muted)
+                .child("Popover content is anchored, elevated, and dismissible by host state."),
+        )
 }
 
 fn terminal_dropdown_menu(open: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {

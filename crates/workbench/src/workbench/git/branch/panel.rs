@@ -5,11 +5,10 @@ use gpui::{
 
 use relay_ui_core::{
     icon::{Icon, IconName, IconSize},
-    interaction::{SharedDismissHandler, SharedSelectHandler},
+    interaction::SharedSelectHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, radius, space},
 };
-use relay_ui_patterns::overlay;
 
 use super::types::{BranchOption, BranchPickerAction};
 
@@ -19,24 +18,13 @@ pub(super) fn branch_picker_panel(
     actions: Vec<BranchPickerAction>,
     select_handler: Option<SharedSelectHandler>,
     action_handler: Option<SharedSelectHandler>,
-    dismiss_handler: Option<SharedDismissHandler>,
 ) -> impl IntoElement {
-    let panel = overlay(
-        BranchPickerPanel {
-            selected_key,
-            branches,
-            actions,
-            select_handler,
-            action_handler,
-        }
-        .into_any_element(),
-    )
-    .offset(0.0, 32.0);
-
-    if let Some(dismiss_handler) = dismiss_handler {
-        panel.on_dismiss(move |window, cx| dismiss_handler(window, cx))
-    } else {
-        panel
+    BranchPickerPanel {
+        selected_key,
+        branches,
+        actions,
+        select_handler,
+        action_handler,
     }
 }
 

@@ -1,12 +1,9 @@
-use gpui::{
-    Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div,
-    prelude::FluentBuilder, px,
-};
+use gpui::{Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_core::{
     ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
     Tone, radius, space,
 };
-use relay_ui_patterns::overlay;
+use relay_ui_patterns::overlay::AnchoredOverlay;
 use relay_workbench::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
 
 use super::GalleryScenesApp;
@@ -92,12 +89,7 @@ pub(super) fn branch_controls(
         .items_center()
         .gap_1()
         .child(branch_selector(host, selected, picker_open))
-        .child(
-            div()
-                .relative()
-                .child(branch_actions_button(host, actions_open))
-                .when(actions_open, |this| this.child(branch_actions_menu(host))),
-        )
+        .child(branch_actions_menu(host, actions_open))
 }
 
 fn branch_selector(
@@ -179,8 +171,10 @@ fn branch_actions_button(host: &Entity<GalleryScenesApp>, open: bool) -> impl In
         })
 }
 
-fn branch_actions_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    overlay(
+fn branch_actions_menu(host: &Entity<GalleryScenesApp>, open: bool) -> impl IntoElement {
+    AnchoredOverlay::new(
+        "gallery-branch-actions-overlay",
+        branch_actions_button(host, open),
         BranchActionsMenu::new("gallery-branch-actions-menu").on_select({
             let host = host.clone();
             move |action: BranchActionKind, _window, cx| {
@@ -192,7 +186,7 @@ fn branch_actions_menu(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
             }
         }),
     )
-    .offset(0.0, 32.0)
+    .open(open)
     .on_dismiss({
         let host = host.clone();
         move |_window, cx| {

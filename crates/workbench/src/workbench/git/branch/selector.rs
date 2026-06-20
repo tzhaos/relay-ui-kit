@@ -9,6 +9,7 @@ use relay_ui_core::{
     interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
     theme::{ActiveTheme, radius},
 };
+use relay_ui_patterns::overlay::AnchoredOverlay;
 
 use super::panel::{branch_picker_panel, default_picker_actions};
 use super::types::{BranchOption, BranchPickerAction};
@@ -103,76 +104,80 @@ impl RenderOnce for BranchSelector {
         let dismiss_handler = self.on_dismiss;
         let trigger_handler = self.on_toggle;
         let trigger_clickable = trigger_handler.is_some();
-        let mut root = div().id(self.id).relative().flex().items_center().child(
-            div()
-                .id("branch-selector-trigger")
-                .h(px(28.0))
-                .max_w(px(260.0))
-                .px_2()
-                .flex()
-                .items_center()
-                .gap_1()
-                .rounded(px(radius::MD))
-                .border_1()
-                .border_color(if self.open {
-                    theme.border_strong
-                } else {
-                    theme.border
-                })
-                .bg(if self.open {
-                    theme.panel_alt
-                } else {
-                    theme.panel
-                })
-                .text_color(theme.text_secondary)
-                .when(trigger_clickable, |this| {
-                    this.cursor_pointer()
-                        .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
-                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
-                            window.prevent_default();
-                        })
-                })
-                .child(
-                    Icon::new(IconName::GitBranch)
-                        .size(IconSize::Small)
-                        .color(theme.text_muted),
-                )
-                .child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .text_xs()
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(selected_label),
-                )
-                .child(
-                    Icon::new(IconName::ChevronDown)
-                        .size(IconSize::XSmall)
-                        .color(theme.text_muted),
-                )
-                .when_some(
-                    trigger_handler.filter(|_| trigger_clickable),
-                    |this, handler| {
-                        this.on_click(move |event, window, cx| {
-                            handler(event, window, cx);
-                            cx.stop_propagation();
-                        })
-                    },
-                ),
-        );
+        let trigger = div()
+            .id("branch-selector-trigger")
+            .h(px(28.0))
+            .max_w(px(260.0))
+            .px_2()
+            .flex()
+            .items_center()
+            .gap_1()
+            .rounded(px(radius::MD))
+            .border_1()
+            .border_color(if self.open {
+                theme.border_strong
+            } else {
+                theme.border
+            })
+            .bg(if self.open {
+                theme.panel_alt
+            } else {
+                theme.panel
+            })
+            .text_color(theme.text_secondary)
+            .when(trigger_clickable, |this| {
+                this.cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
+            .child(
+                Icon::new(IconName::GitBranch)
+                    .size(IconSize::Small)
+                    .color(theme.text_muted),
+            )
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(selected_label),
+            )
+            .child(
+                Icon::new(IconName::ChevronDown)
+                    .size(IconSize::XSmall)
+                    .color(theme.text_muted),
+            )
+            .when_some(
+                trigger_handler.filter(|_| trigger_clickable),
+                |this, handler| {
+                    this.on_click(move |event, window, cx| {
+                        handler(event, window, cx);
+                        cx.stop_propagation();
+                    })
+                },
+            );
 
-        if self.open {
-            root = root.child(branch_picker_panel(
+        let mut overlay = AnchoredOverlay::new(
+            self.id,
+            trigger,
+            branch_picker_panel(
                 selected_key,
                 self.branches,
                 self.actions,
                 select_handler,
                 action_handler,
-                dismiss_handler,
-            ));
+            ),
+        )
+        .open(self.open);
+
+        if let Some(dismiss_handler) = dismiss_handler {
+            overlay = overlay.on_dismiss(move |window, cx| dismiss_handler(window, cx));
         }
 
-        root
+        overlay
     }
 }
 
