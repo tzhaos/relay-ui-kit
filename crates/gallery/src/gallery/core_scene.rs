@@ -72,8 +72,8 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
-            "List foundations",
-            list_foundation_samples(state, host, theme),
+            "Core list patterns",
+            list_core_samples(state, host, theme),
         ))
         .child(section(
             cx,
@@ -113,9 +113,9 @@ fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                 .gap_1()
                 .child(
                     Disclosure::new(
-                        "foundation-disclosure",
+                        "core-disclosure",
                         "Recent terminal sessions",
-                        state.foundations_disclosure_open,
+                        state.core_disclosure_open,
                     )
                     .detail("host-owned state")
                     .count(3)
@@ -123,14 +123,13 @@ fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                         let host = host.clone();
                         move |_event, _window, cx| {
                             host.update(cx, |this, cx| {
-                                this.state.foundations_disclosure_open =
-                                    !this.state.foundations_disclosure_open;
+                                this.state.core_disclosure_open = !this.state.core_disclosure_open;
                                 cx.notify();
                             });
                         }
                     }),
                 )
-                .when(state.foundations_disclosure_open, |this| {
+                .when(state.core_disclosure_open, |this| {
                     this.child(
                         div()
                             .ml_6()
@@ -198,7 +197,7 @@ fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
 fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
-            ToolbarGroup::new("foundation-toolbar-group")
+            ToolbarGroup::new("core-toolbar-group")
                 .child(
                     IconButton::new("ib-filter", IconName::ListFilter).on_click({
                         let host = host.clone();
@@ -245,7 +244,7 @@ fn stepper_filter_samples(
         .flex_col()
         .gap_3()
         .child(
-            FilterBar::new("foundation-filter-bar")
+            FilterBar::new("core-filter-bar")
                 .child(
                     FilterChip::new("filter-all-sessions", "All sessions")
                         .icon(IconName::ListFilter)
@@ -294,7 +293,7 @@ fn stepper_filter_samples(
         )
         .child(
             Stepper::new(
-                "foundation-stepper",
+                "core-stepper",
                 format!("{}%", state.contrast.round() as i32),
             )
             .on_decrement({
@@ -402,13 +401,13 @@ fn task_rows_sample() -> impl IntoElement {
         ))
 }
 
-fn list_foundation_samples(
+fn list_core_samples(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
     theme: Theme,
 ) -> impl IntoElement {
     let selected = state.viewer_tab;
-    let tree_nodes = foundation_tree_nodes(state);
+    let tree_nodes = core_tree_nodes(state);
     let select_tree = {
         let host = host.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
@@ -424,16 +423,14 @@ fn list_foundation_samples(
             host.update(cx, |this, cx| {
                 match key {
                     "tree:src" => {
-                        this.state.foundations_tree_src_open =
-                            !this.state.foundations_tree_src_open;
+                        this.state.core_tree_src_open = !this.state.core_tree_src_open;
                     }
                     "tree:components" => {
-                        this.state.foundations_tree_components_open =
-                            !this.state.foundations_tree_components_open;
+                        this.state.core_tree_components_open =
+                            !this.state.core_tree_components_open;
                     }
                     "tree:list" => {
-                        this.state.foundations_tree_list_open =
-                            !this.state.foundations_tree_list_open;
+                        this.state.core_tree_list_open = !this.state.core_tree_list_open;
                     }
                     _ => {}
                 }
@@ -449,13 +446,13 @@ fn list_foundation_samples(
         .flex_wrap()
         .child(
             div().w(gpui::px(320.0)).child(
-                TreeView::new("foundation-tree-view", tree_nodes)
+                TreeView::new("core-tree-view", tree_nodes)
                     .on_select(select_tree)
                     .on_toggle(toggle_tree),
             ),
         )
         .child(div().w(gpui::px(340.0)).child(SectionedList::new(
-            "foundation-sectioned-list",
+            "core-sectioned-list",
             vec![
                     SectionedListGroup::new("Recent")
                         .count(2)
@@ -463,7 +460,7 @@ fn list_foundation_samples(
                             ListItem::new("recent-terminal")
                                 .selected(selected == "recent:terminal")
                                 .start_slot(Icon::new(IconName::Terminal))
-                                .on_click(select_foundation_item(host, "recent:terminal"))
+                                .on_click(select_core_item(host, "recent:terminal"))
                                 .child(list_item_text(
                                     "Terminal surface",
                                     "PTY host shell preview",
@@ -474,14 +471,14 @@ fn list_foundation_samples(
                             ListItem::new("recent-diff")
                                 .selected(selected == "recent:diff")
                                 .start_slot(Icon::new(IconName::FileDiff))
-                                .on_click(select_foundation_item(host, "recent:diff"))
+                                .on_click(select_core_item(host, "recent:diff"))
                                 .child(list_item_text("Diff viewer", "Unified file delta", theme)),
                         ),
                     SectionedListGroup::new("Pinned").child(
                         ListItem::new("pinned-command")
                             .start_slot(Icon::new(IconName::Zap))
                             .selected(selected == "pinned:command")
-                            .on_click(select_foundation_item(host, "pinned:command"))
+                            .on_click(select_core_item(host, "pinned:command"))
                             .child(list_item_text(
                                 "Command palette",
                                 "Keyboard-first launcher",
@@ -492,7 +489,7 @@ fn list_foundation_samples(
         )))
 }
 
-fn select_foundation_item(
+fn select_core_item(
     host: &Entity<GalleryScenesApp>,
     key: &'static str,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
@@ -505,32 +502,27 @@ fn select_foundation_item(
     }
 }
 
-fn foundation_tree_nodes(state: &GalleryState) -> Vec<TreeNode> {
-    let mut nodes = vec![
-        TreeNode::new("tree:src", IconName::Folder, "src")
-            .expanded(state.foundations_tree_src_open),
-    ];
+fn core_tree_nodes(state: &GalleryState) -> Vec<TreeNode> {
+    let mut nodes =
+        vec![TreeNode::new("tree:src", IconName::Folder, "src").expanded(state.core_tree_src_open)];
 
-    if state.foundations_tree_src_open {
+    if state.core_tree_src_open {
         nodes.push(
             TreeNode::new("tree:components", IconName::Folder, "components")
                 .depth(1)
-                .expanded(state.foundations_tree_components_open),
+                .expanded(state.core_tree_components_open),
         );
     }
 
-    if state.foundations_tree_src_open && state.foundations_tree_components_open {
+    if state.core_tree_src_open && state.core_tree_components_open {
         nodes.push(
             TreeNode::new("tree:list", IconName::Folder, "list")
                 .depth(2)
-                .expanded(state.foundations_tree_list_open),
+                .expanded(state.core_tree_list_open),
         );
     }
 
-    if state.foundations_tree_src_open
-        && state.foundations_tree_components_open
-        && state.foundations_tree_list_open
-    {
+    if state.core_tree_src_open && state.core_tree_components_open && state.core_tree_list_open {
         nodes.push(
             TreeNode::new("tree:item", IconName::FileText, "item.rs")
                 .depth(3)
