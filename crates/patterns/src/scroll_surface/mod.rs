@@ -12,7 +12,7 @@ use relay_ui_core::theme::{ActiveTheme, space};
 /// Width of the reserved scrollbar gutter area.
 const SCROLL_GUTTER_WIDTH: f32 = 10.0;
 
-use state::{ScrollSurfaceState, schedule_scroll_decay, schedule_smooth_scroll};
+use state::{ScrollSurfaceState, schedule_scroll_decay};
 use thumb::{THUMB_WIDTH, scroll_rail};
 
 /// A stable vertical scrolling surface with Relay's standard scroll affordance.
@@ -22,7 +22,6 @@ pub struct ScrollSurface {
     content: AnyElement,
     reserve_gutter: bool,
     show_rail: bool,
-    smooth_wheel: bool,
     max_height: Option<f32>,
 }
 
@@ -33,7 +32,6 @@ impl ScrollSurface {
             content: content.into_any_element(),
             reserve_gutter: true,
             show_rail: true,
-            smooth_wheel: true,
             max_height: None,
         }
     }
@@ -45,11 +43,6 @@ impl ScrollSurface {
 
     pub fn show_rail(mut self, show: bool) -> Self {
         self.show_rail = show;
-        self
-    }
-
-    pub fn smooth_wheel(mut self, smooth: bool) -> Self {
-        self.smooth_wheel = smooth;
         self
     }
 
@@ -70,7 +63,6 @@ impl RenderOnce for ScrollSurface {
 
         let state_for_scroll = state.clone();
         let state_for_hover = state.clone();
-        let smooth_wheel = self.smooth_wheel;
         let mut scroller = div()
             .id((id.clone(), "content"))
             .size_full()
@@ -79,40 +71,16 @@ impl RenderOnce for ScrollSurface {
             .overflow_y_scroll()
             .on_scroll_wheel(move |event, window, cx| {
                 let delta_y = f32::from(event.delta.pixel_delta(window.line_height()).y);
-                let should_smooth = smooth_wheel && !event.delta.precise();
-                if should_smooth {
-                    cx.stop_propagation();
-                }
-
-                let (should_schedule_decay, should_schedule_smooth) =
-                    state_for_scroll.update(cx, |state, cx| {
-                        if should_smooth {
-                            let started = state.start_smooth_scroll(delta_y);
-                            let should_schedule_smooth =
-                                started && state.schedule_smooth_if_needed();
-                            if started {
-                                state.mark_scrolling();
-                                cx.notify();
-                            }
-                            return (
-                                started && state.schedule_decay_if_needed(),
-                                should_schedule_smooth,
-                            );
-                        }
-
-                        if delta_y != 0.0 {
-                            state.mark_scrolling();
-                            cx.notify();
-                        }
-                        (state.schedule_decay_if_needed(), false)
-                    });
+                let should_schedule_decay = state_for_scroll.update(cx, |state, cx| {
+                    if delta_y != 0.0 {
+                        state.mark_scrolling();
+                        cx.notify();
+                    }
+                    state.schedule_decay_if_needed()
+                });
 
                 if should_schedule_decay {
                     schedule_scroll_decay(state_for_scroll.clone(), window);
-                }
-
-                if should_schedule_smooth {
-                    schedule_smooth_scroll(state_for_scroll.clone(), window);
                 }
             })
             .on_hover(move |hovered, _window, cx| {
@@ -253,12 +221,5 @@ mod tests {
         let surface = ScrollSurface::new("scroll", div()).show_rail(false);
 
         assert!(!surface.show_rail);
-    }
-
-    #[test]
-    fn scroll_surface_smooths_wheel_by_default() {
-        let surface = ScrollSurface::new("scroll", div());
-
-        assert!(surface.smooth_wheel);
     }
 }

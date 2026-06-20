@@ -428,7 +428,6 @@ fn session_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
     )
     .open(open)
     .min_width(190.0)
-    .offset(0.0, 34.0)
     .on_dismiss(close_filter_menu(host))
 }
 
@@ -457,7 +456,6 @@ fn project_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
     )
     .open(open)
     .min_width(180.0)
-    .offset(0.0, 34.0)
     .on_dismiss(close_filter_menu(host))
 }
 

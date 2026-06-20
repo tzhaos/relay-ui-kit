@@ -1,6 +1,6 @@
 use gpui::{
-    Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px,
-    rgb,
+    Anchor, Context, Entity, IntoElement, ParentElement, Styled, Window, div,
+    prelude::FluentBuilder, px, rgb,
 };
 use relay_ui_core::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
@@ -214,7 +214,7 @@ pub(super) fn render(
                                 .detail("codex on ui-kit/branch-controls")
                                 .tone(Tone::Accent),
                         )
-                        .offset(368.0, 8.0)
+                        .window_corner(Anchor::BottomRight, 16.0)
                         .on_dismiss({
                             let host = host.clone();
                             move |_window, cx| {

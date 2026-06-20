@@ -3,17 +3,12 @@ use gpui::{Entity, ScrollHandle, Window, point, px};
 use super::thumb::{ScrollThumbMetrics, thumb_metrics_from_values};
 
 const SCROLL_ACTIVITY_FRAMES: u8 = 14;
-const SCROLL_DISTANCE_PER_DETENT: f32 = 15.0;
-const SMOOTH_LERP_FACTOR: f32 = 0.10;
-const SMOOTH_EPSILON: f32 = 0.5;
 
 pub(super) struct ScrollSurfaceState {
     handle: ScrollHandle,
     hovered: bool,
     activity_frames: u8,
     decay_scheduled: bool,
-    smooth_target_y: Option<f32>,
-    smooth_scheduled: bool,
     thumb_drag: Option<ThumbDragState>,
 }
 
@@ -24,8 +19,6 @@ impl ScrollSurfaceState {
             hovered: false,
             activity_frames: 0,
             decay_scheduled: false,
-            smooth_target_y: None,
-            smooth_scheduled: false,
             thumb_drag: None,
         }
     }
@@ -81,7 +74,6 @@ impl ScrollSurfaceState {
             viewport_height,
             thumb_height,
         });
-        self.smooth_target_y = None;
     }
 
     pub(super) fn update_thumb_drag(&mut self, mouse_window_y: f32) -> bool {
@@ -100,87 +92,6 @@ impl ScrollSurfaceState {
 
     pub(super) fn end_thumb_drag(&mut self) {
         self.thumb_drag = None;
-    }
-
-    // ------------------------------------------------------------------
-    // Smooth scroll (wheel)
-    // ------------------------------------------------------------------
-
-    pub(super) fn start_smooth_scroll(&mut self, delta_y: f32) -> bool {
-        let max_scroll_y = f32::from(self.handle.max_offset().y);
-        if max_scroll_y <= 0.0 || delta_y == 0.0 {
-            return false;
-        }
-        let current_y = f32::from(self.handle.offset().y);
-
-        if current_y >= 0.0 && delta_y > 0.0 {
-            self.set_scroll_y(0.0);
-            self.smooth_target_y = None;
-            return false;
-        }
-        if current_y <= -max_scroll_y && delta_y < 0.0 {
-            self.set_scroll_y(-max_scroll_y);
-            self.smooth_target_y = None;
-            return false;
-        }
-
-        let dir = delta_y.signum();
-        let base = match self.smooth_target_y {
-            Some(t) if (t - current_y).signum() != dir => current_y,
-            Some(t) => t,
-            None => current_y,
-        };
-        let step = dir * SCROLL_DISTANCE_PER_DETENT;
-        let target = clamp_scroll_y(base + step, max_scroll_y);
-
-        if (target - current_y).abs() <= SMOOTH_EPSILON {
-            self.set_scroll_y(target);
-            self.smooth_target_y = None;
-            return false;
-        }
-
-        self.smooth_target_y = Some(target);
-        true
-    }
-
-    pub(super) fn schedule_smooth_if_needed(&mut self) -> bool {
-        if self.smooth_target_y.is_some() && !self.smooth_scheduled {
-            self.smooth_scheduled = true;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn tick_smooth_scroll(&mut self) -> bool {
-        self.smooth_scheduled = false;
-        let Some(target_y) = self.smooth_target_y else {
-            return false;
-        };
-        let max_scroll_y = f32::from(self.handle.max_offset().y);
-        let current_y = f32::from(self.handle.offset().y);
-        let distance = target_y - current_y;
-        if distance.abs() <= SMOOTH_EPSILON {
-            self.smooth_target_y = None;
-            return false;
-        }
-        let next_y = clamp_scroll_y(current_y + distance * SMOOTH_LERP_FACTOR, max_scroll_y);
-        self.set_scroll_y(next_y);
-        if next_y <= -max_scroll_y || next_y >= 0.0 {
-            self.smooth_target_y = None;
-            return false;
-        }
-        if (next_y - target_y).abs() <= SMOOTH_EPSILON {
-            self.smooth_target_y = None;
-            false
-        } else {
-            self.smooth_scheduled = true;
-            true
-        }
-    }
-
-    fn should_continue_smooth_scroll(&self) -> bool {
-        self.smooth_target_y.is_some()
     }
 
     // ------------------------------------------------------------------
@@ -241,24 +152,6 @@ pub(super) fn schedule_scroll_decay(state: Entity<ScrollSurfaceState>, window: &
     });
 }
 
-pub(super) fn schedule_smooth_scroll(state: Entity<ScrollSurfaceState>, window: &mut Window) {
-    window.on_next_frame(move |window, cx| {
-        let should_continue = state.update(cx, |state, cx| {
-            if state.tick_smooth_scroll() {
-                cx.notify();
-            }
-            state.should_continue_smooth_scroll()
-        });
-        if should_continue {
-            schedule_smooth_scroll(state, window);
-        }
-    });
-}
-
-fn clamp_scroll_y(value: f32, max_scroll_y: f32) -> f32 {
-    value.clamp(-max_scroll_y, 0.0)
-}
-
 #[derive(Clone, Copy)]
 struct ThumbDragState {
     rail_top: f32,
@@ -294,17 +187,6 @@ mod tests {
         assert!(state.mark_scrolling());
         assert!(state.schedule_decay_if_needed());
         assert!(!state.schedule_decay_if_needed());
-    }
-
-    #[test]
-    fn clamp_scroll_y_keeps_offset_in_scroll_bounds() {
-        assert_eq!(clamp_scroll_y(-480.0, 320.0), -320.0);
-    }
-
-    #[test]
-    fn smooth_start_noops_when_no_overflow() {
-        let mut state = ScrollSurfaceState::new();
-        assert!(!state.start_smooth_scroll(-100.0));
     }
 
     #[test]

@@ -95,7 +95,7 @@ impl RenderOnce for Toast {
             );
 
         if self.animated {
-            base.motion_slide_in(MotionDirection::FromTop, true)
+            base.motion_slide_in(MotionDirection::FromBottom, true)
                 .into_any_element()
         } else {
             base.into_any_element()
