@@ -1,7 +1,7 @@
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div, linear_color_stop,
-    linear_gradient, prelude::FluentBuilder, px, rgb,
+    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    linear_color_stop, linear_gradient, prelude::FluentBuilder, px, rgb,
 };
 
 use crate::{
@@ -71,7 +71,13 @@ impl ThemePreviewCard {
         self.kind.key()
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for ThemePreviewCard {
@@ -100,8 +106,13 @@ impl RenderOnce for ThemePreviewCard {
             } else {
                 theme.panel
             })
-            .cursor_pointer()
-            .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+            .when(handler.is_some(), |this| {
+                this.cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .child(preview_frame((id.clone(), "preview"), self.kind, theme))
             .child(
                 div()

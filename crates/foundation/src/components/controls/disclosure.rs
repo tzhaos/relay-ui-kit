@@ -1,6 +1,7 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -44,12 +45,19 @@ impl Disclosure {
         self
     }
 
-    crate::callback_builder!(on_toggle, on_toggle, ClickEvent);
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Disclosure {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let handler = self.on_toggle;
 
         div()
             .id(self.id)
@@ -60,8 +68,13 @@ impl RenderOnce for Disclosure {
             .gap_2()
             .rounded(px(radius::MD))
             .text_color(theme.text_secondary)
-            .cursor_pointer()
-            .hover(move |style| style.bg(theme.hover))
+            .when(handler.is_some(), |this| {
+                this.cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover))
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .child(
                 Icon::new(if self.open {
                     IconName::ChevronDown
@@ -93,7 +106,7 @@ impl RenderOnce for Disclosure {
             .when_some(self.count, |this, count| {
                 this.child(CountBadge::new(count).tone(Tone::Secondary))
             })
-            .when_some(self.on_toggle, |this, handler| {
+            .when_some(handler, |this, handler| {
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
