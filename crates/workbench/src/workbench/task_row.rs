@@ -3,8 +3,8 @@ use gpui::{
     div, prelude::FluentBuilder, px,
 };
 
-use crate::{
-    display::StatusDot,
+use relay_ui_core::{
+    StatusDot,
     interaction::ClickHandler,
     list::{ListItem, ListItemSpacing},
     theme::{ActiveTheme, space},
@@ -110,7 +110,9 @@ impl RenderOnce for TaskRow {
             );
 
         if let Some(handler) = self.on_click {
-            row = row.on_click_handler(handler);
+            row = row.on_click(move |event, window, cx| {
+                handler(event, window, cx);
+            });
         }
 
         row

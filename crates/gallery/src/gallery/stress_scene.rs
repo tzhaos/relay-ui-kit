@@ -1,12 +1,11 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_core::{
-    Button, ButtonVariant, IconButton, IconName, IconSize, TaskRow, TaskRowData, Theme, Tone,
-    TreeRow, radius,
+    Button, ButtonVariant, IconButton, IconName, IconSize, Theme, Tone, TreeRow, radius,
 };
 use relay_ui_patterns::ScrollSurface;
 use relay_workbench::{
-    CodeView, FileKind, FileView, TerminalLine, TerminalLineStyle, TerminalSurface,
-    TerminalTranscript,
+    CodeView, FileKind, FileView, TaskRow, TaskRowData, TerminalLine, TerminalLineStyle,
+    TerminalSurface, TerminalTranscript,
 };
 
 use super::{

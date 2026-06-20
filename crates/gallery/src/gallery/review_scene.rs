@@ -1,5 +1,6 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use relay_ui_core::{Button, IconName, TaskRow, TaskRowData, Theme, Tone, TreeRow};
+use relay_ui_core::{Button, IconName, Theme, Tone, TreeRow};
+use relay_workbench::{TaskRow, TaskRowData};
 
 use super::{
     GalleryScenesApp, GalleryState,

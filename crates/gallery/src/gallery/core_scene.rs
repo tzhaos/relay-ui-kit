@@ -2,10 +2,11 @@ use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::Fl
 use relay_ui_core::{
     Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, FilterBar,
     FilterChip, Icon, IconButton, IconName, Label, LabelSize, ListItem, NavRow, SectionedList,
-    SectionedListGroup, Segment, SegmentedControl, Stepper, TaskRow, TaskRowData, Theme, Tone,
-    ToolbarGroup, TreeNode, TreeRow, TreeView,
+    SectionedListGroup, Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode,
+    TreeRow, TreeView,
 };
 use relay_ui_patterns::{Tab, Tabs};
+use relay_workbench::{TaskRow, TaskRowData};
 
 use super::{
     GalleryScenesApp, GalleryState,

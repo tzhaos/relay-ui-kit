@@ -21,3 +21,4 @@ pub use terminal::{
 pub use viewer::{
     CodeView, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView, MarkdownView,
 };
+pub use workbench::task_row::{TaskRow, TaskRowData};

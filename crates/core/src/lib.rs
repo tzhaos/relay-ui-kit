@@ -31,6 +31,6 @@ pub use input::{
 };
 pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
 pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
-pub use row::{NavRow, TaskRow, TaskRowData, TreeRow};
+pub use row::{NavRow, TreeRow};
 pub use theme::{ActiveTheme, Theme, radius, space};
 pub use tone::Tone;
