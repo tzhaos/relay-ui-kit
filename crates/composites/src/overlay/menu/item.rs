@@ -1,4 +1,4 @@
-use gpui::{AnyElement, ClickEvent, IntoElement};
+use gpui::{AnyElement, App, ClickEvent, IntoElement, Window};
 
 use relay_foundation::{icon::IconName, interaction::ClickHandler};
 
@@ -113,7 +113,13 @@ impl MenuItem {
         self
     }
 
-    relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 #[cfg(test)]
