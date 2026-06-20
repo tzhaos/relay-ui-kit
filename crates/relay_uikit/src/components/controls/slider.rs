@@ -3,6 +3,7 @@ use gpui::{
     IntoElement, MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled,
     Window, div, prelude::FluentBuilder, px, relative,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -19,6 +20,7 @@ pub struct Slider {
     max: f32,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
+    binding: Option<Binding<f32>>,
     on_change: Option<SharedChangeHandler<f32>>,
 }
 
@@ -31,6 +33,20 @@ impl Slider {
             max,
             on_decrement: None,
             on_increment: None,
+            binding: None,
+            on_change: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, binding: Binding<f32>, min: f32, max: f32) -> Self {
+        Self {
+            id: id.into(),
+            value: min,
+            min,
+            max,
+            on_decrement: None,
+            on_increment: None,
+            binding: Some(binding),
             on_change: None,
         }
     }
@@ -64,10 +80,15 @@ impl Slider {
 impl RenderOnce for Slider {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let ratio = self.ratio();
+        let binding = self.binding;
+        let value = binding
+            .as_ref()
+            .map_or(self.value, |binding| binding.get(cx));
+        let ratio = slider_ratio(value, self.min, self.max);
         let on_decrement = self.on_decrement;
         let on_increment = self.on_increment;
         let on_change = self.on_change;
+        let can_change = binding.is_some() || on_change.is_some();
         let drag = DraggedSlider {
             id: self.id.clone(),
         };
@@ -122,8 +143,10 @@ impl RenderOnce for Slider {
                             .border_2()
                             .border_color(theme.accent),
                     )
-                    .when_some(on_change.clone(), |this, handler| {
+                    .when(can_change, |this| {
                         let drag_for_start = drag.clone();
+                        let binding = binding.clone();
+                        let handler = on_change.clone();
                         this.cursor_pointer()
                             .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                                 window.prevent_default();
@@ -133,7 +156,13 @@ impl RenderOnce for Slider {
                                 if event.drag(cx).id != drag.id {
                                     return;
                                 }
-                                handler(value_from_drag(event, min, max), window, cx);
+                                let value = value_from_drag(event, min, max);
+                                if let Some(binding) = &binding {
+                                    binding.set(cx, value);
+                                }
+                                if let Some(handler) = &handler {
+                                    handler(value, window, cx);
+                                }
                                 cx.stop_propagation();
                             })
                     }),
@@ -201,6 +230,8 @@ fn value_from_drag(event: &DragMoveEvent<DraggedSlider>, min: f32, max: f32) -> 
 
 #[cfg(test)]
 mod tests {
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
@@ -213,5 +244,13 @@ mod tests {
         let slider = Slider::new("slider", 50.0, 0.0, 100.0);
 
         assert!(slider.on_change.is_none());
+    }
+
+    #[test]
+    fn bound_slider_stores_binding() {
+        let mut app = gpui::TestApp::new();
+        let slider = app.update(|cx| Slider::bound("slider", cx.binding(50.0), 0.0, 100.0));
+
+        assert!(slider.binding.is_some());
     }
 }

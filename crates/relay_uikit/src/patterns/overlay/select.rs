@@ -5,6 +5,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -51,6 +52,7 @@ pub struct Select {
     options: Vec<SelectOption>,
     open: bool,
     placeholder: String,
+    binding: Option<Binding<&'static str>>,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SelectHandler>,
     on_dismiss: Option<DismissHandler>,
@@ -68,6 +70,25 @@ impl Select {
             options,
             open: false,
             placeholder: "Select".into(),
+            binding: None,
+            on_toggle: None,
+            on_select: None,
+            on_dismiss: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        binding: Binding<&'static str>,
+        options: Vec<SelectOption>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            selected_key: "",
+            options,
+            open: false,
+            placeholder: "Select".into(),
+            binding: Some(binding),
             on_toggle: None,
             on_select: None,
             on_dismiss: None,
@@ -116,8 +137,11 @@ impl Select {
 impl RenderOnce for Select {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let label = self.selected_label().to_string();
-        let selected_key = self.selected_key;
+        let binding = self.binding;
+        let selected_key = binding
+            .as_ref()
+            .map_or(self.selected_key, |binding| binding.get(cx));
+        let label = selected_label(&self.options, selected_key, &self.placeholder).to_string();
         let select_handler = self.on_select.map(Rc::new);
         let dismiss_handler = self.on_dismiss;
         let id = self.id.clone();
@@ -186,8 +210,17 @@ impl RenderOnce for Select {
             if let Some(icon) = option.icon {
                 item = item.icon(icon);
             }
-            if let Some(handler) = select_handler.clone() {
-                item = item.on_click(move |_event, window, cx| handler(key, window, cx));
+            if binding.is_some() || select_handler.is_some() {
+                let binding = binding.clone();
+                let handler = select_handler.clone();
+                item = item.on_click(move |_event, window, cx| {
+                    if let Some(binding) = &binding {
+                        binding.set(cx, key);
+                    }
+                    if let Some(handler) = &handler {
+                        handler(key, window, cx);
+                    }
+                });
             }
             items.push(item);
         }
@@ -206,8 +239,21 @@ impl RenderOnce for Select {
     }
 }
 
+fn selected_label<'a>(
+    options: &'a [SelectOption],
+    selected_key: &'static str,
+    placeholder: &'a str,
+) -> &'a str {
+    options
+        .iter()
+        .find(|option| option.key == selected_key)
+        .map_or(placeholder, |option| option.label.as_str())
+}
+
 #[cfg(test)]
 mod tests {
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
@@ -215,5 +261,19 @@ mod tests {
         let select = Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")]);
 
         assert_eq!(select.selected_label(), "Dark");
+    }
+
+    #[test]
+    fn bound_select_stores_binding() {
+        let mut app = gpui::TestApp::new();
+        let select = app.update(|cx| {
+            Select::bound(
+                "select",
+                cx.binding("dark"),
+                vec![SelectOption::new("dark", "Dark")],
+            )
+        });
+
+        assert!(select.binding.is_some());
     }
 }

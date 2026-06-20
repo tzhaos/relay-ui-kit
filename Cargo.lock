@@ -4305,6 +4305,7 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "pulldown-cmark",
+ "relay",
  "similar",
  "unicode-segmentation",
 ]

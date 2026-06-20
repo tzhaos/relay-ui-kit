@@ -19,5 +19,6 @@ path = "src/bin/relay_gallery/main.rs"
 gpui.workspace = true
 gpui_platform.workspace = true
 pulldown-cmark.workspace = true
+relay.workspace = true
 similar.workspace = true
 unicode-segmentation.workspace = true

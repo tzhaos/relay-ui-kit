@@ -2,6 +2,7 @@ use gpui::{
     App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
     RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -22,6 +23,7 @@ pub struct TextInput {
     leading_icon: Option<IconName>,
     focused: bool,
     key_context: &'static str,
+    binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
 
@@ -37,6 +39,26 @@ impl TextInput {
             leading_icon: None,
             focused: false,
             key_context: "TextInput",
+            binding: None,
+            on_key: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        focus: FocusHandle,
+        binding: Binding<TextInputState>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            focus,
+            before: String::new(),
+            after: String::new(),
+            placeholder: String::new(),
+            leading_icon: None,
+            focused: false,
+            key_context: "TextInput",
+            binding: Some(binding),
             on_key: None,
         }
     }
@@ -73,6 +95,15 @@ impl TextInput {
 impl RenderOnce for TextInput {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let (before, after) = match binding.as_ref() {
+            Some(binding) => {
+                let state = binding.get(cx);
+                let (before, after) = state.split();
+                (before.to_string(), after.to_string())
+            }
+            None => (self.before, self.after),
+        };
         let border = if self.focused {
             theme.accent
         } else {
@@ -80,7 +111,8 @@ impl RenderOnce for TextInput {
         };
         let focus_for_click = self.focus.clone();
         let on_key = self.on_key;
-        let show_placeholder = self.before.is_empty() && self.after.is_empty() && !self.focused;
+        let handle_key = binding.is_some() || on_key.is_some();
+        let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
 
         div()
             .id(self.id)
@@ -121,14 +153,19 @@ impl RenderOnce for TextInput {
                     })
                     .when(!show_placeholder, |this| {
                         this.text_color(theme.text)
-                            .child(self.before)
+                            .child(before)
                             .when(self.focused, |this| this.child(caret(theme.accent)))
-                            .child(self.after)
+                            .child(after)
                     }),
             )
-            .when_some(on_key, |this, on_key| {
+            .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
-                    on_key(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |state| state.handle_key(event).should_notify());
+                    }
+                    if let Some(on_key) = &on_key {
+                        on_key(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })
@@ -140,4 +177,26 @@ impl RenderOnce for TextInput {
 
 fn caret(color: gpui::Hsla) -> impl IntoElement {
     div().w(px(1.5)).h(px(16.0)).bg(color)
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
+    use super::*;
+
+    #[test]
+    fn bound_text_input_stores_binding() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            TextInput::bound(
+                "text",
+                cx.focus_handle(),
+                cx.binding(TextInputState::with_text("relay")),
+            )
+        });
+
+        assert!(input.binding.is_some());
+    }
 }

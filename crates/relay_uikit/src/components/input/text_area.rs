@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     interaction::KeyHandler,
@@ -23,6 +24,7 @@ pub struct TextArea {
     min_rows: usize,
     bordered: bool,
     key_context: &'static str,
+    binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
 
@@ -39,6 +41,27 @@ impl TextArea {
             min_rows: 3,
             bordered: true,
             key_context: "TextArea",
+            binding: None,
+            on_key: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        focus: FocusHandle,
+        binding: Binding<TextInputState>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            focus,
+            before: String::new(),
+            after: String::new(),
+            placeholder: String::new(),
+            focused: false,
+            min_rows: 3,
+            bordered: true,
+            key_context: "TextArea",
+            binding: Some(binding),
             on_key: None,
         }
     }
@@ -80,6 +103,15 @@ impl TextArea {
 impl RenderOnce for TextArea {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let (before, after) = match binding.as_ref() {
+            Some(binding) => {
+                let state = binding.get(cx);
+                let (before, after) = state.split();
+                (before.to_string(), after.to_string())
+            }
+            None => (self.before, self.after),
+        };
         let border = if self.focused {
             theme.accent
         } else {
@@ -88,7 +120,8 @@ impl RenderOnce for TextArea {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let show_placeholder = self.before.is_empty() && self.after.is_empty() && !self.focused;
+        let handle_key = binding.is_some() || on_key.is_some();
+        let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
 
         div()
@@ -122,16 +155,23 @@ impl RenderOnce for TextArea {
                     })
                     .when(!show_placeholder, |this| {
                         this.text_color(theme.text).children(text_area_lines(
-                            self.before,
-                            self.after,
+                            before,
+                            after,
                             self.focused,
                             theme.accent,
                         ))
                     }),
             )
-            .when_some(on_key, |this, on_key| {
+            .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
-                    on_key(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |state| {
+                            state.handle_multiline_key(event).should_notify()
+                        });
+                    }
+                    if let Some(on_key) = &on_key {
+                        on_key(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })
@@ -180,4 +220,26 @@ fn line_element(line: String) -> gpui::AnyElement {
 
 fn caret(color: gpui::Hsla) -> impl IntoElement {
     div().w(px(1.5)).h(px(16.0)).bg(color)
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
+    use super::*;
+
+    #[test]
+    fn bound_text_area_stores_binding() {
+        let mut app = TestApp::new();
+        let area = app.update(|cx| {
+            TextArea::bound(
+                "area",
+                cx.focus_handle(),
+                cx.binding(TextInputState::with_text("relay")),
+            )
+        });
+
+        assert!(area.binding.is_some());
+    }
 }

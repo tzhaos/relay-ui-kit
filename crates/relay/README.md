@@ -13,7 +13,7 @@
 
 ```rust
 use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
-use relay::{Signal, init, track};
+use relay::{ReactiveAppExt, ReactiveContextExt, Signal, init};
 
 struct Counter {
     count: Signal<i32>,
@@ -23,17 +23,40 @@ impl Counter {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
         Self {
-            count: Signal::new(cx, 0),
+            count: cx.signal(0),
         }
     }
 }
 
 impl Render for Counter {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        track(cx, |cx| div().child(self.count.get(cx).to_string()))
+        cx.tracked(|cx| div().child(self.count.get(cx).to_string()))
     }
 }
 ```
+
+## GPUI 便利 API
+
+`ReactiveAppExt` 给 `App` / `Context` 增加创建方法：
+
+```rust
+let count = cx.signal(0);
+let enabled = cx.binding(false);
+let doubled = cx.memo({
+    let count = count.clone();
+    move |cx| count.get(cx) * 2
+});
+```
+
+`ReactiveContextExt` 给 GPUI view 增加 entity-scoped 用法：
+
+```rust
+cx.tracked(|cx| {
+    div().child(count.get(cx).to_string())
+});
+```
+
+UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元素和事件系统。
 
 运行示例：
 

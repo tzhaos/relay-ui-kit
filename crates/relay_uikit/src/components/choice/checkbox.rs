@@ -3,6 +3,7 @@ use gpui::{
     RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -17,6 +18,7 @@ pub struct Checkbox {
     checked: bool,
     label: Option<String>,
     disabled: bool,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -27,6 +29,18 @@ impl Checkbox {
             checked,
             label: None,
             disabled: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, binding: Binding<bool>) -> Self {
+        Self {
+            id: id.into(),
+            checked: false,
+            label: None,
+            disabled: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -53,13 +67,18 @@ impl Checkbox {
 impl RenderOnce for Checkbox {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let (box_bg, box_border) = if self.checked {
+        let binding = self.binding;
+        let checked = binding
+            .as_ref()
+            .map_or(self.checked, |binding| binding.get(cx));
+        let (box_bg, box_border) = if checked {
             (theme.accent, theme.accent)
         } else {
             (theme.panel, theme.border_strong)
         };
         let disabled = self.disabled;
-        let handler = self.on_click.filter(|_| !disabled);
+        let handler = self.on_click;
+        let interactive = !disabled && (binding.is_some() || handler.is_some());
 
         div()
             .id(self.id)
@@ -67,9 +86,9 @@ impl RenderOnce for Checkbox {
             .items_center()
             .gap_2()
             .role(Role::CheckBox)
-            .aria_toggled(Toggled::from(self.checked))
+            .aria_toggled(Toggled::from(checked))
             .when(disabled, |this| this.opacity(DISABLED_OPACITY))
-            .when(!disabled, |this| {
+            .when(interactive, |this| {
                 this.cursor_pointer()
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                         window.prevent_default();
@@ -86,7 +105,7 @@ impl RenderOnce for Checkbox {
                     .border_1()
                     .border_color(box_border)
                     .bg(box_bg)
-                    .when(self.checked, |this| {
+                    .when(checked, |this| {
                         this.child(
                             Icon::new(IconName::Check)
                                 .size(IconSize::XSmall)
@@ -97,11 +116,35 @@ impl RenderOnce for Checkbox {
             .when_some(self.label, |this, label| {
                 this.child(div().text_sm().text_color(theme.text).child(label))
             })
-            .when_some(handler, |this, handler| {
+            .when(interactive, |this| {
                 this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |checked| {
+                            *checked = !*checked;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
+    use super::*;
+
+    #[test]
+    fn bound_checkbox_stores_binding() {
+        let mut app = TestApp::new();
+        let checkbox = app.update(|cx| Checkbox::bound("checkbox", cx.binding(false)));
+
+        assert!(checkbox.binding.is_some());
     }
 }

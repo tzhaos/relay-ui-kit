@@ -5,7 +5,7 @@ use gpui::{
     WindowOptions, div, prelude::*, px, rgb, size,
 };
 use gpui_platform::application;
-use relay::{Memo, Signal, init, track};
+use relay::{Memo, ReactiveAppExt, ReactiveContextExt, Signal, init};
 
 struct Counter {
     count: Signal<i32>,
@@ -15,8 +15,8 @@ struct Counter {
 impl Counter {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
-        let count = Signal::new(cx, 0);
-        let doubled = Memo::new(cx, {
+        let count = cx.signal(0);
+        let doubled = cx.memo({
             let count = count.clone();
             move |cx| count.get(cx) * 2
         });
@@ -34,7 +34,7 @@ impl Counter {
 
 impl Render for Counter {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        track(cx, |cx| {
+        cx.tracked(|cx| {
             div()
                 .flex()
                 .flex_col()

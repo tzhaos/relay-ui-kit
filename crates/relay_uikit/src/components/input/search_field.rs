@@ -3,12 +3,15 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::KeyCaptureHandler,
     theme::{ActiveTheme, radius},
 };
+
+use super::TextInputState;
 
 /// A focusable search/filter well with a leading magnifier icon.
 #[derive(IntoElement)]
@@ -18,6 +21,7 @@ pub struct SearchField {
     value: String,
     placeholder: String,
     key_context: &'static str,
+    binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyCaptureHandler>,
 }
 
@@ -29,6 +33,23 @@ impl SearchField {
             value: String::new(),
             placeholder: "Search".into(),
             key_context: "SearchField",
+            binding: None,
+            on_key: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        focus: FocusHandle,
+        binding: Binding<TextInputState>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            focus,
+            value: String::new(),
+            placeholder: "Search".into(),
+            key_context: "SearchField",
+            binding: Some(binding),
             on_key: None,
         }
     }
@@ -60,11 +81,16 @@ impl SearchField {
 impl RenderOnce for SearchField {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let is_empty = self.value.is_empty();
+        let binding = self.binding;
+        let value = binding.as_ref().map_or_else(
+            || self.value,
+            |binding| binding.read(cx, |state| state.value().to_string()),
+        );
+        let is_empty = value.is_empty();
         let display = if is_empty {
             self.placeholder.clone()
         } else {
-            self.value.clone()
+            value
         };
         let text_color = if is_empty {
             theme.text_muted
@@ -74,6 +100,7 @@ impl RenderOnce for SearchField {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
+        let handle_key = binding.is_some() || on_key.is_some();
 
         div()
             .id(self.id)
@@ -106,9 +133,22 @@ impl RenderOnce for SearchField {
                     .text_color(text_color)
                     .child(display),
             )
-            .when_some(on_key, |this, on_key| {
+            .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
-                    if on_key(event, window, cx) {
+                    let mut consumed = false;
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |state| {
+                            let action = state.handle_key(event);
+                            consumed = action.should_notify();
+                            consumed
+                        });
+                    }
+                    if let Some(on_key) = &on_key
+                        && on_key(event, window, cx)
+                    {
+                        consumed = true;
+                    }
+                    if consumed {
                         cx.stop_propagation();
                     }
                 })
@@ -120,5 +160,27 @@ impl RenderOnce for SearchField {
             .on_click(move |_: &ClickEvent, window, cx| {
                 window.focus(&focus_for_click, cx);
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
+    use super::*;
+
+    #[test]
+    fn bound_search_field_stores_binding() {
+        let mut app = TestApp::new();
+        let field = app.update(|cx| {
+            SearchField::bound(
+                "search",
+                cx.focus_handle(),
+                cx.binding(TextInputState::with_text("relay")),
+            )
+        });
+
+        assert!(field.binding.is_some());
     }
 }
