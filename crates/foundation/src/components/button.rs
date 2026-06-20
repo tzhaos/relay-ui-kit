@@ -5,15 +5,13 @@
 //! concrete view — the gallery and the real workbench wire the same component to
 //! different handlers.
 
-use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce, Role,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
-};
+use gpui::{App, ClickEvent, ElementId, FontWeight, IntoElement, RenderOnce, Window};
 
 use crate::{
+    components::button_like::{ButtonLike, ButtonLikeColors},
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius},
+    theme::ActiveTheme,
 };
 
 /// Visual emphasis for a [`Button`].
@@ -90,14 +88,14 @@ impl Button {
 impl RenderOnce for Button {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        // (bg, border, fg, hover_bg, hover_border)
-        let (bg, border, fg, hover_bg, hover_border) = match self.variant {
+        let (bg, border, fg, hover_bg, hover_border, hover_fg) = match self.variant {
             ButtonVariant::Primary => (
                 theme.accent,
                 theme.accent,
                 theme.on_accent,
                 theme.accent,
                 theme.accent,
+                theme.on_accent,
             ),
             ButtonVariant::Danger => (
                 theme.danger,
@@ -105,6 +103,7 @@ impl RenderOnce for Button {
                 gpui::white(),
                 theme.danger,
                 theme.danger,
+                gpui::white(),
             ),
             ButtonVariant::Secondary => (
                 theme.panel,
@@ -112,6 +111,7 @@ impl RenderOnce for Button {
                 theme.text,
                 theme.hover,
                 theme.border_strong,
+                theme.text,
             ),
             ButtonVariant::Ghost => (
                 gpui::transparent_black(),
@@ -119,45 +119,28 @@ impl RenderOnce for Button {
                 theme.text_secondary,
                 theme.hover,
                 gpui::transparent_black(),
+                theme.text,
             ),
         };
 
         let icon_color = fg;
-        let handler = self.on_click;
-        let disabled = self.disabled;
-        let interactive = handler.is_some() && !disabled;
+        let mut button = ButtonLike::new(
+            self.id,
+            ButtonLikeColors::new(bg, border, fg, hover_bg, hover_border, hover_fg),
+        )
+        .height(28.0)
+        .padding_x(8.0)
+        .gap(4.0)
+        .text_size(12.0)
+        .font_weight(FontWeight::MEDIUM)
+        .disabled(self.disabled)
+        .on_click(self.on_click);
 
-        div()
-            .id(self.id)
-            .h(px(28.0))
-            .px_2()
-            .rounded(px(radius::MD))
-            .border_1()
-            .border_color(border)
-            .bg(bg)
-            .flex()
-            .items_center()
-            .justify_center()
-            .gap_1()
-            .text_xs()
-            .font_weight(gpui::FontWeight::MEDIUM)
-            .text_color(fg)
-            .role(Role::Button)
-            .when(disabled, |this| this.opacity(0.5))
-            .when(interactive, |this| {
-                this.cursor_pointer()
-                    .hover(move |style| style.bg(hover_bg).border_color(hover_border))
-            })
-            .when_some(self.icon, |this, icon| {
-                this.child(Icon::new(icon).size(IconSize::Small).color(icon_color))
-            })
-            .child(self.label)
-            .when_some(handler.filter(|_| interactive), |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            })
+        if let Some(icon) = self.icon {
+            button = button.child(Icon::new(icon).size(IconSize::Small).color(icon_color));
+        }
+
+        button.child(self.label)
     }
 }
 
@@ -211,29 +194,21 @@ impl RenderOnce for IconButton {
         } else {
             theme.text_muted
         };
-        let handler = self.on_click;
-        let interactive = handler.is_some() && !self.disabled;
 
-        div()
-            .id(self.id)
-            .size(px(26.0))
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(radius::MD))
-            .text_color(fg)
-            .role(Role::Button)
-            .when(self.disabled, |this| this.opacity(0.5))
-            .when(interactive, |this| {
-                this.cursor_pointer()
-                    .hover(move |style| style.bg(theme.hover).text_color(theme.text))
-            })
-            .child(Icon::new(self.icon).size(self.size).color(fg))
-            .when_some(handler.filter(|_| interactive), |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            })
+        ButtonLike::new(
+            self.id,
+            ButtonLikeColors::new(
+                gpui::transparent_black(),
+                gpui::transparent_black(),
+                fg,
+                theme.hover,
+                gpui::transparent_black(),
+                theme.text,
+            ),
+        )
+        .size(26.0)
+        .disabled(self.disabled)
+        .on_click(self.on_click)
+        .child(Icon::new(self.icon).size(self.size).color(fg))
     }
 }

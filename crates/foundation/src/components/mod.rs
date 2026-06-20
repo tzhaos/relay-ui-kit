@@ -1,6 +1,7 @@
 //! Core reusable components with no Relay product state.
 
 pub mod button;
+pub(crate) mod button_like;
 pub mod choice;
 pub mod controls;
 pub mod display;
