@@ -174,13 +174,7 @@ pub(super) fn render(
                                 let host = host.clone();
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
-                                        this.state.feedback_toast_serial =
-                                            this.state.feedback_toast_serial.wrapping_add(1);
-                                        let next = this.state.feedback_toast_serial;
-                                        this.state.feedback_toasts.push(next);
-                                        if this.state.feedback_toasts.len() > 4 {
-                                            this.state.feedback_toasts.remove(0);
-                                        }
+                                        this.add_feedback_toast(cx);
                                         cx.notify();
                                     });
                                 }
@@ -209,25 +203,26 @@ pub(super) fn render(
                                 .flex_col()
                                 .items_end()
                                 .gap_2()
-                                .children(state.feedback_toasts.iter().map(|serial| {
+                                .children(state.feedback_toasts.iter().map(|toast| {
+                                    let id = toast.id;
                                     Toast::new(
-                                        format!("feedback-floating-toast-{serial}"),
-                                        format!("Terminal session restored #{serial}"),
+                                        format!("feedback-floating-toast-{id}"),
+                                        format!("Terminal session restored #{id}"),
                                     )
                                     .detail("codex on ui-kit/branch-controls")
                                     .tone(Tone::Accent)
+                                    .on_close({
+                                        let host = host.clone();
+                                        move |_event, _window, cx| {
+                                            host.update(cx, |this, cx| {
+                                                this.dismiss_feedback_toast(id);
+                                                cx.notify();
+                                            });
+                                        }
+                                    })
                                 })),
                         )
                         .window_corner(Anchor::BottomRight, 16.0)
-                        .on_dismiss({
-                            let host = host.clone();
-                            move |_window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.feedback_toasts.clear();
-                                    cx.notify();
-                                });
-                            }
-                        }),
                     )
                 })
                 .child(div().text_xs().text_color(theme.text_muted).child(format!(

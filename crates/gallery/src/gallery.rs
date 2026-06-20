@@ -3,6 +3,8 @@
 //! Each scene presents components in the kind of surface where Relay will use
 //! them, instead of packing every primitive into one long showcase page.
 
+use std::time::Duration;
+
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
     Styled, Window, div, px,
@@ -20,6 +22,9 @@ mod stress_scene;
 mod terminal_scene;
 mod viewer_samples;
 mod workbench_samples;
+
+const FEEDBACK_TOAST_DURATION: Duration = Duration::from_secs(4);
+const FEEDBACK_TOAST_LIMIT: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GallerySurface {
@@ -81,7 +86,7 @@ pub struct GalleryState {
     pub confirm_dialog_open: bool,
     pub pattern_select_open: bool,
     pub pattern_dialog_open: bool,
-    pub feedback_toasts: Vec<u64>,
+    pub feedback_toasts: Vec<FeedbackToast>,
     pub feedback_toast_serial: u64,
     pub accent_choice: &'static str,
     pub overlay_event: String,
@@ -89,6 +94,17 @@ pub struct GalleryState {
     pub core_tree_src_open: bool,
     pub core_tree_components_open: bool,
     pub core_tree_list_open: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FeedbackToast {
+    pub id: u64,
+}
+
+impl FeedbackToast {
+    fn new(id: u64) -> Self {
+        Self { id }
+    }
 }
 
 impl GalleryState {
@@ -126,7 +142,7 @@ impl GalleryState {
             confirm_dialog_open: false,
             pattern_select_open: false,
             pattern_dialog_open: false,
-            feedback_toasts: vec![0],
+            feedback_toasts: Vec::new(),
             feedback_toast_serial: 0,
             accent_choice: "green",
             overlay_event: "No overlay action yet".into(),
@@ -135,6 +151,37 @@ impl GalleryState {
             core_tree_components_open: true,
             core_tree_list_open: true,
         }
+    }
+}
+
+impl GalleryScenesApp {
+    pub fn add_feedback_toast(&mut self, cx: &mut Context<Self>) {
+        self.state.feedback_toast_serial = self.state.feedback_toast_serial.wrapping_add(1);
+        let id = self.state.feedback_toast_serial;
+        self.state.feedback_toasts.push(FeedbackToast::new(id));
+        if self.state.feedback_toasts.len() > FEEDBACK_TOAST_LIMIT {
+            self.state.feedback_toasts.remove(0);
+        }
+        self.schedule_feedback_toast_dismiss(id, cx);
+    }
+
+    pub fn dismiss_feedback_toast(&mut self, id: u64) {
+        self.state.feedback_toasts.retain(|toast| toast.id != id);
+    }
+
+    fn schedule_feedback_toast_dismiss(&self, id: u64, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(FEEDBACK_TOAST_DURATION)
+                .await;
+            if let Some(this) = this.upgrade() {
+                this.update(cx, |this, cx| {
+                    this.dismiss_feedback_toast(id);
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
     }
 }
 

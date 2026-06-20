@@ -4,6 +4,9 @@ use gpui::{
 };
 
 use crate::{
+    components::button::IconButton,
+    icon::{IconName, IconSize},
+    interaction::ClickHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, radius},
     tone::Tone,
@@ -19,6 +22,7 @@ pub struct Toast {
     detail: Option<String>,
     tone: Tone,
     animated: bool,
+    on_close: Option<ClickHandler>,
 }
 
 impl Toast {
@@ -29,6 +33,7 @@ impl Toast {
             detail: None,
             tone: Tone::Info,
             animated: true,
+            on_close: None,
         }
     }
 
@@ -46,12 +51,22 @@ impl Toast {
         self.animated = animated;
         self
     }
+
+    pub fn on_close(
+        mut self,
+        handler: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_close = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for Toast {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let fg = self.tone.fg(&theme);
+        let close_id: ElementId = (self.id.clone(), "close").into();
+        let on_close = self.on_close;
         let base = div()
             .id(self.id)
             .w(px(320.0))
@@ -92,7 +107,14 @@ impl RenderOnce for Toast {
                                 .child(detail),
                         )
                     }),
-            );
+            )
+            .when_some(on_close, |this, handler| {
+                this.child(
+                    IconButton::new(close_id, IconName::X)
+                        .size(IconSize::XSmall)
+                        .on_click(handler),
+                )
+            });
 
         if self.animated {
             base.motion_slide_in(MotionDirection::FromBottom, true)

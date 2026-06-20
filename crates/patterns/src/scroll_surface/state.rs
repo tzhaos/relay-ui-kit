@@ -9,6 +9,8 @@ pub(super) struct ScrollSurfaceState {
     hovered: bool,
     activity_frames: u8,
     decay_scheduled: bool,
+    activity_check_scheduled: bool,
+    last_scroll_y: f32,
     thumb_drag: Option<ThumbDragState>,
 }
 
@@ -19,6 +21,8 @@ impl ScrollSurfaceState {
             hovered: false,
             activity_frames: 0,
             decay_scheduled: false,
+            activity_check_scheduled: false,
+            last_scroll_y: 0.0,
             thumb_drag: None,
         }
     }
@@ -55,6 +59,25 @@ impl ScrollSurfaceState {
         } else {
             false
         }
+    }
+
+    pub(super) fn schedule_activity_check_if_needed(&mut self) -> bool {
+        if self.activity_check_scheduled {
+            false
+        } else {
+            self.activity_check_scheduled = true;
+            true
+        }
+    }
+
+    fn mark_scrolling_if_offset_changed(&mut self) -> bool {
+        self.activity_check_scheduled = false;
+        let scroll_y = f32::from(self.handle.offset().y);
+        if (scroll_y - self.last_scroll_y).abs() <= f32::EPSILON {
+            return false;
+        }
+        self.last_scroll_y = scroll_y;
+        self.mark_scrolling()
     }
 
     pub(super) fn start_thumb_drag(
@@ -125,6 +148,7 @@ impl ScrollSurfaceState {
     fn set_scroll_y(&mut self, y: f32) {
         let offset = self.handle.offset();
         self.handle.set_offset(point(offset.x, px(y)));
+        self.last_scroll_y = y;
     }
 
     fn thumb_opacity(&self) -> f32 {
@@ -151,6 +175,24 @@ pub(super) fn schedule_scroll_decay(state: Entity<ScrollSurfaceState>, window: &
             state.should_continue_decay()
         });
         if should_continue {
+            schedule_scroll_decay(state, window);
+        }
+    });
+}
+
+pub(super) fn schedule_scroll_activity_check(
+    state: Entity<ScrollSurfaceState>,
+    window: &mut Window,
+) {
+    window.on_next_frame(move |window, cx| {
+        let should_schedule_decay = state.update(cx, |state, cx| {
+            let became_visible = state.mark_scrolling_if_offset_changed();
+            if became_visible {
+                cx.notify();
+            }
+            became_visible && state.schedule_decay_if_needed()
+        });
+        if should_schedule_decay {
             schedule_scroll_decay(state, window);
         }
     });
@@ -191,6 +233,13 @@ mod tests {
         assert!(state.mark_scrolling());
         assert!(state.schedule_decay_if_needed());
         assert!(!state.schedule_decay_if_needed());
+    }
+
+    #[test]
+    fn scroll_activity_ignores_unchanged_offset() {
+        let mut state = ScrollSurfaceState::new();
+
+        assert!(!state.mark_scrolling_if_offset_changed());
     }
 
     #[test]

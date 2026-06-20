@@ -13,7 +13,7 @@ use relay_ui_core::theme::{ActiveTheme, space};
 const SCROLL_GUTTER_WIDTH: f32 = 10.0;
 
 use scrollbar::scrollbar_layer;
-use state::{ScrollSurfaceState, schedule_scroll_decay};
+use state::{ScrollSurfaceState, schedule_scroll_activity_check};
 
 /// A stable vertical scrolling surface with Relay's standard scroll affordance.
 #[derive(IntoElement)]
@@ -71,16 +71,13 @@ impl RenderOnce for ScrollSurface {
             .overflow_y_scroll()
             .on_scroll_wheel(move |event, window, cx| {
                 let delta_y = f32::from(event.delta.pixel_delta(window.line_height()).y);
-                let should_schedule_decay = state_for_scroll.update(cx, |state, cx| {
-                    if delta_y != 0.0 {
-                        state.mark_scrolling();
-                        cx.notify();
-                    }
-                    state.schedule_decay_if_needed()
-                });
-
-                if should_schedule_decay {
-                    schedule_scroll_decay(state_for_scroll.clone(), window);
+                if delta_y == 0.0 {
+                    return;
+                }
+                let should_check_activity = state_for_scroll
+                    .update(cx, |state, _cx| state.schedule_activity_check_if_needed());
+                if should_check_activity {
+                    schedule_scroll_activity_check(state_for_scroll.clone(), window);
                 }
             })
             .on_hover(move |hovered, _window, cx| {
