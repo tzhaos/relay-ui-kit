@@ -16,8 +16,8 @@ pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
 pub use controls::{
     ColorField, ColorPicker, ColorPreset, ColorSwatch, Disclosure, FilterBar, FilterChip,
-    PanelHeader, SearchField, Segment, SegmentedControl, Slider, Stepper, ThemePreviewCard,
-    ThemePreviewKind, ToolbarGroup,
+    PanelHeader, Segment, SegmentedControl, Slider, Stepper, ThemePreviewCard, ThemePreviewKind,
+    ToolbarGroup,
 };
 pub use display::{
     Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
@@ -26,8 +26,8 @@ pub use feedback::{Banner, Callout, InlineError, LoadingSpinner, ProgressBar, Sk
 pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use icon::{Icon, IconName, IconSize, KitAssets};
 pub use input::{
-    InputActionKind, InputValueKind, NumberInput, NumberInputLayout, TextArea, TextInput,
-    TextInputAction, TextInputState, ValidationState,
+    InputActionKind, InputValueKind, NumberInput, NumberInputLayout, SearchField, TextArea,
+    TextInput, TextInputAction, TextInputState, ValidationState,
 };
 pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
 pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
