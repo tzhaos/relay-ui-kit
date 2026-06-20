@@ -4,7 +4,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use relay_foundation::{
+use relay_ui_core::{
     display::StatusDot,
     interaction::ClickHandler,
     theme::{ActiveTheme, radius},

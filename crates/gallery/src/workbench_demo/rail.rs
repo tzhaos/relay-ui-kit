@@ -1,9 +1,9 @@
 use gpui::{Entity, FontWeight, IntoElement, ParentElement, Styled, div, px};
-use relay_composites::{Pane, PaneSurface, PaneWidth};
-use relay_foundation::{
+use relay_ui_core::{
     Divider, IconButton, IconName, NavRow, PanelHeader, TaskRow, TaskRowData, Theme, TreeRow,
     theme::{radius, space},
 };
+use relay_ui_patterns::{Pane, PaneSurface, PaneWidth};
 use relay_workbench::TerminalStatusBadge;
 
 use super::{

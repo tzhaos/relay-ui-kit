@@ -34,8 +34,8 @@ use gpui::{
     StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
-use relay_composites::{TitleBar, WorkspaceBreadcrumb};
-use relay_foundation::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
+use relay_ui_core::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
+use relay_ui_patterns::{TitleBar, WorkspaceBreadcrumb};
 
 /// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

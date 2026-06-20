@@ -2,11 +2,11 @@ use gpui::{
     Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div,
     prelude::FluentBuilder, px,
 };
-use relay_composites::overlay;
-use relay_foundation::{
+use relay_ui_core::{
     ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
     Tone, radius, space,
 };
+use relay_ui_patterns::overlay;
 use relay_workbench::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
 
 use super::GalleryScenesApp;

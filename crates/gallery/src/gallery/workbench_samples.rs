@@ -1,10 +1,10 @@
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div, px};
-use relay_composites::{
+use relay_ui_core::{
+    Button, IconName, NavRow, PanelHeader, TextInput, TextInputAction, Theme, Tone, TreeRow, radius,
+};
+use relay_ui_patterns::{
     AppShell, CommandPalette, CommandRow, KeybindingShortcut, Pane, PaneSurface, PaneWidth,
     SplitPane, StatusBar, StatusItem, TitleBar, WorkspaceBreadcrumb,
-};
-use relay_foundation::{
-    Button, IconName, NavRow, PanelHeader, TextInput, TextInputAction, Theme, Tone, TreeRow, radius,
 };
 use relay_workbench::{
     LauncherItem, LauncherItemKind, LauncherMenu, TerminalAgentQuickLaunch, TerminalLine,

@@ -4,7 +4,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use relay_foundation::{
+use relay_ui_core::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
     theme::{ActiveTheme, radius},

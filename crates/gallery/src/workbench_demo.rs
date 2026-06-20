@@ -6,8 +6,8 @@ mod data;
 mod rail;
 
 use gpui::{AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
-use relay_composites::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
-use relay_foundation::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
+use relay_ui_core::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
+use relay_ui_patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
 
 use center::center_pane;
 use context::right_context;

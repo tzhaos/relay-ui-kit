@@ -1,9 +1,9 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
-use relay_composites::{
+use relay_ui_core::{Button, IconName, Theme};
+use relay_ui_patterns::{
     CommandRow, ConfirmDialog, DropdownMenu, KeybindingActions, KeybindingRow, KeybindingShortcut,
     KeybindingTable, MenuItem, Popover, overlay,
 };
-use relay_foundation::{Button, IconName, Theme};
 
 use super::{
     GalleryScenesApp, GalleryState,

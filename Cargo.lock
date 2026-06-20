@@ -4214,15 +4214,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "relay_composites"
+name = "relay_gallery"
 version = "0.1.0"
 dependencies = [
  "gpui",
- "relay_foundation",
+ "gpui_platform",
+ "relay_ui_core",
+ "relay_ui_patterns",
+ "relay_workbench",
 ]
 
 [[package]]
-name = "relay_foundation"
+name = "relay_ui_core"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -4230,14 +4233,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "relay_gallery"
+name = "relay_ui_patterns"
 version = "0.1.0"
 dependencies = [
  "gpui",
- "gpui_platform",
- "relay_composites",
- "relay_foundation",
- "relay_workbench",
+ "relay_ui_core",
 ]
 
 [[package]]
@@ -4246,8 +4246,8 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "pulldown-cmark",
- "relay_composites",
- "relay_foundation",
+ "relay_ui_core",
+ "relay_ui_patterns",
  "similar",
 ]
 

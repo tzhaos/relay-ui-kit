@@ -1,9 +1,9 @@
 use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
-use relay_composites::{Pane, PaneSurface, PaneWidth, Tab, Tabs};
-use relay_foundation::{
+use relay_ui_core::{
     Badge, IconButton, IconName, PanelHeader, StatusDot, TextInput, TextInputAction, Theme, Tone,
     TreeRow, radius,
 };
+use relay_ui_patterns::{Pane, PaneSurface, PaneWidth, Tab, Tabs};
 use relay_workbench::{DiffView, FileKind, FileView, TerminalSessionRow};
 
 use super::{
@@ -152,7 +152,7 @@ fn files_tab(
 fn diff_tab() -> impl IntoElement {
     div().flex_1().min_h_0().p_2().child(
         FileView::new(
-            "crates/composites/src/layout/shell/split_pane/mod.rs",
+            "crates/patterns/src/layout/shell/split_pane/mod.rs",
             FileKind::Diff,
             DiffView::from_text_diff(DIFF_OLD, DIFF_NEW),
         )

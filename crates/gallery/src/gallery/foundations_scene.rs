@@ -1,11 +1,11 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
-use relay_composites::{Tab, Tabs};
-use relay_foundation::{
+use relay_ui_core::{
     Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, FilterBar,
     FilterChip, Icon, IconButton, IconName, Label, LabelSize, ListItem, NavRow, SectionedList,
     SectionedListGroup, Segment, SegmentedControl, Stepper, TaskRow, TaskRowData, Theme, Tone,
     ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
+use relay_ui_patterns::{Tab, Tabs};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -357,7 +357,7 @@ fn tree_rows_sample() -> impl IntoElement {
                 .depth(0),
         )
         .child(
-            TreeRow::new("tr-2", IconName::Folder, "relay_foundation")
+            TreeRow::new("tr-2", IconName::Folder, "relay_ui_core")
                 .expandable(false)
                 .depth(1),
         )

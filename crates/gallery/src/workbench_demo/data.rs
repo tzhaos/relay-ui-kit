@@ -1,4 +1,4 @@
-use relay_foundation::{IconName, Tone};
+use relay_ui_core::{IconName, Tone};
 use relay_workbench::{TerminalLine, TerminalLineStyle};
 
 use super::WorkbenchState;
@@ -113,7 +113,7 @@ pub(super) const DEMO_FILES: [DemoFile; 13] = [
     DemoFile {
         depth: 1,
         icon: IconName::Folder,
-        name: "relay_foundation",
+        name: "relay_ui_core",
         expandable: true,
     },
     DemoFile {

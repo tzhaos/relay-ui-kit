@@ -2,7 +2,7 @@ use gpui::{
     App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_foundation::theme::{ActiveTheme, Theme, space};
+use relay_ui_core::theme::{ActiveTheme, Theme, space};
 
 use super::TerminalLine;
 

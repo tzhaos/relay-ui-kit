@@ -3,7 +3,7 @@ use gpui::{
     Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_foundation::theme::{ActiveTheme, radius};
+use relay_ui_core::theme::{ActiveTheme, radius};
 
 // --- Layout constants ---
 /// Min composer height when docked (non-floating).
