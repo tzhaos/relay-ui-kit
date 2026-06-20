@@ -176,21 +176,23 @@ impl Element for ScrollbarElement {
             }
 
             let mouse_y = f32::from(event.position.y);
-            let should_schedule_decay = state_for_move.update(cx, |state, cx| {
+            let (handled, should_schedule_decay) = state_for_move.update(cx, |state, cx| {
                 if !state.is_thumb_dragging() || !event.dragging() {
-                    return false;
+                    return (false, false);
                 }
                 let changed = state.update_thumb_drag(mouse_y);
                 if changed {
                     state.mark_scrolling();
                     cx.notify();
                 }
-                changed && state.schedule_decay_if_needed()
+                (true, changed && state.schedule_decay_if_needed())
             });
             if should_schedule_decay {
                 schedule_scroll_decay(state_for_move.clone(), window);
             }
-            cx.stop_propagation();
+            if handled {
+                cx.stop_propagation();
+            }
         });
 
         window.on_mouse_event(move |_event: &MouseUpEvent, phase, _window, cx| {
@@ -198,13 +200,18 @@ impl Element for ScrollbarElement {
                 return;
             }
 
-            state_for_up.update(cx, |state, cx| {
+            let handled = state_for_up.update(cx, |state, cx| {
                 if state.is_thumb_dragging() {
                     state.end_thumb_drag();
                     cx.notify();
+                    true
+                } else {
+                    false
                 }
             });
-            cx.stop_propagation();
+            if handled {
+                cx.stop_propagation();
+            }
         });
     }
 }
