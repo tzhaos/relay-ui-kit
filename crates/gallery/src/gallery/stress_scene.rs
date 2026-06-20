@@ -1,7 +1,8 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
+use relay_composites::ScrollSurface;
 use relay_foundation::{
-    Button, ButtonVariant, IconButton, IconName, IconSize, ScrollSurface, TaskRow, TaskRowData,
-    Theme, Tone, TreeRow, radius,
+    Button, ButtonVariant, IconButton, IconName, IconSize, TaskRow, TaskRowData, Theme, Tone,
+    TreeRow, radius,
 };
 use relay_workbench::{
     CodeView, FileKind, FileView, TerminalLine, TerminalLineStyle, TerminalSurface,

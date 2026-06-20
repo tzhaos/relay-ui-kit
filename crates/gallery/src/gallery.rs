@@ -7,8 +7,8 @@ use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
     Styled, Window, div, px,
 };
-use relay_composites::SplitPaneState;
-use relay_foundation::{ActiveTheme, ScrollSurface, TextInputState, space};
+use relay_composites::{ScrollSurface, SplitPaneState};
+use relay_foundation::{ActiveTheme, TextInputState, space};
 
 mod command_scene;
 mod foundations_scene;

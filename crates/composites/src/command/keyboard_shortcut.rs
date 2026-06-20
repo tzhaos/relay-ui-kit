@@ -1,6 +1,6 @@
 use gpui::{App, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
 
-use crate::theme::{ActiveTheme, radius, space};
+use relay_foundation::theme::{ActiveTheme, radius, space};
 
 /// A visual keyboard shortcut hint, rendered as compact keycaps.
 #[derive(Clone, Debug, PartialEq, Eq, IntoElement)]

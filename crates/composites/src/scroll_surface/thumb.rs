@@ -1,6 +1,6 @@
 use gpui::{Hsla, IntoElement, Styled, div, px};
 
-use crate::theme::BORDER_WIDTH;
+use relay_foundation::theme::BORDER_WIDTH;
 
 /// Scroll thumb width in pixels.
 pub(super) const THUMB_WIDTH: f32 = 5.0;

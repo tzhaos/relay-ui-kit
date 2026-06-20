@@ -3,8 +3,8 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
+use relay_composites::overlay;
 use relay_foundation::{
-    components::overlay::overlay,
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
     motion::{MotionDirection, MotionExt},

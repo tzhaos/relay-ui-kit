@@ -7,7 +7,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_foundation::{
     icon::IconName,
     interaction::ClickHandler,
     theme::{self, ActiveTheme, space},
@@ -64,7 +64,7 @@ impl Dialog {
         self
     }
 
-    crate::callback_builder!(on_dismiss, on_dismiss, ClickEvent);
+    relay_foundation::callback_builder!(on_dismiss, on_dismiss, ClickEvent);
 }
 
 impl ParentElement for Dialog {

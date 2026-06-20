@@ -4,7 +4,7 @@ use gpui::{
     App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
 };
 
-use crate::{
+use relay_foundation::{
     button::{Button, ButtonVariant},
     icon::IconName,
     interaction::SharedClickHandler,

@@ -3,7 +3,7 @@ use gpui::{
     Window, div, prelude::FluentBuilder,
 };
 
-use crate::interaction::DismissHandler;
+use relay_foundation::interaction::DismissHandler;
 
 use super::{Menu, MenuItem, overlay};
 
@@ -56,7 +56,7 @@ impl DropdownMenu {
         self
     }
 
-    crate::callback_builder!(on_dismiss, on_dismiss,);
+    relay_foundation::callback_builder!(on_dismiss, on_dismiss,);
 }
 
 impl RenderOnce for DropdownMenu {

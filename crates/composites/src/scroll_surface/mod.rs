@@ -7,7 +7,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, space};
+use relay_foundation::theme::{ActiveTheme, space};
 
 /// Width of the reserved scrollbar gutter area.
 const SCROLL_GUTTER_WIDTH: f32 = 10.0;

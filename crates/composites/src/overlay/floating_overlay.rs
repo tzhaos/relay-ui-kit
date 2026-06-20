@@ -3,7 +3,7 @@ use gpui::{
     Window, anchored, deferred, div, px,
 };
 
-use crate::{interaction::DismissHandler, theme};
+use relay_foundation::{interaction::DismissHandler, theme};
 
 /// Anchored floating content with window-edge snapping.
 #[derive(IntoElement)]
@@ -39,7 +39,7 @@ impl Overlay {
         self
     }
 
-    crate::callback_builder!(on_dismiss, on_dismiss,);
+    relay_foundation::callback_builder!(on_dismiss, on_dismiss,);
 }
 
 impl RenderOnce for Overlay {

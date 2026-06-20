@@ -3,13 +3,14 @@ use gpui::{
     Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_foundation::{
     display::EmptyState,
     icon::IconName,
     motion::{MotionDirection, MotionExt},
-    structure::ScrollSurface,
     theme::{ActiveTheme, radius, space},
 };
+
+use crate::ScrollSurface;
 
 /// A floating command palette panel.
 #[derive(IntoElement)]

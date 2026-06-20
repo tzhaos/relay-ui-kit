@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
+use relay_foundation::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
     theme::{BORDER_WIDTH, Theme, radius, space},

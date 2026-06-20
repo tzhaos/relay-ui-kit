@@ -1,6 +1,6 @@
 use gpui::{App, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
 
-use crate::theme::{ActiveTheme, radius};
+use relay_foundation::theme::{ActiveTheme, radius};
 
 /// A tiny tooltip body for GPUI tooltip views.
 #[derive(IntoElement)]

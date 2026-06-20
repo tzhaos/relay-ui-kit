@@ -7,7 +7,7 @@ use gpui::{
 
 pub use item::MenuItem;
 
-use crate::{
+use relay_foundation::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius, space},

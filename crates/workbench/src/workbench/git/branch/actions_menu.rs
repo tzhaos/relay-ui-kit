@@ -1,9 +1,7 @@
 use gpui::{App, ElementId, IntoElement, RenderOnce, Window};
 
-use relay_foundation::{
-    components::overlay::{Menu, MenuItem},
-    interaction::SharedActionHandler,
-};
+use relay_composites::{Menu, MenuItem};
+use relay_foundation::interaction::SharedActionHandler;
 
 use super::types::BranchActionKind;
 

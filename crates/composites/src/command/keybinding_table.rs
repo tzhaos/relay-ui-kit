@@ -3,10 +3,9 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::{
-    command::KeybindingShortcut,
-    theme::{ActiveTheme, radius, space},
-};
+use relay_foundation::theme::{ActiveTheme, Theme, radius, space};
+
+use crate::command::KeybindingShortcut;
 
 /// One command row in a keybinding table.
 pub struct KeybindingRow {
@@ -89,7 +88,7 @@ impl RenderOnce for KeybindingTable {
     }
 }
 
-fn render_row(row: KeybindingRow, last: bool, theme: crate::Theme) -> impl IntoElement {
+fn render_row(row: KeybindingRow, last: bool, theme: Theme) -> impl IntoElement {
     div()
         .min_h(px(56.0))
         .px_3()

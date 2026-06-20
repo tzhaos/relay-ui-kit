@@ -1,6 +1,6 @@
 use gpui::{AnyElement, ClickEvent, IntoElement};
 
-use crate::{icon::IconName, interaction::ClickHandler};
+use relay_foundation::{icon::IconName, interaction::ClickHandler};
 
 /// One row in a [`super::Menu`].
 pub struct MenuItem {
@@ -122,7 +122,7 @@ impl MenuItem {
         self
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
 }
 
 #[cfg(test)]

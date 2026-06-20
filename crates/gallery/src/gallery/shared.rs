@@ -2,9 +2,10 @@ use gpui::{
     Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div,
     prelude::FluentBuilder, px,
 };
+use relay_composites::overlay;
 use relay_foundation::{
     ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
-    Tone, overlay, radius, space,
+    Tone, radius, space,
 };
 use relay_workbench::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
 

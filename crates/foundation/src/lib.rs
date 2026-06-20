@@ -7,31 +7,17 @@
 pub(crate) mod component_prelude;
 pub mod components;
 pub mod interaction;
-pub mod structure;
 pub mod styles;
 
-pub use components::{
-    button, choice, command, controls, display, feedback, form, icon, input, list, row,
-};
-pub use structure::ScrollSurface;
+pub use components::{button, choice, controls, display, feedback, form, icon, input, list, row};
 pub use styles::{motion, theme, tone};
 
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
-#[allow(deprecated)]
-pub use command::KeyboardShortcut;
-pub use command::{
-    CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
-    KeybindingShortcut, KeybindingTable,
-};
-pub use components::overlay::{
-    ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,
-    TooltipBody, overlay,
-};
 pub use controls::{
     ColorField, ColorPicker, ColorPreset, ColorSwatch, Disclosure, FilterBar, FilterChip,
-    PanelHeader, SearchField, Segment, SegmentedControl, Select, SelectOption, Slider, Stepper,
-    ThemePreviewCard, ThemePreviewKind, ToolbarGroup,
+    PanelHeader, SearchField, Segment, SegmentedControl, Slider, Stepper, ThemePreviewCard,
+    ThemePreviewKind, ToolbarGroup,
 };
 pub use display::{
     Badge, BadgeStyle, CountBadge, Divider, EmptyState, Label, LabelColor, LabelSize, StatusDot,
@@ -57,14 +43,25 @@ mod tests {
         let composites_cargo = read_crate_toml("composites");
         let workbench_cargo = read_crate_toml("workbench");
         let gallery_cargo = read_crate_toml("gallery");
+        let foundation_components = read_crate_source("foundation", "src/components/mod.rs");
+        let foundation_lib = read_crate_source("foundation", "src/lib.rs");
+        let composites_lib = read_crate_source("composites", "src/lib.rs");
 
         // Foundation must not depend on higher layers.
         assert!(!foundation_cargo.contains("relay_composites"));
         assert!(!foundation_cargo.contains("relay_workbench"));
+        assert!(!foundation_components.contains(&module_declaration("command")));
+        assert!(!foundation_components.contains(&module_declaration("overlay")));
+        assert!(!foundation_components.contains("mod select"));
+        assert!(!foundation_lib.contains(&module_declaration("structure")));
 
         // Composites depend on foundation, not on workbench.
         assert!(composites_cargo.contains("relay_foundation.workspace"));
         assert!(!composites_cargo.contains("relay_workbench"));
+        assert!(composites_lib.contains(&module_declaration("command")));
+        assert!(composites_lib.contains(&module_declaration("overlay")));
+        assert!(composites_lib.contains(&module_declaration("scroll_surface")));
+        assert!(composites_lib.contains(&module_declaration("select")));
 
         // Workbench depends on foundation and composites.
         assert!(workbench_cargo.contains("relay_foundation.workspace"));
@@ -76,6 +73,10 @@ mod tests {
 
     /// Read a crate's `Cargo.toml` at test time using `CARGO_MANIFEST_DIR`.
     fn read_crate_toml(crate_dir: &str) -> String {
+        read_crate_source(crate_dir, "Cargo.toml")
+    }
+
+    fn read_crate_source(crate_dir: &str, relative_path: &str) -> String {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let Some(workspace_root) = manifest_dir.parent().and_then(|p| p.parent()) else {
             panic!("workspace root");
@@ -83,8 +84,12 @@ mod tests {
         let path = workspace_root
             .join("crates")
             .join(crate_dir)
-            .join("Cargo.toml");
+            .join(relative_path);
         std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e))
+    }
+
+    fn module_declaration(name: &str) -> String {
+        format!("pub mod {name}")
     }
 }

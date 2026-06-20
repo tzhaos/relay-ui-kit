@@ -5,12 +5,13 @@ use gpui::{
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{
-    components::overlay::{Menu, MenuItem, overlay},
+use relay_foundation::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, DismissHandler, SelectHandler},
     theme::{ActiveTheme, radius},
 };
+
+use crate::{Menu, MenuItem, overlay};
 
 /// One option in a [`Select`].
 pub struct SelectOption {
@@ -82,7 +83,7 @@ impl Select {
         self
     }
 
-    crate::callback_builder!(on_toggle, on_toggle, ClickEvent);
+    relay_foundation::callback_builder!(on_toggle, on_toggle, ClickEvent);
 
     pub fn on_select(
         mut self,
@@ -92,7 +93,7 @@ impl Select {
         self
     }
 
-    crate::callback_builder!(on_dismiss, on_dismiss,);
+    relay_foundation::callback_builder!(on_dismiss, on_dismiss,);
 
     pub fn selected_label(&self) -> &str {
         self.options
