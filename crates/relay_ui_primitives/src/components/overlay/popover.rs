@@ -97,9 +97,9 @@ impl RenderOnce for Popover {
                                     .truncate()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme.text),
+                                    .text_color(theme.text)
+                                    .child(title),
                             )
-                            .child(title)
                         }),
                 )
             })

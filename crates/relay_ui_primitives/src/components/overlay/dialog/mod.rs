@@ -84,6 +84,7 @@ impl RenderOnce for Dialog {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let on_dismiss = self.on_dismiss;
+        let id = self.id.clone();
         let panel = DialogPanel {
             theme,
             id: self.id,
@@ -98,7 +99,7 @@ impl RenderOnce for Dialog {
 
         deferred(
             div()
-                .id("dialog-backdrop")
+                .id((id, "backdrop"))
                 .absolute()
                 .inset_0()
                 .size_full()

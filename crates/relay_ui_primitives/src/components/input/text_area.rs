@@ -18,7 +18,6 @@ pub struct TextArea {
     focus: FocusHandle,
     before: String,
     after: String,
-    is_empty: bool,
     placeholder: String,
     focused: bool,
     min_rows: usize,
@@ -35,7 +34,6 @@ impl TextArea {
             focus,
             before: before.to_string(),
             after: after.to_string(),
-            is_empty: state.is_empty(),
             placeholder: String::new(),
             focused: false,
             min_rows: 3,
@@ -90,7 +88,7 @@ impl RenderOnce for TextArea {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let show_placeholder = self.is_empty && !self.focused;
+        let show_placeholder = self.before.is_empty() && self.after.is_empty() && !self.focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
 
         div()

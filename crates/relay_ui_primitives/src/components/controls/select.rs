@@ -118,9 +118,10 @@ impl RenderOnce for Select {
         let selected_key = self.selected_key;
         let select_handler = self.on_select.map(Rc::new);
         let dismiss_handler = self.on_dismiss;
+        let id = self.id.clone();
         let mut root = div().id(self.id).relative().flex().items_center().child(
             div()
-                .id("select-trigger")
+                .id((id.clone(), "trigger"))
                 .h(px(30.0))
                 .min_w(px(180.0))
                 .max_w(px(280.0))
@@ -181,7 +182,7 @@ impl RenderOnce for Select {
                 }
                 items.push(item);
             }
-            let menu = overlay(Menu::new("select-menu", items).min_width(220.0)).offset(0.0, 32.0);
+            let menu = overlay(Menu::new((id, "menu"), items).min_width(220.0)).offset(0.0, 32.0);
             let menu = if let Some(dismiss_handler) = dismiss_handler {
                 menu.on_dismiss(dismiss_handler)
             } else {

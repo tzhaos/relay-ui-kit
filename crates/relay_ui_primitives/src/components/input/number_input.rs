@@ -22,7 +22,6 @@ struct EditableNumberValue {
     focus: FocusHandle,
     before: String,
     after: String,
-    is_empty: bool,
     focused: bool,
     key_context: &'static str,
     on_key: Option<KeyHandler>,
@@ -69,7 +68,6 @@ impl NumberInput {
             focus,
             before: before.to_string(),
             after: after.to_string(),
-            is_empty: state.is_empty(),
             focused: false,
             key_context: "NumberInput",
             on_key: None,
@@ -145,14 +143,14 @@ impl RenderOnce for NumberInput {
             }
         };
         let decrement = stepper(
-            "number-decrement",
+            (id.clone(), "decrement"),
             IconName::Minus,
             on_decrement,
             theme.hover,
             theme.text_muted,
         );
         let increment = stepper(
-            "number-increment",
+            (id.clone(), "increment"),
             IconName::Plus,
             on_increment,
             theme.hover,
@@ -222,7 +220,8 @@ fn editable_number_value(
     let focus_for_click = editable.focus.clone();
     let focus_for_mouse_down = editable.focus.clone();
     let on_key = editable.on_key;
-    let show_fallback = editable.is_empty && !editable.focused;
+    let show_fallback =
+        editable.before.is_empty() && editable.after.is_empty() && !editable.focused;
 
     div()
         .id(id)
@@ -273,7 +272,7 @@ fn editable_number_value(
 }
 
 fn stepper(
-    id: &'static str,
+    id: impl Into<ElementId>,
     icon: IconName,
     handler: Option<ClickHandler>,
     hover_bg: gpui::Hsla,
