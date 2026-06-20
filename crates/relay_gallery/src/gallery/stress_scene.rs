@@ -1,7 +1,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
 use relay_ui_primitives::{
-    Button, ButtonVariant, IconName, ScrollSurface, TaskRow, TaskRowData, Theme, Tone, TreeRow,
-    radius,
+    Button, ButtonVariant, IconButton, IconName, IconSize, ScrollSurface, TaskRow, TaskRowData,
+    Theme, Tone, TreeRow, radius,
 };
 use relay_workbench_ui::{
     CodeView, FileKind, FileView, TerminalLine, TerminalLineStyle, TerminalSurface,
@@ -52,6 +52,27 @@ pub(super) fn render(
                         .ghost()
                         .icon(IconName::RefreshCw)
                         .disabled(true),
+                ),
+        ))
+        .child(section(
+            cx,
+            "Disabled icon buttons",
+            strip()
+                .child(
+                    IconButton::new("stress-ib-disabled", IconName::Plus)
+                        .size(IconSize::Small)
+                        .disabled(true),
+                )
+                .child(
+                    IconButton::new("stress-ib-active-disabled", IconName::PanelLeft)
+                        .active(true)
+                        .size(IconSize::Small)
+                        .disabled(true),
+                )
+                .child(
+                    IconButton::new("stress-ib-active", IconName::Settings)
+                        .active(true)
+                        .size(IconSize::Small),
                 ),
         ))
         .child(section(cx, "Scroll surface", scroll_surface_sample(theme)))

@@ -26,13 +26,16 @@
 mod gallery;
 mod workbench_demo;
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gpui::{
     AnyElement, AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
     StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
 use relay_ui_components::{TitleBar, WorkspaceBreadcrumb};
-use relay_ui_primitives::{ActiveTheme, IconName, KitAssets, NavRow, space, theme};
+use relay_ui_primitives::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
 
 /// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +51,7 @@ pub enum Page {
 
 pub struct GalleryApp {
     page: Page,
+    dark_mode: Rc<Cell<bool>>,
     gallery: gpui::Entity<gallery::GalleryScenesApp>,
     workbench: gpui::Entity<workbench_demo::WorkbenchApp>,
 }
@@ -56,6 +60,7 @@ impl GalleryApp {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
             page: Page::Workbench,
+            dark_mode: Rc::new(Cell::new(false)),
             gallery: cx.new(gallery::GalleryScenesApp::new),
             workbench: cx.new(workbench_demo::WorkbenchApp::new),
         }
@@ -136,6 +141,32 @@ impl GalleryApp {
             .child(self.catalog_row(Page::Settings, cx))
             .child(self.catalog_row(Page::Foundations, cx))
             .child(self.catalog_row(Page::Stress, cx))
+            .child(div().flex_1())
+            .child(self.theme_toggle(cx))
+    }
+
+    fn theme_toggle(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = *cx.theme();
+        let is_dark = self.dark_mode.get();
+        let label = if is_dark { "☀  Light" } else { "☾  Dark" };
+        let dark_mode = self.dark_mode.clone();
+
+        div()
+            .px_3()
+            .py_2()
+            .border_t_1()
+            .border_color(theme.border)
+            .child(Button::new("theme-toggle", label).ghost().on_click(
+                move |_event, _window, cx: &mut App| {
+                    let was_dark = dark_mode.get();
+                    dark_mode.set(!was_dark);
+                    if was_dark {
+                        theme::init(cx);
+                    } else {
+                        theme::init_dark(cx);
+                    }
+                },
+            ))
     }
 
     fn catalog_row(&self, page: Page, cx: &mut Context<Self>) -> impl IntoElement {
