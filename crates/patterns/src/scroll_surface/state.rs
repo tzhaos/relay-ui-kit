@@ -94,6 +94,10 @@ impl ScrollSurfaceState {
         self.thumb_drag = None;
     }
 
+    pub(super) fn is_thumb_dragging(&self) -> bool {
+        self.thumb_drag.is_some()
+    }
+
     // ------------------------------------------------------------------
     // Scrollbar visibility decay
     // ------------------------------------------------------------------

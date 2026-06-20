@@ -1,7 +1,3 @@
-use gpui::{Hsla, IntoElement, Styled, div, px};
-
-use relay_ui_core::theme::BORDER_WIDTH;
-
 /// Scroll thumb width in pixels.
 pub(super) const THUMB_WIDTH: f32 = 5.0;
 
@@ -12,16 +8,6 @@ const MIN_THUMB_HEIGHT: f32 = 24.0;
 pub(super) struct ScrollThumbMetrics {
     pub(super) top: f32,
     pub(super) height: f32,
-}
-
-pub(super) fn scroll_rail(color: Hsla) -> impl IntoElement {
-    div()
-        .absolute()
-        .top_0()
-        .right_0()
-        .bottom_0()
-        .w(px(BORDER_WIDTH))
-        .bg(color)
 }
 
 pub(super) fn thumb_metrics_from_values(

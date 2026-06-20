@@ -1,10 +1,10 @@
+mod scrollbar;
 mod state;
 mod thumb;
 
 use gpui::{
-    AnyElement, App, AppContext as _, ElementId, Empty, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use relay_ui_core::theme::{ActiveTheme, space};
@@ -12,8 +12,8 @@ use relay_ui_core::theme::{ActiveTheme, space};
 /// Width of the reserved scrollbar gutter area.
 const SCROLL_GUTTER_WIDTH: f32 = 10.0;
 
+use scrollbar::scrollbar_layer;
 use state::{ScrollSurfaceState, schedule_scroll_decay};
-use thumb::{THUMB_WIDTH, scroll_rail};
 
 /// A stable vertical scrolling surface with Relay's standard scroll affordance.
 #[derive(IntoElement)]
@@ -97,7 +97,7 @@ impl RenderOnce for ScrollSurface {
             .child(self.content);
         scroller.style().restrict_scroll_to_axis = Some(true);
 
-        let outer = div()
+        div()
             .relative()
             .size_full()
             .min_h_0()
@@ -108,101 +108,16 @@ impl RenderOnce for ScrollSurface {
             })
             .child(scroller)
             .when(self.show_rail, |this| {
-                this.child(scroll_rail(theme.border.opacity(0.72)))
-                    .when_some(snapshot.thumb, |this, thumb| {
-                        let state_for_thumb = state.clone();
-                        let thumb_id = (id.clone(), "thumb");
-                        this.child(
-                            div()
-                                .id(thumb_id)
-                                .absolute()
-                                .right(px(space::XXS))
-                                .top(px(thumb.top))
-                                .w(px(THUMB_WIDTH))
-                                .h(px(thumb.height))
-                                .rounded_full()
-                                .bg(theme.text_muted.opacity(snapshot.thumb_opacity))
-                                .cursor_pointer()
-                                .on_drag(
-                                    DraggedScrollThumb {
-                                        id: id.clone(),
-                                        thumb_top: thumb.top,
-                                        thumb_height: thumb.height,
-                                    },
-                                    move |drag, cursor_offset, window, cx| {
-                                        let mouse_y = f32::from(window.mouse_position().y);
-                                        let click_y = f32::from(cursor_offset.y);
-                                        let should_schedule_decay =
-                                            state_for_thumb.update(cx, |state, cx| {
-                                                state.start_thumb_drag(
-                                                    mouse_y,
-                                                    drag.thumb_top,
-                                                    drag.thumb_height,
-                                                    click_y,
-                                                );
-                                                state.update_thumb_drag(mouse_y);
-                                                state.mark_scrolling();
-                                                cx.notify();
-                                                state.schedule_decay_if_needed()
-                                            });
-                                        if should_schedule_decay {
-                                            schedule_scroll_decay(state_for_thumb.clone(), window);
-                                        }
-                                        cx.new(|_| Empty)
-                                    },
-                                ),
-                        )
-                    })
-            });
-
-        let state_for_drag_move = state.clone();
-        let state_for_drop = state.clone();
-        let drag_id = id.clone();
-        let drop_id = id;
-
-        outer
-            .on_drag_move::<DraggedScrollThumb>(move |event, window, cx| {
-                if event.drag(cx).id != drag_id {
-                    return;
-                }
-
-                let mouse_y = f32::from(event.event.position.y);
-                let should_schedule_decay = state_for_drag_move.update(cx, |state, cx| {
-                    let changed = state.update_thumb_drag(mouse_y);
-                    if changed {
-                        state.mark_scrolling();
-                        cx.notify();
-                    }
-                    changed && state.schedule_decay_if_needed()
-                });
-                if should_schedule_decay {
-                    schedule_scroll_decay(state_for_drag_move.clone(), window);
-                }
-                cx.stop_propagation();
-            })
-            .on_drop::<DraggedScrollThumb>(move |drag, _window, cx| {
-                if drag.id == drop_id {
-                    state_for_drop.update(cx, |state, cx| {
-                        state.end_thumb_drag();
-                        cx.notify();
-                    });
-                    cx.stop_propagation();
-                }
-            })
-            .on_mouse_up_out(MouseButton::Left, move |_event, _window, cx| {
-                state.update(cx, |state, cx| {
-                    state.end_thumb_drag();
-                    cx.notify();
-                });
+                this.child(scrollbar_layer(
+                    (id.clone(), "scrollbar").into(),
+                    state.clone(),
+                    snapshot.thumb,
+                    theme.text_muted,
+                    theme.border.opacity(0.72),
+                    snapshot.thumb_opacity,
+                ))
             })
     }
-}
-
-#[derive(Clone)]
-struct DraggedScrollThumb {
-    id: ElementId,
-    thumb_top: f32,
-    thumb_height: f32,
 }
 
 #[cfg(test)]
