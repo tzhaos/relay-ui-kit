@@ -1,16 +1,33 @@
 use gpui::{
-    App, AppContext as _, Empty, InteractiveElement, MouseButton, ParentElement,
+    App, AppContext as _, Empty, InteractiveElement, KeyDownEvent, MouseButton, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_ui_primitives::theme::ActiveTheme;
+use relay_ui_primitives::{
+    interaction::{SharedChangeHandler, SharedDismissHandler},
+    theme::ActiveTheme,
+};
 
-use super::{SplitAxis, drag::DraggedSplitPane};
+use super::{SplitAxis, drag::DraggedSplitPane, geometry::clamp_split_size};
+
+/// Keyboard step size for SplitPane resize (pixels per arrow-key press).
+const KEYBOARD_RESIZE_STEP: f32 = 10.0;
+/// Large step for Home/End keys (pixels).
+const KEYBOARD_RESIZE_LARGE_STEP: f32 = 100.0;
+
+pub(super) struct SplitHandleContext {
+    pub resize: Option<SharedChangeHandler<f32>>,
+    pub resize_end: Option<SharedDismissHandler>,
+    pub first_size: f32,
+    pub min_first: f32,
+    pub min_second: f32,
+}
 
 pub(super) fn render_split_handle(
     id: &'static str,
     axis: SplitAxis,
     enabled: bool,
+    keyboard: Option<SplitHandleContext>,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::Div {
@@ -56,6 +73,7 @@ pub(super) fn render_split_handle(
                         let hover_state = is_highlighted.clone();
                         let drag_state = is_highlighted.clone();
                         let drop_state = is_highlighted.clone();
+                        let key_ctx = keyboard;
                         this.on_hover(move |&hovered, _window, cx| {
                             hover_state.write(cx, hovered);
                         })
@@ -69,6 +87,78 @@ pub(super) fn render_split_handle(
                         .on_drop::<DraggedSplitPane>(move |_, _, cx| {
                             drop_state.write(cx, false);
                             cx.stop_propagation();
+                        })
+                        // Keyboard accessibility: Arrow keys resize, Enter/Escape commit/cancel
+                        .tab_index(0)
+                        .when_some(key_ctx, |this, ctx| {
+                            let resize = ctx.resize.clone();
+                            let resize_end = ctx.resize_end.clone();
+                            let first_size = ctx.first_size;
+                            let min_first = ctx.min_first;
+                            let min_second = ctx.min_second;
+                            // Use a generous upper bound for simple keyboard clamping;
+                            // the SplitPaneState's commit_resize handles the real bounds.
+                            let total_estimate = (first_size + min_second + 800.0).max(1200.0);
+                            this.on_key_down(move |event: &KeyDownEvent, window, cx| {
+                                let key = event.keystroke.key.as_str();
+                                match key {
+                                    "left" | "up" => {
+                                        if let Some(ref handler) = resize {
+                                            let next = clamp_split_size(
+                                                first_size - KEYBOARD_RESIZE_STEP,
+                                                total_estimate,
+                                                min_first,
+                                                min_second,
+                                            );
+                                            handler(next, window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    "right" | "down" => {
+                                        if let Some(ref handler) = resize {
+                                            let next = clamp_split_size(
+                                                first_size + KEYBOARD_RESIZE_STEP,
+                                                total_estimate,
+                                                min_first,
+                                                min_second,
+                                            );
+                                            handler(next, window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    "home" => {
+                                        if let Some(ref handler) = resize {
+                                            handler(min_first, window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    "end" => {
+                                        if let Some(ref handler) = resize {
+                                            let end_size = clamp_split_size(
+                                                first_size + KEYBOARD_RESIZE_LARGE_STEP,
+                                                total_estimate,
+                                                min_first,
+                                                min_second,
+                                            );
+                                            handler(end_size, window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    "enter" | "space" => {
+                                        if let Some(ref handler) = resize_end {
+                                            handler(window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    "escape" => {
+                                        if let Some(ref handler) = resize_end {
+                                            handler(window, cx);
+                                            cx.stop_propagation();
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            })
                         })
                     })
                     .hover(move |style| style.bg(gpui::black().opacity(0.08))),

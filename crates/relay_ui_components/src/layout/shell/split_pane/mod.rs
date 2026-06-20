@@ -18,7 +18,7 @@ use relay_ui_primitives::{
 
 use drag::{DraggedSplitPane, split_size_from_drag};
 use geometry::{should_emit_resize, snap_split_size};
-use handle::render_split_handle;
+use handle::{SplitHandleContext, render_split_handle};
 use handlers::{resize_end_handler, resize_handler};
 pub use state::SplitPaneState;
 
@@ -119,7 +119,14 @@ impl RenderOnce for SplitPane {
         let first_size = snap_split_size(state_first_size);
         let handler = resize_handler(state.clone(), self.on_resize);
         let resize_end = resize_end_handler(state, self.on_resize_end);
-        let handle = render_split_handle(id, axis, handler.is_some(), window, cx);
+        let keyboard_ctx = handler.as_ref().map(|_| SplitHandleContext {
+            resize: handler.clone(),
+            resize_end: resize_end.clone(),
+            first_size,
+            min_first,
+            min_second,
+        });
+        let handle = render_split_handle(id, axis, handler.is_some(), keyboard_ctx, window, cx);
 
         let first = match axis {
             SplitAxis::Horizontal => div()
