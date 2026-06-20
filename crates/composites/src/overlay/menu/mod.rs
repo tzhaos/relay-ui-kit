@@ -13,7 +13,7 @@ use relay_foundation::{
     theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius, space},
 };
 
-use super::overlay;
+const SUBMENU_MIN_WIDTH: f32 = 180.0;
 
 /// A floating menu panel.
 #[derive(IntoElement)]
@@ -131,8 +131,14 @@ impl RenderOnce for Menu {
                 .child(row_content)
                 .when(submenu_visible, |this| {
                     this.child(
-                        overlay(Menu::new(("submenu", index), submenu_items).min_width(180.0))
-                            .offset(self.min_width - 4.0, 0.0),
+                        div()
+                            .absolute()
+                            .left(px(self.min_width - (space::XS * 2.0)))
+                            .top(px(0.0))
+                            .child(
+                                Menu::new(("submenu", index), submenu_items)
+                                    .min_width(SUBMENU_MIN_WIDTH),
+                            ),
                     )
                 });
             panel = panel.child(row);

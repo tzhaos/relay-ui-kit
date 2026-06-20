@@ -137,6 +137,22 @@ mod tests {
     }
 
     #[test]
+    fn submenu_items_do_not_open_submenu_by_default() {
+        let item = MenuItem::new("Open With").submenu_items(vec![MenuItem::new("Shell")]);
+
+        assert!(!item.submenu_open);
+    }
+
+    #[test]
+    fn submenu_open_sets_explicit_submenu_state() {
+        let item = MenuItem::new("Open With")
+            .submenu_items(vec![MenuItem::new("Shell")])
+            .submenu_open(true);
+
+        assert!(item.submenu_open);
+    }
+
+    #[test]
     fn menu_header_is_not_interactive() {
         let item = MenuItem::header("Actions");
 

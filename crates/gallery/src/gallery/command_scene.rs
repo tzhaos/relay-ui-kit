@@ -243,9 +243,8 @@ fn terminal_dropdown_menu(open: bool, host: &Entity<GalleryScenesApp>) -> impl I
                 .icon(IconName::PanelLeft)
                 .submenu_items(vec![
                     menu_action(host, "Split right", IconName::ArrowRight),
-                    menu_action(host, "Split down", IconName::ChevronDown),
-                ])
-                .submenu_open(true),
+                    menu_action(host, "Split down", IconName::LayoutGrid),
+                ]),
             menu_action(host, "Rename session", IconName::Settings),
             MenuItem::separator(),
             menu_action(host, "Close session", IconName::Archive).danger(),
