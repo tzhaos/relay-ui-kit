@@ -221,10 +221,9 @@ mod tests {
     #[test]
     fn diff_lines_assigns_new_line_number_to_insertions() {
         let lines = diff_lines("a\n", "a\nb\n");
-        let added = lines
-            .iter()
-            .find(|line| line.kind == DiffLineKind::Added)
-            .unwrap();
+        let Some(added) = lines.iter().find(|line| line.kind == DiffLineKind::Added) else {
+            panic!("expected inserted line");
+        };
         assert_eq!(added.new_line, Some(2));
     }
 }

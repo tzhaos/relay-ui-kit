@@ -18,12 +18,12 @@ pub use styles::{motion, theme, tone};
 
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
-pub use command::{
-    CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
-    KeybindingTable, KeybindingShortcut,
-};
 #[allow(deprecated)]
 pub use command::KeyboardShortcut;
+pub use command::{
+    CommandPalette, CommandRow, KeybindingActionKind, KeybindingActions, KeybindingRow,
+    KeybindingShortcut, KeybindingTable,
+};
 pub use components::overlay::{
     ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay, Popover,
     TooltipBody, overlay,
@@ -77,10 +77,9 @@ mod tests {
     /// Read a crate's `Cargo.toml` at test time using `CARGO_MANIFEST_DIR`.
     fn read_crate_toml(crate_name: &str) -> String {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let workspace_root = manifest_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .expect("workspace root");
+        let Some(workspace_root) = manifest_dir.parent().and_then(|p| p.parent()) else {
+            panic!("workspace root");
+        };
         let path = workspace_root
             .join("crates")
             .join(crate_name)

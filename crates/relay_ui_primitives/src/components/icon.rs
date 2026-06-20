@@ -279,8 +279,12 @@ mod tests {
             IconName::X,
             IconName::Zap,
         ] {
-            let loaded = assets.load(name.path().as_ref()).expect("asset load ok");
-            assert!(loaded.is_some(), "missing embedded svg for {name:?}");
+            assert!(
+                assets
+                    .load(name.path().as_ref())
+                    .is_ok_and(|loaded| loaded.is_some()),
+                "missing embedded svg for {name:?}"
+            );
         }
     }
 }

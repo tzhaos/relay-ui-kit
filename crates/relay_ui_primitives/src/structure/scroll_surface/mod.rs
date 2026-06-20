@@ -2,8 +2,9 @@ mod state;
 mod thumb;
 
 use gpui::{
-    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, AppContext as _, ElementId, Empty, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::theme::{ActiveTheme, space};
@@ -61,7 +62,7 @@ impl ScrollSurface {
 impl RenderOnce for ScrollSurface {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let id = self.id;
+        let id = self.id.clone();
         let state = window.use_keyed_state((id.clone(), "scroll-state"), cx, |_, _| {
             ScrollSurfaceState::new()
         });
@@ -71,33 +72,39 @@ impl RenderOnce for ScrollSurface {
         let state_for_hover = state.clone();
         let smooth_wheel = self.smooth_wheel;
         let mut scroller = div()
-            .id((id, "content"))
+            .id((id.clone(), "content"))
             .size_full()
             .min_h_0()
             .track_scroll(&snapshot.handle)
             .overflow_y_scroll()
             .on_scroll_wheel(move |event, window, cx| {
-                let smooth_delta = if smooth_wheel && !event.delta.precise() {
-                    Some(f32::from(event.delta.pixel_delta(window.line_height()).y))
-                } else {
-                    None
-                };
+                let delta_y = f32::from(event.delta.pixel_delta(window.line_height()).y);
+                let should_smooth = smooth_wheel && !event.delta.precise();
+                if should_smooth {
+                    cx.stop_propagation();
+                }
 
-                let (should_schedule_decay, should_schedule_smooth, consumed) = state_for_scroll
-                    .update(cx, |state, cx| {
-                        let smooth_started =
-                            smooth_delta.is_some_and(|delta_y| state.start_smooth_scroll(delta_y));
-                        let should_schedule_smooth =
-                            smooth_started && state.schedule_smooth_if_needed();
+                let (should_schedule_decay, should_schedule_smooth) =
+                    state_for_scroll.update(cx, |state, cx| {
+                        if should_smooth {
+                            let started = state.start_smooth_scroll(delta_y);
+                            let should_schedule_smooth =
+                                started && state.schedule_smooth_if_needed();
+                            if started {
+                                state.mark_scrolling();
+                                cx.notify();
+                            }
+                            return (
+                                started && state.schedule_decay_if_needed(),
+                                should_schedule_smooth,
+                            );
+                        }
 
-                        state.mark_scrolling();
-                        cx.notify();
-
-                        (
-                            state.schedule_decay_if_needed(),
-                            should_schedule_smooth,
-                            smooth_started,
-                        )
+                        if delta_y != 0.0 {
+                            state.mark_scrolling();
+                            cx.notify();
+                        }
+                        (state.schedule_decay_if_needed(), false)
                     });
 
                 if should_schedule_decay {
@@ -106,10 +113,6 @@ impl RenderOnce for ScrollSurface {
 
                 if should_schedule_smooth {
                     schedule_smooth_scroll(state_for_scroll.clone(), window);
-                }
-
-                if consumed {
-                    cx.stop_propagation();
                 }
             })
             .on_hover(move |hovered, _window, cx| {
@@ -126,7 +129,7 @@ impl RenderOnce for ScrollSurface {
             .child(self.content);
         scroller.style().restrict_scroll_to_axis = Some(true);
 
-        div()
+        let outer = div()
             .relative()
             .size_full()
             .min_h_0()
@@ -139,19 +142,99 @@ impl RenderOnce for ScrollSurface {
             .when(self.show_rail, |this| {
                 this.child(scroll_rail(theme.border.opacity(0.72)))
                     .when_some(snapshot.thumb, |this, thumb| {
+                        let state_for_thumb = state.clone();
+                        let thumb_id = (id.clone(), "thumb");
                         this.child(
                             div()
+                                .id(thumb_id)
                                 .absolute()
                                 .right(px(space::XXS))
                                 .top(px(thumb.top))
                                 .w(px(THUMB_WIDTH))
                                 .h(px(thumb.height))
                                 .rounded_full()
-                                .bg(theme.text_muted.opacity(snapshot.thumb_opacity)),
+                                .bg(theme.text_muted.opacity(snapshot.thumb_opacity))
+                                .cursor_pointer()
+                                .on_drag(
+                                    DraggedScrollThumb {
+                                        id: id.clone(),
+                                        thumb_top: thumb.top,
+                                        thumb_height: thumb.height,
+                                    },
+                                    move |drag, cursor_offset, window, cx| {
+                                        let mouse_y = f32::from(window.mouse_position().y);
+                                        let click_y = f32::from(cursor_offset.y);
+                                        let should_schedule_decay =
+                                            state_for_thumb.update(cx, |state, cx| {
+                                                state.start_thumb_drag(
+                                                    mouse_y,
+                                                    drag.thumb_top,
+                                                    drag.thumb_height,
+                                                    click_y,
+                                                );
+                                                state.update_thumb_drag(mouse_y);
+                                                state.mark_scrolling();
+                                                cx.notify();
+                                                state.schedule_decay_if_needed()
+                                            });
+                                        if should_schedule_decay {
+                                            schedule_scroll_decay(state_for_thumb.clone(), window);
+                                        }
+                                        cx.new(|_| Empty)
+                                    },
+                                ),
                         )
                     })
+            });
+
+        let state_for_drag_move = state.clone();
+        let state_for_drop = state.clone();
+        let drag_id = id.clone();
+        let drop_id = id;
+
+        outer
+            .on_drag_move::<DraggedScrollThumb>(move |event, window, cx| {
+                if event.drag(cx).id != drag_id {
+                    return;
+                }
+
+                let mouse_y = f32::from(event.event.position.y);
+                let should_schedule_decay = state_for_drag_move.update(cx, |state, cx| {
+                    let changed = state.update_thumb_drag(mouse_y);
+                    if changed {
+                        state.mark_scrolling();
+                        cx.notify();
+                    }
+                    changed && state.schedule_decay_if_needed()
+                });
+                if should_schedule_decay {
+                    schedule_scroll_decay(state_for_drag_move.clone(), window);
+                }
+                cx.stop_propagation();
+            })
+            .on_drop::<DraggedScrollThumb>(move |drag, _window, cx| {
+                if drag.id == drop_id {
+                    state_for_drop.update(cx, |state, cx| {
+                        state.end_thumb_drag();
+                        cx.notify();
+                    });
+                    cx.stop_propagation();
+                }
+            })
+            .on_mouse_up_out(MouseButton::Left, move |_event, _window, cx| {
+                state.update(cx, |state, cx| {
+                    state.end_thumb_drag();
+                    cx.notify();
+                });
             })
     }
+}
+
+#[derive(Clone)]
+struct DraggedScrollThumb {
+    id: ElementId,
+    thumb_top: f32,
+    thumb_height: f32,
 }
 
 #[cfg(test)]

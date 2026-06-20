@@ -61,14 +61,12 @@ mod tests {
 
     #[test]
     fn thumb_metrics_track_scroll_progress() {
-        let thumb = thumb_metrics_from_values(300.0, 300.0, -150.0).unwrap();
-
         assert_eq!(
-            thumb,
-            ScrollThumbMetrics {
+            thumb_metrics_from_values(300.0, 300.0, -150.0),
+            Some(ScrollThumbMetrics {
                 top: 75.0,
                 height: 150.0
-            }
+            })
         );
     }
 }
