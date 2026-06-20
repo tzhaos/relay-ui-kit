@@ -1,9 +1,9 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
 use relay_ui_core::{
-    Badge, Button, ButtonVariant, CountBadge, Disclosure, Divider, EmptyState, FilterBar,
-    FilterChip, Icon, IconButton, IconName, Label, LabelSize, ListItem, NavRow, SectionedList,
-    SectionedListGroup, Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode,
-    TreeRow, TreeView,
+    Badge, Button, ButtonVariant, ColorField, ColorSwatch, CountBadge, Disclosure, Divider,
+    EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton, IconName,
+    Label, LabelSize, ListItem, NavRow, Radio, SearchField, SectionedList, SectionedListGroup,
+    Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 use relay_ui_patterns::navigation::{Tab, Tabs};
 use relay_workbench::{TaskRow, TaskRowData};
@@ -26,6 +26,11 @@ pub(super) fn render(
             cx,
             "Steppers and filters",
             stepper_filter_samples(state, host),
+        ))
+        .child(section(
+            cx,
+            "Inputs and choices",
+            input_choice_samples(state, host, theme),
         ))
         .child(section(
             cx,
@@ -143,6 +148,103 @@ fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                     )
                 }),
         )
+}
+
+fn input_choice_samples(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    theme: Theme,
+) -> impl IntoElement {
+    div()
+        .flex()
+        .items_start()
+        .gap_4()
+        .flex_wrap()
+        .child(
+            div()
+                .w(gpui::px(320.0))
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(FieldLabel::new("SearchField"))
+                .child(FieldDescription::new(
+                    "Focusable input shell with host-owned text",
+                ))
+                .child(
+                    SearchField::new("core-search-field", state.search_focus.clone())
+                        .value(state.search_input.value())
+                        .placeholder("Filter sessions")
+                        .on_key({
+                            let host = host.clone();
+                            move |event, _window, cx| {
+                                let mut handled = false;
+                                host.update(cx, |this, cx| {
+                                    let action = this.state.search_input.handle_key(event);
+                                    if action.should_notify() {
+                                        handled = true;
+                                        cx.notify();
+                                    }
+                                });
+                                handled
+                            }
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .w(gpui::px(260.0))
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(FieldLabel::new("Radio"))
+                .child(
+                    Radio::new(
+                        "core-radio-system",
+                        state.theme_choice == "system",
+                        "System",
+                    )
+                    .on_click(set_theme_choice(host, "system")),
+                )
+                .child(
+                    Radio::new("core-radio-light", state.theme_choice == "light", "Light")
+                        .on_click(set_theme_choice(host, "light")),
+                )
+                .child(
+                    Radio::new("core-radio-dark", state.theme_choice == "dark", "Dark")
+                        .on_click(set_theme_choice(host, "dark")),
+                ),
+        )
+        .child(
+            div()
+                .w(gpui::px(260.0))
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(FieldLabel::new("Color primitives"))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(ColorSwatch::new("core-swatch-accent", theme.accent))
+                        .child(ColorSwatch::new("core-swatch-warning", theme.warning))
+                        .child(ColorSwatch::new("core-swatch-danger", theme.danger)),
+                )
+                .child(ColorField::new("core-color-field", theme.accent, "#16A34A")),
+        )
+}
+
+fn set_theme_choice(
+    host: &Entity<GalleryScenesApp>,
+    key: &'static str,
+) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+    let host = host.clone();
+    move |_event, _window, cx| {
+        host.update(cx, |this, cx| {
+            this.state.theme_choice = key;
+            cx.notify();
+        });
+    }
 }
 
 fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {

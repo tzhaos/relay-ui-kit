@@ -12,6 +12,7 @@ use relay_ui_patterns::{ScrollSurface, SplitPaneState};
 
 mod command_scene;
 mod core_scene;
+mod patterns_scene;
 mod review_scene;
 mod settings_scene;
 mod shared;
@@ -74,6 +75,8 @@ pub struct GalleryState {
     pub command_popover_open: bool,
     pub command_context_open: bool,
     pub confirm_dialog_open: bool,
+    pub pattern_select_open: bool,
+    pub pattern_dialog_open: bool,
     pub accent_choice: &'static str,
     pub overlay_event: String,
     pub core_disclosure_open: bool,
@@ -111,6 +114,8 @@ impl GalleryState {
             command_popover_open: false,
             command_context_open: false,
             confirm_dialog_open: false,
+            pattern_select_open: false,
+            pattern_dialog_open: false,
             accent_choice: "green",
             overlay_event: "No overlay action yet".into(),
             core_disclosure_open: true,
@@ -144,9 +149,13 @@ fn render_surface(
             .child(core_scene::render(state, host, theme, cx))
             .child(settings_scene::render(state, host, window, theme, cx))
             .into_any_element(),
-        GallerySurface::Patterns => {
-            command_scene::render(state, host, theme, cx).into_any_element()
-        }
+        GallerySurface::Patterns => div()
+            .flex()
+            .flex_col()
+            .gap(px(space::XL))
+            .child(patterns_scene::render(state, host, theme, cx))
+            .child(command_scene::render(state, host, theme, cx))
+            .into_any_element(),
         GallerySurface::Workbench => div()
             .flex()
             .flex_col()
