@@ -111,6 +111,20 @@ pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &
 /// adds `&` automatically.  Use `gpui::ClickEvent`, not `&ClickEvent`.
 #[macro_export]
 macro_rules! callback_builder {
+    // Zero-arg variant
+    ($method:ident, $field:ident,) => {
+        #[doc = concat!(
+            "Attach a handler that receives `(&mut Window, &mut App)`."
+        )]
+        pub fn $method(
+            mut self,
+            handler: impl Fn(&mut ::gpui::Window, &mut ::gpui::App) + 'static,
+        ) -> Self {
+            self.$field = Some(::std::boxed::Box::new(handler));
+            self
+        }
+    };
+    // One-or-more args variant
     ($method:ident, $field:ident, $($arg:ty),+ $(,)?) => {
         #[doc = concat!(
             "Attach a handler that receives `(&",

@@ -31,13 +31,7 @@ impl Radio {
         self
     }
 
-    pub fn on_click(
-        mut self,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_click = Some(Box::new(handler));
-        self
-    }
+    crate::callback_builder!(on_click, on_click, ClickEvent);
 }
 
 impl RenderOnce for Radio {
