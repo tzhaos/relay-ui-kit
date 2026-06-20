@@ -5,9 +5,8 @@ use gpui::{
 use relay_uikit::patterns::overlay::{Select, SelectOption, overlay};
 use relay_uikit::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
-    InlineError, InputActionKind, InputValueKind, LoadingSpinner, NumberInput, ProgressBar,
-    SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind,
-    Toast, Toggle, Tone,
+    InlineError, LoadingSpinner, NumberInput, ProgressBar, SettingsRow, SettingsSection, Skeleton,
+    Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone,
 };
 
 use super::{
@@ -70,12 +69,12 @@ pub(super) fn render(
                 .row(
                     SettingsRow::new("UI font size")
                         .description("Stepper controls mutate gallery state")
-                        .control(font_size_input(state, host, window)),
+                        .control(font_size_input(state, window)),
                 )
                 .row(
                     SettingsRow::new("Contrast")
                         .description("Slider exposes value and discrete step callbacks")
-                        .control(contrast_slider(state, host)),
+                        .control(contrast_slider(state)),
                 ),
         )
         .child(
@@ -83,12 +82,12 @@ pub(super) fn render(
                 .row(
                     SettingsRow::new("Notifications")
                         .description("Show task and terminal lifecycle notices")
-                        .control(notifications_toggle(state.notifications, host)),
+                        .control(notifications_toggle(state)),
                 )
                 .row(
                     SettingsRow::new("Auto archive")
                         .description("Move completed sessions out of the active list")
-                        .control(auto_archive_toggle(state.auto_archive, host)),
+                        .control(auto_archive_toggle(state)),
                 ),
         )
         .child(section(
@@ -348,127 +347,41 @@ fn accent_picker(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
     })
 }
 
-fn font_size_input(
-    state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
-    window: &Window,
-) -> impl IntoElement {
+fn font_size_input(state: &GalleryState, window: &Window) -> impl IntoElement {
     let focused = state.ui_font_size_focus.is_focused(window);
 
-    NumberInput::new("settings-ui-font-size", state.ui_font_size)
-        .input(state.ui_font_size_focus.clone(), &state.ui_font_size_input)
+    NumberInput::bound("settings-ui-font-size", state.ui_font_size.clone())
+        .input_bound(
+            state.ui_font_size_focus.clone(),
+            state.ui_font_size_input.clone(),
+        )
         .focused(focused)
+        .range(11, 18)
         .suffix("px")
-        .on_key({
-            let host = host.clone();
-            move |event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    let action = this
-                        .state
-                        .ui_font_size_input
-                        .handle_integer_key(event, false);
-                    match action.contract_kind_for(InputValueKind::Number) {
-                        InputActionKind::Changed(InputValueKind::Number)
-                        | InputActionKind::Submit => {
-                            sync_font_size_from_input(&mut this.state);
-                            cx.notify();
-                        }
-                        InputActionKind::CursorMoved => cx.notify(),
-                        InputActionKind::Cancel => {
-                            sync_font_size_text(&mut this.state);
-                            cx.notify();
-                        }
-                        InputActionKind::Ignored => {}
-                        InputActionKind::Changed(_) | InputActionKind::Validate => {}
-                    }
-                });
-            }
-        })
+}
+
+fn contrast_slider(state: &GalleryState) -> impl IntoElement {
+    Slider::bound("settings-contrast", state.contrast.clone(), 0.0, 100.0)
         .on_decrement({
-            let host = host.clone();
+            let contrast = state.contrast.clone();
             move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.ui_font_size = (this.state.ui_font_size - 1).max(11);
-                    sync_font_size_text(&mut this.state);
-                    cx.notify();
-                });
+                let value = (contrast.get(cx) - 5.0).max(0.0);
+                contrast.set(cx, value);
             }
         })
         .on_increment({
-            let host = host.clone();
+            let contrast = state.contrast.clone();
             move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.ui_font_size = (this.state.ui_font_size + 1).min(18);
-                    sync_font_size_text(&mut this.state);
-                    cx.notify();
-                });
+                let value = (contrast.get(cx) + 5.0).min(100.0);
+                contrast.set(cx, value);
             }
         })
 }
 
-fn sync_font_size_from_input(state: &mut GalleryState) {
-    if let Ok(value) = state.ui_font_size_input.value().parse::<i32>() {
-        state.ui_font_size = value.clamp(11, 18);
-    }
+fn notifications_toggle(state: &GalleryState) -> impl IntoElement {
+    Checkbox::bound("settings-notifications", state.notifications.clone())
 }
 
-fn sync_font_size_text(state: &mut GalleryState) {
-    state
-        .ui_font_size_input
-        .set_text(state.ui_font_size.to_string());
-}
-
-fn contrast_slider(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    Slider::new("settings-contrast", state.contrast, 0.0, 100.0)
-        .on_change({
-            let host = host.clone();
-            move |value, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.contrast = value;
-                    cx.notify();
-                });
-            }
-        })
-        .on_decrement({
-            let host = host.clone();
-            move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.contrast = (this.state.contrast - 5.0).max(0.0);
-                    cx.notify();
-                });
-            }
-        })
-        .on_increment({
-            let host = host.clone();
-            move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.contrast = (this.state.contrast + 5.0).min(100.0);
-                    cx.notify();
-                });
-            }
-        })
-}
-
-fn notifications_toggle(on: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    Checkbox::new("settings-notifications", on).on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.notifications = !this.state.notifications;
-                cx.notify();
-            });
-        }
-    })
-}
-
-fn auto_archive_toggle(on: bool, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    Toggle::new("settings-auto-archive", on).on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.auto_archive = !this.state.auto_archive;
-                cx.notify();
-            });
-        }
-    })
+fn auto_archive_toggle(state: &GalleryState) -> impl IntoElement {
+    Toggle::bound("settings-auto-archive", state.auto_archive.clone())
 }

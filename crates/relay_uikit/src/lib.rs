@@ -2,6 +2,17 @@
 //!
 //! This crate groups Relay's GPUI visual tokens, controls, reusable interaction
 //! patterns, workbench compositions, and gallery binary into one UI package.
+//!
+//! Components render ordinary GPUI elements and can be wired in two styles:
+//!
+//! - host-owned state, where the app passes a value snapshot and mutates its
+//!   own GPUI entity from event callbacks;
+//! - relay-bound state, where form controls receive a [`relay::Binding`] and
+//!   update that binding directly for common two-way interactions.
+//!
+//! The two styles can be mixed during migration. App-specific workflows can
+//! keep using GPUI entities and callbacks, while simple fields such as toggles,
+//! sliders, selects, and text inputs can move to relay bindings.
 
 pub(crate) mod component_prelude;
 pub mod components;

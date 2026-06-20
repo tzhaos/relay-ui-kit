@@ -9,6 +9,7 @@ use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
     Styled, Window, div, px,
 };
+use relay::{Binding, ReactiveAppExt, ReactiveContextExt};
 use relay_uikit::patterns::{ScrollSurface, SplitPaneState};
 use relay_uikit::{ActiveTheme, TextInputState, space};
 
@@ -60,10 +61,10 @@ pub struct GalleryState {
     pub search_focus: FocusHandle,
     pub composer_input: TextInputState,
     pub composer_focus: FocusHandle,
-    pub ui_font_size_input: TextInputState,
+    pub ui_font_size_input: Binding<TextInputState>,
     pub ui_font_size_focus: FocusHandle,
-    pub notifications: bool,
-    pub auto_archive: bool,
+    pub notifications: Binding<bool>,
+    pub auto_archive: Binding<bool>,
     pub theme_choice: &'static str,
     pub filter_choice: &'static str,
     pub project_filter_choice: &'static str,
@@ -77,8 +78,8 @@ pub struct GalleryState {
     pub viewer_tab: &'static str,
     pub shell_split: Entity<SplitPaneState>,
     pub settings_select_open: bool,
-    pub ui_font_size: i32,
-    pub contrast: f32,
+    pub ui_font_size: Binding<i32>,
+    pub contrast: Binding<f32>,
     pub branch_picker_open: bool,
     pub branch_actions_open: bool,
     pub command_popover_open: bool,
@@ -116,10 +117,10 @@ impl GalleryState {
             search_focus: cx.focus_handle(),
             composer_input: TextInputState::new(),
             composer_focus: cx.focus_handle(),
-            ui_font_size_input: TextInputState::with_text("14"),
+            ui_font_size_input: cx.binding(TextInputState::with_text("14")),
             ui_font_size_focus: cx.focus_handle(),
-            notifications: true,
-            auto_archive: false,
+            notifications: cx.binding(true),
+            auto_archive: cx.binding(false),
             theme_choice: "system",
             filter_choice: "all",
             project_filter_choice: "all-projects",
@@ -133,8 +134,8 @@ impl GalleryState {
             viewer_tab: "diff",
             shell_split: cx.new(|_| SplitPaneState::new(260.0)),
             settings_select_open: false,
-            ui_font_size: 14,
-            contrast: 60.0,
+            ui_font_size: cx.binding(14),
+            contrast: cx.binding(60.0),
             branch_picker_open: false,
             branch_actions_open: false,
             command_popover_open: false,
@@ -187,8 +188,10 @@ impl GalleryScenesApp {
 
 impl Render for GalleryScenesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let surface = self.surface;
+        let state = &self.state;
         let host = cx.entity();
-        render_surface(self.surface, &self.state, &host, window, cx)
+        cx.tracked(|cx| render_surface(surface, state, &host, window, cx))
     }
 }
 

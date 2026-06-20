@@ -20,13 +20,15 @@ pub(super) fn render(
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
+    let contrast = state.contrast.get(cx);
+
     scene_stack()
         .child(section(cx, "Buttons", button_samples(host)))
         .child(section(cx, "Icon buttons", icon_button_samples(host)))
         .child(section(
             cx,
             "Steppers and filters",
-            stepper_filter_samples(state, host),
+            stepper_filter_samples(state, host, contrast),
         ))
         .child(section(
             cx,
@@ -285,8 +287,10 @@ fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                     let host = host.clone();
                     move |_event, _window, cx| {
                         host.update(cx, |this, cx| {
-                            this.state.auto_archive = !this.state.auto_archive;
-                            cx.notify();
+                            this.state.auto_archive.update(cx, |auto_archive| {
+                                *auto_archive = !*auto_archive;
+                                true
+                            });
                         });
                     }
                 }),
@@ -342,6 +346,7 @@ fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
 fn stepper_filter_samples(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
+    contrast: f32,
 ) -> impl IntoElement {
     div()
         .flex()
@@ -368,37 +373,27 @@ fn stepper_filter_samples(
                 .child(project_filter_menu(state, host)),
         )
         .child(
-            Stepper::new(
-                "core-stepper",
-                format!("{}%", state.contrast.round() as i32),
-            )
-            .on_decrement({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.contrast = (this.state.contrast - 5.0).max(0.0);
-                        cx.notify();
-                    });
-                }
-            })
-            .on_increment({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.contrast = (this.state.contrast + 5.0).min(100.0);
-                        cx.notify();
-                    });
-                }
-            })
-            .on_reset({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.contrast = 60.0;
-                        cx.notify();
-                    });
-                }
-            }),
+            Stepper::new("core-stepper", format!("{}%", contrast.round() as i32))
+                .on_decrement({
+                    let contrast = state.contrast.clone();
+                    move |_event, _window, cx| {
+                        let value = (contrast.get(cx) - 5.0).max(0.0);
+                        contrast.set(cx, value);
+                    }
+                })
+                .on_increment({
+                    let contrast = state.contrast.clone();
+                    move |_event, _window, cx| {
+                        let value = (contrast.get(cx) + 5.0).min(100.0);
+                        contrast.set(cx, value);
+                    }
+                })
+                .on_reset({
+                    let contrast = state.contrast.clone();
+                    move |_event, _window, cx| {
+                        contrast.set(cx, 60.0);
+                    }
+                }),
         )
 }
 

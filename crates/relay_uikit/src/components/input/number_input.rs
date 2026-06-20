@@ -3,19 +3,26 @@ use gpui::{
     KeyDownEvent, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled,
     Window, div, prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ClickHandler, KeyHandler},
+    interaction::{ClickHandler, KeyHandler, SharedChangeHandler},
     theme::{ActiveTheme, BORDER_WIDTH, radius},
 };
 
-use super::TextInputState;
+use super::{InputActionKind, InputValueKind, TextInputState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberInputLayout {
     ControlsAroundValue,
     ControlsTrailing,
+}
+
+#[derive(Clone, Copy)]
+enum NumberStep {
+    Decrement,
+    Increment,
 }
 
 struct EditableNumberValue {
@@ -24,6 +31,7 @@ struct EditableNumberValue {
     after: String,
     focused: bool,
     key_context: &'static str,
+    binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
 
@@ -32,9 +40,14 @@ struct EditableNumberValue {
 pub struct NumberInput {
     id: ElementId,
     value: i32,
+    value_binding: Option<Binding<i32>>,
     suffix: Option<String>,
     layout: NumberInputLayout,
     editable: Option<EditableNumberValue>,
+    min: Option<i32>,
+    max: Option<i32>,
+    step: i32,
+    on_change: Option<SharedChangeHandler<i32>>,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
 }
@@ -44,9 +57,31 @@ impl NumberInput {
         Self {
             id: id.into(),
             value,
+            value_binding: None,
             suffix: None,
             layout: NumberInputLayout::ControlsAroundValue,
             editable: None,
+            min: None,
+            max: None,
+            step: 1,
+            on_change: None,
+            on_decrement: None,
+            on_increment: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, binding: Binding<i32>) -> Self {
+        Self {
+            id: id.into(),
+            value: 0,
+            value_binding: Some(binding),
+            suffix: None,
+            layout: NumberInputLayout::ControlsAroundValue,
+            editable: None,
+            min: None,
+            max: None,
+            step: 1,
+            on_change: None,
             on_decrement: None,
             on_increment: None,
         }
@@ -62,6 +97,27 @@ impl NumberInput {
         self
     }
 
+    pub fn range(mut self, min: i32, max: i32) -> Self {
+        self.min = Some(min);
+        self.max = Some(max);
+        self
+    }
+
+    pub fn min(mut self, min: i32) -> Self {
+        self.min = Some(min);
+        self
+    }
+
+    pub fn max(mut self, max: i32) -> Self {
+        self.max = Some(max);
+        self
+    }
+
+    pub fn step(mut self, step: i32) -> Self {
+        self.step = step.max(1);
+        self
+    }
+
     pub fn editable(mut self, focus: FocusHandle, state: &TextInputState) -> Self {
         let (before, after) = state.split();
         self.editable = Some(EditableNumberValue {
@@ -70,6 +126,7 @@ impl NumberInput {
             after: after.to_string(),
             focused: false,
             key_context: "NumberInput",
+            binding: None,
             on_key: None,
         });
         self
@@ -77,6 +134,23 @@ impl NumberInput {
 
     pub fn input(self, focus: FocusHandle, state: &TextInputState) -> Self {
         self.editable(focus, state)
+    }
+
+    pub fn editable_bound(mut self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
+        self.editable = Some(EditableNumberValue {
+            focus,
+            before: String::new(),
+            after: String::new(),
+            focused: false,
+            key_context: "NumberInput",
+            binding: Some(binding),
+            on_key: None,
+        });
+        self
+    }
+
+    pub fn input_bound(self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
+        self.editable_bound(focus, binding)
     }
 
     pub fn focused(mut self, focused: bool) -> Self {
@@ -103,6 +177,11 @@ impl NumberInput {
         self
     }
 
+    pub fn on_change(mut self, handler: impl Fn(i32, &mut Window, &mut App) + 'static) -> Self {
+        self.on_change = Some(std::rc::Rc::new(handler));
+        self
+    }
+
     pub fn on_decrement(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -125,18 +204,45 @@ impl RenderOnce for NumberInput {
         let NumberInput {
             id,
             value: current_value,
+            value_binding,
             suffix,
             layout,
             editable,
+            min,
+            max,
+            step,
+            on_change,
             on_decrement,
             on_increment,
         } = self;
         let theme = *cx.theme();
+        let current_value = value_binding
+            .as_ref()
+            .map_or(current_value, |binding| binding.get(cx));
+        let editable_text_binding = editable
+            .as_ref()
+            .and_then(|editable| editable.binding.clone());
         let value_id = format!("{id}-value");
         let value = match editable {
-            Some(editable) => {
-                editable_number_value(value_id, editable, current_value, suffix, theme)
-                    .into_any_element()
+            Some(mut editable) => {
+                if let Some(binding) = &editable.binding {
+                    let state = binding.get(cx);
+                    let (before, after) = state.split();
+                    editable.before = before.to_string();
+                    editable.after = after.to_string();
+                }
+                editable_number_value(
+                    value_id,
+                    editable,
+                    current_value,
+                    suffix,
+                    theme,
+                    value_binding.clone(),
+                    min,
+                    max,
+                    on_change.clone(),
+                )
+                .into_any_element()
             }
             None => {
                 number_value(current_value, suffix, theme.text, theme.text_muted).into_any_element()
@@ -146,6 +252,14 @@ impl RenderOnce for NumberInput {
             (id.clone(), "decrement"),
             IconName::Minus,
             on_decrement,
+            value_binding.clone(),
+            editable_text_binding.clone(),
+            on_change.clone(),
+            NumberStep::Decrement,
+            current_value,
+            min,
+            max,
+            step,
             theme.hover,
             theme.text_muted,
         );
@@ -153,6 +267,14 @@ impl RenderOnce for NumberInput {
             (id.clone(), "increment"),
             IconName::Plus,
             on_increment,
+            value_binding,
+            editable_text_binding,
+            on_change,
+            NumberStep::Increment,
+            current_value,
+            min,
+            max,
+            step,
             theme.hover,
             theme.text_muted,
         );
@@ -215,18 +337,29 @@ fn number_value(
         })
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Editable number rendering keeps GPUI element state and relay bindings explicit."
+)]
 fn editable_number_value(
     id: impl Into<ElementId>,
     editable: EditableNumberValue,
     fallback: i32,
     suffix: Option<String>,
     theme: crate::Theme,
+    value_binding: Option<Binding<i32>>,
+    min: Option<i32>,
+    max: Option<i32>,
+    on_change: Option<SharedChangeHandler<i32>>,
 ) -> impl IntoElement {
     let focus_for_click = editable.focus.clone();
     let focus_for_mouse_down = editable.focus.clone();
+    let text_binding = editable.binding;
     let on_key = editable.on_key;
     let show_fallback =
         editable.before.is_empty() && editable.after.is_empty() && !editable.focused;
+    let allow_negative = min.is_none_or(|min| min < 0);
+    let handle_key = text_binding.is_some() || on_key.is_some();
 
     div()
         .id(id)
@@ -262,9 +395,25 @@ fn editable_number_value(
         .when_some(suffix, |this, suffix| {
             this.child(div().text_xs().text_color(theme.text_muted).child(suffix))
         })
-        .when_some(on_key, |this, on_key| {
+        .when(handle_key, |this| {
             this.on_key_down(move |event, window, cx| {
-                on_key(event, window, cx);
+                if let Some(binding) = &text_binding {
+                    handle_bound_integer_key(
+                        binding,
+                        &value_binding,
+                        &on_change,
+                        event,
+                        fallback,
+                        min,
+                        max,
+                        allow_negative,
+                        window,
+                        cx,
+                    );
+                }
+                if let Some(on_key) = &on_key {
+                    on_key(event, window, cx);
+                }
                 cx.stop_propagation();
             })
         })
@@ -279,13 +428,27 @@ fn editable_number_value(
         })
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "GPUI event wiring passes a compact set of render-time handles."
+)]
 fn stepper(
     id: impl Into<ElementId>,
     icon: IconName,
     handler: Option<ClickHandler>,
+    value_binding: Option<Binding<i32>>,
+    text_binding: Option<Binding<TextInputState>>,
+    on_change: Option<SharedChangeHandler<i32>>,
+    direction: NumberStep,
+    current_value: i32,
+    min: Option<i32>,
+    max: Option<i32>,
+    step: i32,
     hover_bg: gpui::Hsla,
     color: gpui::Hsla,
 ) -> impl IntoElement {
+    let interactive = handler.is_some() || value_binding.is_some();
+
     div()
         .id(id)
         .w(px(24.0))
@@ -293,22 +456,129 @@ fn stepper(
         .flex()
         .items_center()
         .justify_center()
-        .when_some(handler, |this, handler| {
+        .when(interactive, |this| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
                 .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                     window.prevent_default();
                 })
                 .on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    let next = stepped_value(current_value, direction, step, min, max);
+                    if next != current_value {
+                        if let Some(binding) = &value_binding {
+                            binding.set(cx, next);
+                        }
+                        if let Some(binding) = &text_binding {
+                            sync_text_binding(binding, cx, next);
+                        }
+                        if let Some(handler) = &on_change {
+                            handler(next, window, cx);
+                        }
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
         })
         .child(Icon::new(icon).size(IconSize::Small).color(color))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Keyboard handling bridges text, value, and optional host callbacks."
+)]
+fn handle_bound_integer_key(
+    text_binding: &Binding<TextInputState>,
+    value_binding: &Option<Binding<i32>>,
+    on_change: &Option<SharedChangeHandler<i32>>,
+    event: &KeyDownEvent,
+    current_value: i32,
+    min: Option<i32>,
+    max: Option<i32>,
+    allow_negative: bool,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let mut parsed_value = None;
+    let mut should_sync_text = false;
+    text_binding.update(cx, |state| {
+        let action = state.handle_integer_key(event, allow_negative);
+        match action.contract_kind_for(InputValueKind::Number) {
+            InputActionKind::Changed(InputValueKind::Number) => {
+                parsed_value = parse_integer(state.value(), min, max);
+            }
+            InputActionKind::Submit | InputActionKind::Validate => {
+                parsed_value = parse_integer(state.value(), min, max);
+                should_sync_text = parsed_value.is_some();
+            }
+            InputActionKind::Cancel => {
+                state.set_text(current_value.to_string());
+            }
+            InputActionKind::CursorMoved
+            | InputActionKind::Ignored
+            | InputActionKind::Changed(_) => {}
+        }
+        action.should_notify()
+    });
+
+    if let Some(value) = parsed_value {
+        if let Some(binding) = value_binding {
+            binding.set(cx, value);
+        }
+        if should_sync_text {
+            sync_text_binding(text_binding, cx, value);
+        }
+        if value != current_value
+            && let Some(handler) = on_change
+        {
+            handler(value, window, cx);
+        }
+    }
+}
+
+fn parse_integer(text: &str, min: Option<i32>, max: Option<i32>) -> Option<i32> {
+    text.parse::<i32>()
+        .ok()
+        .map(|value| clamp_value(value, min, max))
+}
+
+fn stepped_value(
+    value: i32,
+    direction: NumberStep,
+    step: i32,
+    min: Option<i32>,
+    max: Option<i32>,
+) -> i32 {
+    let value = match direction {
+        NumberStep::Decrement => value.saturating_sub(step),
+        NumberStep::Increment => value.saturating_add(step),
+    };
+    clamp_value(value, min, max)
+}
+
+fn clamp_value(value: i32, min: Option<i32>, max: Option<i32>) -> i32 {
+    let value = min.map_or(value, |min| value.max(min));
+    max.map_or(value, |max| value.min(max))
+}
+
+fn sync_text_binding(binding: &Binding<TextInputState>, cx: &mut App, value: i32) {
+    let text = value.to_string();
+    binding.update(cx, |state| {
+        if state.value() == text {
+            false
+        } else {
+            state.set_text(text);
+            true
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
@@ -330,5 +600,44 @@ mod tests {
         let input = NumberInput::new("number", 14);
 
         assert!(input.editable.is_none());
+    }
+
+    #[test]
+    fn bound_number_input_stores_value_binding() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| NumberInput::bound("number", cx.binding(14)));
+
+        assert!(input.value_binding.is_some());
+    }
+
+    #[test]
+    fn bound_number_input_can_store_editing_binding() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            NumberInput::bound("number", cx.binding(14)).input_bound(
+                cx.focus_handle(),
+                cx.binding(TextInputState::with_text("14")),
+            )
+        });
+
+        assert!(
+            input
+                .editable
+                .and_then(|editable| editable.binding)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn clamp_value_respects_range() {
+        assert_eq!(clamp_value(20, Some(11), Some(18)), 18);
+    }
+
+    #[test]
+    fn stepped_value_saturates_and_clamps() {
+        assert_eq!(
+            stepped_value(i32::MAX, NumberStep::Increment, 4, None, Some(i32::MAX)),
+            i32::MAX
+        );
     }
 }
