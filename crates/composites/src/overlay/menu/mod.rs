@@ -1,8 +1,9 @@
 mod item;
 
 use gpui::{
-    App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, Bounds, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, Pixels,
+    RenderOnce, StatefulInteractiveElement, Styled, Window, canvas, div, prelude::FluentBuilder,
+    px,
 };
 
 pub use item::MenuItem;
@@ -14,6 +15,75 @@ use relay_foundation::{
 };
 
 const SUBMENU_MIN_WIDTH: f32 = 180.0;
+
+#[derive(Default)]
+struct MenuState {
+    open_submenu: Option<usize>,
+    menu_bounds: Option<Bounds<Pixels>>,
+    trigger_bounds: Option<(usize, Bounds<Pixels>)>,
+}
+
+#[derive(Clone, Copy)]
+struct MenuSnapshot {
+    open_submenu: Option<usize>,
+    submenu_offset: Option<Pixels>,
+}
+
+impl MenuState {
+    fn snapshot(&self) -> MenuSnapshot {
+        MenuSnapshot {
+            open_submenu: self.open_submenu,
+            submenu_offset: self.submenu_offset(),
+        }
+    }
+
+    fn open_submenu(&mut self, index: usize) -> bool {
+        if self.open_submenu == Some(index) {
+            return false;
+        }
+
+        self.open_submenu = Some(index);
+        self.trigger_bounds = None;
+        true
+    }
+
+    fn close_submenu(&mut self) -> bool {
+        if self.open_submenu.is_none() {
+            return false;
+        }
+
+        self.open_submenu = None;
+        self.trigger_bounds = None;
+        true
+    }
+
+    fn set_menu_bounds(&mut self, bounds: Bounds<Pixels>) -> bool {
+        if self.menu_bounds == Some(bounds) {
+            return false;
+        }
+
+        self.menu_bounds = Some(bounds);
+        true
+    }
+
+    fn set_trigger_bounds(&mut self, index: usize, bounds: Bounds<Pixels>) -> bool {
+        let next = Some((index, bounds));
+        if self.trigger_bounds == next {
+            return false;
+        }
+
+        self.trigger_bounds = next;
+        true
+    }
+
+    fn submenu_offset(&self) -> Option<Pixels> {
+        let open_index = self.open_submenu?;
+        let menu_bounds = self.menu_bounds?;
+        let (trigger_index, trigger_bounds) = self.trigger_bounds?;
+
+        (trigger_index == open_index).then_some(trigger_bounds.origin.y - menu_bounds.origin.y)
+    }
+}
 
 /// A floating menu panel.
 #[derive(IntoElement)]
@@ -39,10 +109,32 @@ impl Menu {
 }
 
 impl RenderOnce for Menu {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let id = self.id.clone();
+        let state =
+            window.use_keyed_state((id.clone(), "menu-state"), cx, |_, _| MenuState::default());
+        let snapshot = state.read(cx).snapshot();
+
+        let menu_bounds_state = state.clone();
+        let menu_bounds_measure = canvas(
+            move |bounds, _window, cx| {
+                menu_bounds_state.update(cx, |state, cx| {
+                    if state.set_menu_bounds(bounds) {
+                        cx.notify();
+                    }
+                });
+            },
+            |_bounds, (), _window, _cx| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full();
+
         let mut panel = div()
-            .id(self.id)
+            .id((id.clone(), "panel"))
+            .relative()
             .min_w(px(self.min_width))
             .p(px(space::XS))
             .flex()
@@ -53,7 +145,9 @@ impl RenderOnce for Menu {
             .border_1()
             .border_color(theme.border_strong)
             .shadow_lg()
-            .occlude();
+            .occlude()
+            .child(menu_bounds_measure);
+        let mut open_submenu: Option<(usize, Vec<MenuItem>, Pixels)> = None;
 
         for (index, item) in self.items.into_iter().enumerate() {
             let MenuItem {
@@ -68,7 +162,6 @@ impl RenderOnce for Menu {
                 header,
                 submenu,
                 submenu_items,
-                submenu_open,
                 on_click,
             } = item;
 
@@ -82,6 +175,7 @@ impl RenderOnce for Menu {
                 );
                 continue;
             }
+
             if header {
                 panel = panel.child(menu_header(label, theme.text_muted));
                 continue;
@@ -94,9 +188,13 @@ impl RenderOnce for Menu {
                 theme.text_muted
             };
             let has_submenu = submenu || !submenu_items.is_empty();
-            let submenu_visible = submenu_open && !submenu_items.is_empty();
-            let row_content = div()
+            let submenu_visible = snapshot.open_submenu == Some(index) && !submenu_items.is_empty();
+            let state_for_hover = state.clone();
+            let state_for_click = state.clone();
+            let state_for_measure = state.clone();
+            let mut row_content = div()
                 .id(("menu-item", index))
+                .relative()
                 .min_h(px(if detail.is_some() { 38.0 } else { 28.0 }))
                 .px_2()
                 .py_1()
@@ -107,8 +205,25 @@ impl RenderOnce for Menu {
                 .text_sm()
                 .text_color(fg)
                 .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+                .when(submenu_visible, |this| this.bg(theme.hover))
                 .when(!disabled, |this| {
                     this.cursor_pointer().hover(move |s| s.bg(theme.hover))
+                })
+                .on_hover(move |hovered, _window, cx| {
+                    if disabled || !*hovered {
+                        return;
+                    }
+
+                    state_for_hover.update(cx, |state, cx| {
+                        let changed = if has_submenu {
+                            state.open_submenu(index)
+                        } else {
+                            state.close_submenu()
+                        };
+                        if changed {
+                            cx.notify();
+                        }
+                    });
                 })
                 .child(menu_leading_icon(checked, icon, icon_color, theme.accent))
                 .child(menu_label(label, detail, theme.text_muted))
@@ -120,31 +235,64 @@ impl RenderOnce for Menu {
                             .color(theme.text_muted),
                     )
                 })
-                .when_some(on_click.filter(|_| !disabled), |this, handler| {
-                    this.on_click(move |event, window, cx| {
-                        handler(event, window, cx);
+                .when(has_submenu && !disabled, |this| {
+                    this.on_click(move |_event, _window, cx| {
+                        state_for_click.update(cx, |state, cx| {
+                            if state.open_submenu(index) {
+                                cx.notify();
+                            }
+                        });
                         cx.stop_propagation();
                     })
-                });
-            let row = div()
-                .relative()
-                .child(row_content)
-                .when(submenu_visible, |this| {
-                    this.child(
-                        div()
-                            .absolute()
-                            .left(px(self.min_width - (space::XS * 2.0)))
-                            .top(px(0.0))
-                            .child(
-                                Menu::new(("submenu", index), submenu_items)
-                                    .min_width(SUBMENU_MIN_WIDTH),
-                            ),
+                })
+                .when_some(
+                    on_click.filter(|_| !disabled && !has_submenu),
+                    |this, handler| {
+                        this.on_click(move |event, window, cx| {
+                            handler(event, window, cx);
+                            cx.stop_propagation();
+                        })
+                    },
+                );
+
+            if submenu_visible {
+                row_content = row_content.child(
+                    canvas(
+                        move |bounds, _window, cx| {
+                            state_for_measure.update(cx, |state, cx| {
+                                if state.set_trigger_bounds(index, bounds) {
+                                    cx.notify();
+                                }
+                            });
+                        },
+                        |_bounds, (), _window, _cx| {},
                     )
-                });
-            panel = panel.child(row);
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+                );
+            }
+
+            if submenu_visible && let Some(offset) = snapshot.submenu_offset {
+                open_submenu = Some((index, submenu_items, offset));
+            }
+
+            panel = panel.child(div().relative().child(row_content));
         }
 
-        panel.motion_slide_in(MotionDirection::FromTop, true)
+        div()
+            .id(id)
+            .relative()
+            .flex()
+            .items_start()
+            .child(panel)
+            .when_some(open_submenu, |this, (index, submenu_items, offset)| {
+                this.child(div().mt(offset).ml(px(-BORDER_WIDTH)).child(
+                    Menu::new(("submenu", index), submenu_items).min_width(SUBMENU_MIN_WIDTH),
+                ))
+            })
+            .motion_slide_in(MotionDirection::FromTop, true)
     }
 }
 
@@ -208,4 +356,57 @@ fn menu_header(label: String, color: gpui::Hsla) -> impl IntoElement {
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(color)
         .child(label)
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{bounds, point, size};
+
+    use super::*;
+
+    #[test]
+    fn menu_state_has_no_open_submenu_by_default() {
+        let state = MenuState::default();
+
+        assert_eq!(state.snapshot().open_submenu, None);
+    }
+
+    #[test]
+    fn menu_state_switching_submenu_clears_stale_trigger_bounds() {
+        let mut state = MenuState::default();
+        state.open_submenu(1);
+        state.set_trigger_bounds(1, bounds(point(px(0.0), px(24.0)), size(px(1.0), px(1.0))));
+
+        state.open_submenu(2);
+
+        assert!(state.snapshot().submenu_offset.is_none());
+    }
+
+    #[test]
+    fn menu_state_computes_submenu_offset_from_trigger_bounds() {
+        let mut state = MenuState::default();
+        state.open_submenu(1);
+        state.set_menu_bounds(bounds(
+            point(px(20.0), px(100.0)),
+            size(px(200.0), px(180.0)),
+        ));
+        state.set_trigger_bounds(
+            1,
+            bounds(point(px(20.0), px(148.0)), size(px(200.0), px(28.0))),
+        );
+
+        assert_eq!(state.snapshot().submenu_offset, Some(px(48.0)));
+    }
+
+    #[test]
+    fn menu_state_close_submenu_clears_trigger_bounds() {
+        let mut state = MenuState::default();
+        state.open_submenu(1);
+        state.set_trigger_bounds(1, bounds(point(px(0.0), px(24.0)), size(px(1.0), px(1.0))));
+
+        state.close_submenu();
+
+        assert_eq!(state.snapshot().open_submenu, None);
+        assert!(state.snapshot().submenu_offset.is_none());
+    }
 }

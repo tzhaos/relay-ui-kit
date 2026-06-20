@@ -15,7 +15,6 @@ pub struct MenuItem {
     pub(super) header: bool,
     pub(super) submenu: bool,
     pub(super) submenu_items: Vec<MenuItem>,
-    pub(super) submenu_open: bool,
     pub(super) on_click: Option<ClickHandler>,
 }
 
@@ -33,7 +32,6 @@ impl MenuItem {
             header: false,
             submenu: false,
             submenu_items: Vec::new(),
-            submenu_open: false,
             on_click: None,
         }
     }
@@ -52,7 +50,6 @@ impl MenuItem {
             header: false,
             submenu: false,
             submenu_items: Vec::new(),
-            submenu_open: false,
             on_click: None,
         }
     }
@@ -70,7 +67,6 @@ impl MenuItem {
             header: true,
             submenu: false,
             submenu_items: Vec::new(),
-            submenu_open: false,
             on_click: None,
         }
     }
@@ -117,11 +113,6 @@ impl MenuItem {
         self
     }
 
-    pub fn submenu_open(mut self, open: bool) -> Self {
-        self.submenu_open = open;
-        self
-    }
-
     relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
 }
 
@@ -140,16 +131,7 @@ mod tests {
     fn submenu_items_do_not_open_submenu_by_default() {
         let item = MenuItem::new("Open With").submenu_items(vec![MenuItem::new("Shell")]);
 
-        assert!(!item.submenu_open);
-    }
-
-    #[test]
-    fn submenu_open_sets_explicit_submenu_state() {
-        let item = MenuItem::new("Open With")
-            .submenu_items(vec![MenuItem::new("Shell")])
-            .submenu_open(true);
-
-        assert!(item.submenu_open);
+        assert_eq!(item.submenu_items.len(), 1);
     }
 
     #[test]

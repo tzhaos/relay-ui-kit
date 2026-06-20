@@ -253,6 +253,15 @@ fn terminal_dropdown_menu(open: bool, host: &Entity<GalleryScenesApp>) -> impl I
     .open(open)
     .min_width(220.0)
     .offset(0.0, 34.0)
+    .on_dismiss({
+        let host = host.clone();
+        move |_window, cx| {
+            host.update(cx, |this, cx| {
+                this.state.command_context_open = false;
+                cx.notify();
+            });
+        }
+    })
 }
 
 fn menu_action(host: &Entity<GalleryScenesApp>, label: &'static str, icon: IconName) -> MenuItem {
