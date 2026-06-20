@@ -1,13 +1,12 @@
 use gpui::{
     Anchor, AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
     InteractiveElement, IntoElement, LayoutId, Length, ParentElement, Pixels, Point, Position,
-    RenderOnce, Style, Window, anchored, deferred, div, point, px, relative, size,
+    Style, Window, anchored, deferred, div, point, px, relative, size,
 };
 
 use relay_ui_core::{interaction::DismissHandler, theme};
 
 /// Trigger-anchored floating content.
-#[derive(IntoElement)]
 pub struct AnchoredOverlay {
     id: ElementId,
     trigger: AnyElement,
@@ -80,12 +79,6 @@ impl AnchoredOverlay {
 
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_dismiss = Some(Box::new(handler));
-        self
-    }
-}
-
-impl RenderOnce for AnchoredOverlay {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         self
     }
 }
@@ -236,6 +229,14 @@ impl Element for AnchoredOverlay {
         if let Some(content) = request_layout.content.as_mut() {
             content.paint(window, cx);
         }
+    }
+}
+
+impl IntoElement for AnchoredOverlay {
+    type Element = Self;
+
+    fn into_element(self) -> Self::Element {
+        self
     }
 }
 
