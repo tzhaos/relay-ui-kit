@@ -91,9 +91,15 @@ impl SplitPane {
         self
     }
 
-    relay_foundation::shared_callback_builder!(on_resize, on_resize, f32);
+    pub fn on_resize(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
+        self.on_resize = Some(std::rc::Rc::new(handler));
+        self
+    }
 
-    relay_foundation::shared_callback_builder!(on_resize_end, on_resize_end,);
+    pub fn on_resize_end(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_resize_end = Some(std::rc::Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for SplitPane {
