@@ -5,11 +5,10 @@ use gpui::{
 
 use relay_ui_primitives::{
     components::overlay::overlay,
-    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
-    motion::MotionExt,
-    theme::{panel_chrome, ActiveTheme, radius, space},
+    motion::{MotionDirection, MotionExt},
+    theme::{panel_chrome, ActiveTheme, radius, space, BORDER_WIDTH},
 };
 
 use super::types::{BranchOption, BranchPickerAction};

@@ -1,6 +1,6 @@
 use gpui::{App, IntoElement, RenderOnce, Styled, Window, div, px};
 
-use crate::{contract::BORDER_WIDTH, theme::ActiveTheme};
+use crate::{theme::ActiveTheme, theme::BORDER_WIDTH};
 
 /// A 1px hairline divider.
 #[derive(IntoElement)]

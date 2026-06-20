@@ -4,8 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    contract::BORDER_WIDTH,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, BORDER_WIDTH},
     tone::Tone,
 };
 

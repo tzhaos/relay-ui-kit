@@ -107,3 +107,19 @@ Centralized type aliases: `ClickHandler`, `SelectHandler`, `ChangeHandler<T>`,
 4. Re-export in the category `mod.rs` and crate `lib.rs`
 5. Add to relevant contract tables in `contract/` if applicable
 6. Add tests in an inline `#[cfg(test)] mod tests` block
+
+## Standards
+
+All code, documentation, naming, testing, and Git conventions are defined in
+**[`STANDARDS.md`](STANDARDS.md)** — the single authoritative source for project
+standards. Covers:
+
+- **Comments** — `///` / `//!` rules, `//` section headers, no `/* */` blocks
+- **Naming** — modules (singular), types, functions, variables, constants, tests, crates
+- **Documentation** — README structure, CLAUDE.md layout, API docs, new component checklist
+- **Directory structure** — every directory's responsibilities, module layout, re-export rules
+- **Code organization** — import ordering, struct field order, builder methods, RenderOnce
+- **Testing** — inline `#[cfg(test)] mod tests`, naming, minimum coverage, contract tests
+- **Git** — Conventional Commits, branch naming, PR rules
+- **Lints & formatting** — rationale for each lint level, future upgrades
+- **Prohibitions** — banned patterns and their alternatives

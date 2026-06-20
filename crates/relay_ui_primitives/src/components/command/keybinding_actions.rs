@@ -4,10 +4,9 @@ use gpui::{
 };
 
 use crate::{
-    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, Theme, radius, DISABLED_OPACITY},
+    theme::{ActiveTheme, Theme, radius, DISABLED_OPACITY, BORDER_WIDTH},
 };
 
 /// Standard actions for editing a keybinding row.

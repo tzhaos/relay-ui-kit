@@ -1,11 +1,73 @@
 //! Motion helpers for quiet desktop micro-interactions.
+//!
+//! Defines animation duration and direction types, and the [`MotionExt`] extension
+//! trait that makes GPUI animations available on any styled element.
+
+use std::time::Duration;
 
 use gpui::{
     Animation, AnimationElement, AnimationExt, Element, ElementId, Styled, ease_out_quint,
     pulsating_between, px,
 };
 
-use crate::contract::{MotionDirection, MotionDuration};
+// ---------------------------------------------------------------------------
+// Motion duration
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionDuration {
+    /// 50ms — near-instant feedback.
+    Instant,
+    /// 150ms — standard entry animation.
+    Fast,
+    /// 300ms — continuous feedback (spinner, skeleton).
+    Slow,
+}
+
+impl MotionDuration {
+    pub fn duration(self) -> Duration {
+        match self {
+            MotionDuration::Instant => Duration::from_millis(50),
+            MotionDuration::Fast => Duration::from_millis(150),
+            MotionDuration::Slow => Duration::from_millis(300),
+        }
+    }
+}
+
+impl From<MotionDuration> for Duration {
+    fn from(value: MotionDuration) -> Self {
+        value.duration()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Motion direction
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionDirection {
+    FromBottom,
+    FromLeft,
+    FromRight,
+    FromTop,
+}
+
+// ---------------------------------------------------------------------------
+// Motion policy
+// ---------------------------------------------------------------------------
+
+/// What kind of motion a component uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionPolicy {
+    /// Animate the component when it first appears (slide-in + optional fade).
+    Entry,
+    /// A repeating animation that runs as long as the component is visible.
+    ContinuousFeedback,
+}
+
+// ---------------------------------------------------------------------------
+// MotionExt trait
+// ---------------------------------------------------------------------------
 
 /// Common GPUI animation helpers for Relay components.
 pub trait MotionExt: Styled + Element + Sized + 'static {
@@ -72,7 +134,7 @@ fn motion_id(element: &impl Element, animation_name: &'static str) -> ElementId 
 
 #[cfg(test)]
 mod tests {
-    use crate::contract::MotionDirection;
+    use super::*;
 
     #[test]
     fn motion_direction_names_are_stable() {
@@ -80,5 +142,10 @@ mod tests {
             MotionDirection::FromTop.animation_name(),
             "motion-slide-top"
         );
+    }
+
+    #[test]
+    fn motion_duration_values_are_stable() {
+        assert_eq!(MotionDuration::Fast.duration(), Duration::from_millis(150));
     }
 }

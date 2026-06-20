@@ -1,10 +1,12 @@
 use gpui::{Hsla, IntoElement, Styled, div, px};
 
-use crate::contract;
+use crate::theme::BORDER_WIDTH;
 
-pub(super) const THUMB_WIDTH: f32 = contract::SCROLL_THUMB_WIDTH;
+/// Scroll thumb width in pixels.
+pub(super) const THUMB_WIDTH: f32 = 5.0;
 
-const MIN_THUMB_HEIGHT: f32 = contract::SCROLL_MIN_THUMB_HEIGHT;
+/// Minimum scroll thumb height to prevent it from becoming too small to interact with.
+const MIN_THUMB_HEIGHT: f32 = 24.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct ScrollThumbMetrics {
@@ -18,7 +20,7 @@ pub(super) fn scroll_rail(color: Hsla) -> impl IntoElement {
         .top_0()
         .right_0()
         .bottom_0()
-        .w(px(contract::BORDER_WIDTH))
+        .w(px(BORDER_WIDTH))
         .bg(color)
 }
 

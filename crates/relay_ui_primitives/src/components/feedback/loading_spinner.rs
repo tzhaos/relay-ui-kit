@@ -3,7 +3,7 @@ use gpui::{
     Transformation, Window, div, percentage, prelude::FluentBuilder, px, svg,
 };
 
-use crate::{contract::MotionDuration, icon::IconName, theme::ActiveTheme, tone::Tone};
+use crate::{icon::IconName, motion::MotionDuration, theme::ActiveTheme, tone::Tone};
 
 /// An inline spinner for indeterminate work.
 #[derive(IntoElement)]

@@ -4,9 +4,8 @@ use gpui::{
 };
 
 use crate::{
-    contract::{MotionDirection, BORDER_WIDTH},
-    motion::MotionExt,
-    theme::{ActiveTheme, radius},
+    motion::{MotionDirection, MotionExt},
+    theme::{ActiveTheme, radius, BORDER_WIDTH},
     tone::Tone,
 };
 

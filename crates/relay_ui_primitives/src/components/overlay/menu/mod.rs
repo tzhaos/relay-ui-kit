@@ -8,10 +8,9 @@ use gpui::{
 pub use item::MenuItem;
 
 use crate::{
-    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
-    motion::MotionExt,
-    theme::{panel_chrome, ActiveTheme, radius, space, DISABLED_OPACITY},
+    motion::{MotionDirection, MotionExt},
+    theme::{panel_chrome, ActiveTheme, radius, space, DISABLED_OPACITY, BORDER_WIDTH},
 };
 
 use super::overlay;

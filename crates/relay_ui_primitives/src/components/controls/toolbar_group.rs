@@ -3,7 +3,7 @@ use gpui::{
     Window, div, px,
 };
 
-use crate::{contract::BORDER_WIDTH, theme::{ActiveTheme, radius, space}};
+use crate::{theme::{ActiveTheme, radius, space, BORDER_WIDTH}};
 
 /// A compact horizontal group for toolbar icon controls.
 #[derive(IntoElement)]

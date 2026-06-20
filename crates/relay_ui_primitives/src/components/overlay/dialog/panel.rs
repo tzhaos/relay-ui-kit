@@ -4,10 +4,9 @@ use gpui::{
 };
 
 use crate::{
-    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
-    motion::MotionExt,
-    theme::{panel_chrome, Theme, radius, space},
+    motion::{MotionDirection, MotionExt},
+    theme::{panel_chrome, Theme, radius, space, BORDER_WIDTH},
 };
 
 pub(super) struct DialogPanel {

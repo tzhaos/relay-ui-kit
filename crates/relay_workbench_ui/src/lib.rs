@@ -13,9 +13,11 @@ pub use git::{
 };
 pub use launcher::{LauncherItem, LauncherItemKind, LauncherMenu};
 pub use terminal::{
-    TerminalAgentQuickLaunch, AgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
+    TerminalAgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow, TerminalStatusBadge,
     TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
 };
+#[allow(deprecated)]
+pub use terminal::AgentQuickLaunch;
 pub use viewer::{
     CodeView, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView, MarkdownView,
 };

@@ -1,8 +1,8 @@
 use gpui::{ParentElement, Styled, div, px};
 
 use crate::{
-    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
+    theme::BORDER_WIDTH,
     tone::Tone,
 };
 

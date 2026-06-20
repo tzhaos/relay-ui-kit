@@ -1,7 +1,58 @@
 use gpui::KeyDownEvent;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::contract::{InputActionKind, InputValueKind};
+// ---------------------------------------------------------------------------
+// Input value / action kinds
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputValueKind {
+    Text,
+    Number,
+    Selection,
+    Toggle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputActionKind {
+    Changed(InputValueKind),
+    CursorMoved,
+    Submit,
+    Cancel,
+    Validate,
+    Ignored,
+}
+
+impl InputActionKind {
+    pub fn changes_value(self) -> bool {
+        matches!(self, Self::Changed(_))
+    }
+
+    pub fn should_notify(self) -> bool {
+        !matches!(self, Self::Ignored)
+    }
+
+    pub fn should_validate(self) -> bool {
+        matches!(self, Self::Changed(_) | Self::Submit | Self::Validate)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValidationState {
+    NotValidated,
+    Valid,
+    Invalid,
+}
+
+impl ValidationState {
+    pub fn should_show_error(self) -> bool {
+        matches!(self, Self::Invalid)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Text input state
+// ---------------------------------------------------------------------------
 
 /// The editable model for a [`crate::TextInput`].
 #[derive(Debug, Clone, Default)]

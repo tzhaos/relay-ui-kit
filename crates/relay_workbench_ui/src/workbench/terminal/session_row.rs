@@ -4,10 +4,9 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
-    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, BORDER_WIDTH},
     tone::Tone,
 };
 

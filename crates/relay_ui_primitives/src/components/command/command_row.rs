@@ -4,10 +4,9 @@ use gpui::{
 };
 
 use crate::{
-    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
-    theme::{ActiveTheme, radius, DISABLED_OPACITY},
+    theme::{ActiveTheme, radius, DISABLED_OPACITY, BORDER_WIDTH},
 };
 
 use super::KeybindingShortcut;

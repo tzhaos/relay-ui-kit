@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::{contract::BORDER_WIDTH, icon::IconName, theme::ActiveTheme};
+use crate::{icon::IconName, theme::ActiveTheme, theme::BORDER_WIDTH};
 
 use super::shared::feedback_icon;
 

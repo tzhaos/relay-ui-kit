@@ -4,9 +4,9 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
-    contract::BORDER_WIDTH,
     interaction::{SharedChangeHandler, SharedDismissHandler},
     theme::ActiveTheme,
+    theme::BORDER_WIDTH,
 };
 
 use super::{SplitAxis, drag::DraggedSplitPane, geometry::clamp_split_size};

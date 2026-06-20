@@ -5,10 +5,9 @@ use gpui::{
 };
 
 use crate::{
-    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, KeyHandler},
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, BORDER_WIDTH},
 };
 
 use super::TextInputState;

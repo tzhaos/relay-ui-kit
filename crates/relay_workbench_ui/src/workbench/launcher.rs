@@ -10,11 +10,10 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
-    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
-    motion::MotionExt,
-    theme::{panel_chrome, ActiveTheme, radius, space},
+    motion::{MotionDirection, MotionExt},
+    theme::{panel_chrome, ActiveTheme, radius, space, BORDER_WIDTH},
 };
 
 /// Category shown on the right edge of a launcher row.
