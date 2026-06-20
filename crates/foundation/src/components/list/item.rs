@@ -1,4 +1,4 @@
-use gpui::DefiniteLength;
+use gpui::{DefiniteLength, MouseButton};
 
 use crate::component_prelude::*;
 
@@ -94,7 +94,13 @@ impl ListItem {
         self
     }
 
-    crate::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 
     pub(crate) fn on_click_handler(mut self, handler: ClickHandler) -> Self {
         self.on_click = Some(handler);
@@ -147,7 +153,12 @@ impl RenderOnce for ListItem {
             .when(selectable && !selected, |this| {
                 this.hover(move |style| style.bg(theme.hover))
             })
-            .when(clickable, |this| this.cursor_pointer())
+            .when(clickable, |this| {
+                this.cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
+            })
             .children(self.start_slot)
             .child(
                 div()
