@@ -9,7 +9,7 @@ use crate::{
     icon::IconName,
     motion::MotionExt,
     structure::ScrollSurface,
-    theme::{ActiveTheme, radius, space},
+    theme::{panel_chrome, ActiveTheme, space},
 };
 
 /// A floating command palette panel.
@@ -57,14 +57,11 @@ impl RenderOnce for CommandPalette {
         let theme = *cx.theme();
         let has_rows = !self.rows.is_empty();
 
-        div()
+        let panel = div()
             .w(px(560.0))
-            .max_h(px(620.0))
-            .rounded(px(radius::LG))
-            .bg(theme.panel)
-            .border_1()
-            .border_color(theme.border_strong)
-            .shadow_lg()
+            .max_h(px(620.0));
+        let panel = panel_chrome(panel, &theme);
+        panel
             .occlude()
             .flex()
             .flex_col()

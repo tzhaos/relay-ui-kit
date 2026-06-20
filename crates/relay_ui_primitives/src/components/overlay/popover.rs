@@ -7,7 +7,7 @@ use crate::{
     contract::MotionDirection,
     icon::{Icon, IconName, IconSize},
     motion::MotionExt,
-    theme::{ActiveTheme, radius, space},
+    theme::{panel_chrome, ActiveTheme, space},
 };
 
 /// A compact elevated panel for inline details and small action groups.
@@ -63,18 +63,15 @@ impl ParentElement for Popover {
 impl RenderOnce for Popover {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        div()
+        let panel = div()
             .id(self.id)
             .w(px(self.width))
             .p(px(space::SM))
             .flex()
             .flex_col()
-            .gap_2()
-            .rounded(px(radius::LG))
-            .bg(theme.panel)
-            .border_1()
-            .border_color(theme.border_strong)
-            .shadow_lg()
+            .gap_2();
+        let panel = panel_chrome(panel, &theme);
+        panel
             .occlude()
             .when(self.title.is_some() || self.icon.is_some(), |this| {
                 this.child(

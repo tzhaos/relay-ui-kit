@@ -11,7 +11,7 @@
 //! dark dominant terminal surface, a sparse green accent, muted amber/red status
 //! colors, 1px borders, and a 4/8/12/16/24 spacing scale.
 
-use gpui::{App, Global, Hsla, rgb};
+use gpui::{App, Global, Hsla, Styled, px, rgb};
 
 // ---------------------------------------------------------------------------
 // Theme
@@ -254,6 +254,24 @@ pub mod radius {
     pub const MD: f32 = crate::contract::RADIUS_MD;
     /// 8px — cards, popovers.
     pub const LG: f32 = crate::contract::RADIUS_LG;
+}
+
+// ---------------------------------------------------------------------------
+// Shared panel chrome
+// ---------------------------------------------------------------------------
+
+/// Apply the standard floating-panel chrome: rounded corners, panel background,
+/// 1px strong border, large shadow.
+///
+/// Generic over any [`Styled`] element so callers can pass plain `Div` or
+/// stateful wrappers like `Stateful<Div>`. Callers should chain additional
+/// styling (e.g. occlusion, overflow) after calling this helper.
+pub fn panel_chrome<E: Styled>(this: E, theme: &Theme) -> E {
+    this.rounded(px(radius::LG))
+        .bg(theme.panel)
+        .border_1()
+        .border_color(theme.border_strong)
+        .shadow_lg()
 }
 
 // ---------------------------------------------------------------------------

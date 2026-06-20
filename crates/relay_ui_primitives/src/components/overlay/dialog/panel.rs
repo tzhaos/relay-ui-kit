@@ -7,7 +7,7 @@ use crate::{
     contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     motion::MotionExt,
-    theme::{Theme, radius, space},
+    theme::{panel_chrome, Theme, radius, space},
 };
 
 pub(super) struct DialogPanel {
@@ -24,15 +24,12 @@ pub(super) struct DialogPanel {
 impl DialogPanel {
     pub fn render(self) -> impl IntoElement {
         let theme = self.theme;
-        div()
+        let panel = div()
             .id(self.id)
             .w(px(self.width))
-            .max_w_full()
-            .rounded(px(radius::LG))
-            .bg(theme.panel)
-            .border_1()
-            .border_color(theme.border_strong)
-            .shadow_lg()
+            .max_w_full();
+        let panel = panel_chrome(panel, &theme);
+        panel
             .overflow_hidden()
             .occlude()
             .flex()
