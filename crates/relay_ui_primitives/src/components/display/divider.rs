@@ -1,6 +1,6 @@
 use gpui::{App, IntoElement, RenderOnce, Styled, Window, div, px};
 
-use crate::theme::ActiveTheme;
+use crate::{contract::BORDER_WIDTH, theme::ActiveTheme};
 
 /// A 1px hairline divider.
 #[derive(IntoElement)]
@@ -22,9 +22,9 @@ impl RenderOnce for Divider {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let color = cx.theme().border;
         if self.vertical {
-            div().w(px(1.0)).h_full().bg(color)
+            div().w(px(BORDER_WIDTH)).h_full().bg(color)
         } else {
-            div().h(px(1.0)).w_full().bg(color)
+            div().h(px(BORDER_WIDTH)).w_full().bg(color)
         }
     }
 }

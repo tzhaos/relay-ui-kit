@@ -190,6 +190,12 @@ pub fn init_dark(cx: &mut App) {
     cx.set_global(Theme::dark());
 }
 
+/// Opacity applied to disabled interactive elements across the kit.
+///
+/// All components that render a disabled state should use this constant to
+/// ensure visual consistency (see also [`Button`], [`Checkbox`], [`Toggle`]).
+pub const DISABLED_OPACITY: f32 = 0.5;
+
 // ---------------------------------------------------------------------------
 // Spacing + sizing scale
 // ---------------------------------------------------------------------------
@@ -199,6 +205,8 @@ pub fn init_dark(cx: &mut App) {
 /// Compose with `gpui::px(...)`, e.g. `px(space::MD)`. The 4/8/12/16/24 scale is
 /// the contract, alongside the fixed chrome/pane/row dimensions.
 pub mod space {
+    /// 2px — inter-keycap gaps, toggle padding, intra-toolbar spacing.
+    pub const XXS: f32 = 2.0;
     /// 4px — tight intra-component gaps.
     pub const XS: f32 = 4.0;
     /// 8px — default rhythm.

@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
 };
 
-use crate::{interaction::ClickHandler, theme::ActiveTheme};
+use crate::{interaction::ClickHandler, theme::{ActiveTheme, space}};
 
 /// A sliding on/off switch. The host owns `on` and flips it in `on_click`.
 #[derive(IntoElement)]
@@ -56,7 +56,7 @@ impl RenderOnce for Toggle {
             .flex_shrink_0()
             .rounded(px(9.0))
             .bg(track_bg)
-            .p(px(2.0))
+            .p(px(space::XXS))
             .flex()
             .items_center()
             .when(self.on, |this| this.justify_end())

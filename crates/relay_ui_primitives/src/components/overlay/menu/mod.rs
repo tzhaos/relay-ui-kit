@@ -8,10 +8,10 @@ use gpui::{
 pub use item::MenuItem;
 
 use crate::{
-    contract::MotionDirection,
+    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     motion::MotionExt,
-    theme::{ActiveTheme, radius, space},
+    theme::{ActiveTheme, radius, space, DISABLED_OPACITY},
 };
 
 use super::overlay;
@@ -48,7 +48,7 @@ impl RenderOnce for Menu {
             .p(px(space::XS))
             .flex()
             .flex_col()
-            .gap(px(1.0))
+            .gap(px(BORDER_WIDTH))
             .rounded(px(radius::LG))
             .bg(theme.panel)
             .border_1()
@@ -74,7 +74,7 @@ impl RenderOnce for Menu {
             } = item;
 
             if separator {
-                panel = panel.child(div().my(px(space::XS)).h(px(1.0)).w_full().bg(theme.border));
+                panel = panel.child(div().my(px(space::XS)).h(px(BORDER_WIDTH)).w_full().bg(theme.border));
                 continue;
             }
             if header {
@@ -101,7 +101,7 @@ impl RenderOnce for Menu {
                 .rounded(px(radius::MD))
                 .text_sm()
                 .text_color(fg)
-                .when(disabled, |this| this.opacity(0.52))
+                .when(disabled, |this| this.opacity(DISABLED_OPACITY))
                 .when(!disabled, |this| {
                     this.cursor_pointer().hover(move |s| s.bg(theme.hover))
                 })
@@ -169,7 +169,7 @@ fn menu_label(label: String, detail: Option<String>, detail_color: gpui::Hsla) -
         .min_w_0()
         .flex()
         .flex_col()
-        .gap(px(1.0))
+        .gap(px(BORDER_WIDTH))
         .child(
             div()
                 .truncate()

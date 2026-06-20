@@ -3,7 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_ui_primitives::theme::{ActiveTheme, Theme, mono_family, radius};
+use relay_ui_primitives::{contract::BORDER_WIDTH, theme::{ActiveTheme, Theme, mono_family, radius}};
 
 /// A lightweight read-only code/file text surface.
 #[derive(IntoElement)]
@@ -52,7 +52,7 @@ impl RenderOnce for CodeView {
             .text_size(px(12.0))
             .flex()
             .flex_col()
-            .gap(px(1.0))
+            .gap(px(BORDER_WIDTH))
             .when_some(self.language, |this, language| {
                 this.child(
                     div()

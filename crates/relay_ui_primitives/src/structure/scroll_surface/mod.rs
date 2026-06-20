@@ -142,7 +142,7 @@ impl RenderOnce for ScrollSurface {
                         this.child(
                             div()
                                 .absolute()
-                                .right(px(2.0))
+                                .right(px(space::XXS))
                                 .top(px(thumb.top))
                                 .w(px(THUMB_WIDTH))
                                 .h(px(thumb.height))

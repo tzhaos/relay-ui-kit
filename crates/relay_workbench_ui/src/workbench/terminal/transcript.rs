@@ -2,7 +2,7 @@ use gpui::{
     App, IntoElement, ParentElement, RenderOnce, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
-use relay_ui_primitives::theme::{ActiveTheme, Theme};
+use relay_ui_primitives::theme::{ActiveTheme, Theme, space};
 
 use super::TerminalLine;
 
@@ -41,7 +41,7 @@ impl RenderOnce for TerminalTranscript {
         div()
             .flex()
             .flex_col()
-            .gap(px(2.0))
+            .gap(px(space::XXS))
             .children(
                 self.lines
                     .into_iter()

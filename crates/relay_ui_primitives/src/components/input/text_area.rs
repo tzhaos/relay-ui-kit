@@ -6,7 +6,7 @@ use gpui::{
 
 use crate::{
     interaction::KeyHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 use super::TextInputState;
@@ -114,7 +114,7 @@ impl RenderOnce for TextArea {
                     .min_h_0()
                     .flex()
                     .flex_col()
-                    .gap(px(2.0))
+                    .gap(px(space::XXS))
                     .text_sm()
                     .line_height(px(20.0))
                     .when(show_placeholder, |this| {

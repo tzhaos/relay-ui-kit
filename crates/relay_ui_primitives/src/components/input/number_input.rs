@@ -5,6 +5,7 @@ use gpui::{
 };
 
 use crate::{
+    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, KeyHandler},
     theme::{ActiveTheme, radius},
@@ -180,7 +181,7 @@ impl RenderOnce for NumberInput {
                         .flex()
                         .items_center()
                         .child(decrement)
-                        .child(div().h(px(16.0)).w(px(1.0)).bg(theme.border.opacity(0.7)))
+                        .child(div().h(px(16.0)).w(px(BORDER_WIDTH)).bg(theme.border.opacity(0.7)))
                         .child(increment),
                 ),
             })

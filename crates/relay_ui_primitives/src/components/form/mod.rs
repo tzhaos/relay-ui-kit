@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
+use crate::theme::{ActiveTheme, radius, space};
 
 /// Label text for a form field.
 #[derive(IntoElement)]
@@ -103,7 +103,7 @@ impl RenderOnce for SettingsRow {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(2.0))
+                    .gap(px(space::XXS))
                     .child(FieldLabel::new(self.label))
                     .when_some(self.description, |this, description| {
                         this.child(FieldDescription::new(description))

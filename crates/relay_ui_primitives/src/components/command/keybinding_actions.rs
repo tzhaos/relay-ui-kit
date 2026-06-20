@@ -4,9 +4,10 @@ use gpui::{
 };
 
 use crate::{
+    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, Theme, radius},
+    theme::{ActiveTheme, Theme, radius, DISABLED_OPACITY},
 };
 
 /// Standard actions for editing a keybinding row.
@@ -130,7 +131,7 @@ impl RenderOnce for KeybindingActions {
             .h(px(26.0))
             .flex()
             .items_center()
-            .gap(px(1.0))
+            .gap(px(BORDER_WIDTH))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(theme.border)
@@ -161,7 +162,7 @@ fn action_button(action: KeybindingAction, index: usize, theme: Theme) -> impl I
         .justify_center()
         .text_size(px(10.0))
         .font_weight(FontWeight::MEDIUM)
-        .when(action.disabled, |this| this.opacity(0.36))
+        .when(action.disabled, |this| this.opacity(DISABLED_OPACITY))
         .when(!action.disabled, |this| {
             this.cursor_pointer().hover(move |style| {
                 if kind.danger() {

@@ -4,6 +4,7 @@ use gpui::{
 };
 
 use crate::{
+    contract::BORDER_WIDTH,
     theme::{ActiveTheme, radius},
     tone::Tone,
 };
@@ -69,7 +70,7 @@ impl RenderOnce for Banner {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(1.0))
+                    .gap(px(BORDER_WIDTH))
                     .child(
                         div()
                             .text_sm()

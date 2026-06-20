@@ -1,6 +1,6 @@
 use gpui::{App, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window, div, px};
 
-use crate::theme::{ActiveTheme, radius};
+use crate::theme::{ActiveTheme, radius, space};
 
 /// A visual keyboard shortcut hint, rendered as compact keycaps.
 #[derive(Clone, Debug, PartialEq, Eq, IntoElement)]
@@ -26,7 +26,7 @@ impl RenderOnce for KeyboardShortcut {
         div()
             .flex()
             .items_center()
-            .gap(px(2.0))
+            .gap(px(space::XXS))
             .children(self.keys.into_iter().map(|key| {
                 div()
                     .min_w(px(18.0))

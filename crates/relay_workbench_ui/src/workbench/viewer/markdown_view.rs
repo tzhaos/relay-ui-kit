@@ -4,7 +4,7 @@ use gpui::{
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
-use relay_ui_primitives::theme::{ActiveTheme, Theme, mono_family, radius};
+use relay_ui_primitives::{contract::BORDER_WIDTH, theme::{ActiveTheme, Theme, mono_family, radius}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum MarkdownBlock {
@@ -90,7 +90,7 @@ fn render_block(theme: Theme, block: MarkdownBlock) -> gpui::Div {
             .text_sm()
             .text_color(theme.text_muted)
             .child(text),
-        MarkdownBlock::Rule => div().h(px(1.0)).bg(theme.border),
+        MarkdownBlock::Rule => div().h(px(BORDER_WIDTH)).bg(theme.border),
     }
 }
 

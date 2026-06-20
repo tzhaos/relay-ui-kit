@@ -5,7 +5,7 @@ use gpui::{
 
 use crate::{
     interaction::SelectHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 /// One labelled segment in a [`SegmentedControl`].
@@ -61,10 +61,10 @@ impl RenderOnce for SegmentedControl {
         let mut row = div()
             .id(self.id)
             .h(px(28.0))
-            .p(px(2.0))
+            .p(px(space::XXS))
             .flex()
             .items_center()
-            .gap(px(2.0))
+            .gap(px(space::XXS))
             .rounded(px(radius::MD))
             .bg(theme.inset)
             .border_1()

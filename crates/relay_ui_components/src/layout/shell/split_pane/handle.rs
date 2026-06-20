@@ -4,6 +4,7 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
+    contract::BORDER_WIDTH,
     interaction::{SharedChangeHandler, SharedDismissHandler},
     theme::ActiveTheme,
 };
@@ -37,8 +38,8 @@ pub(super) fn render_split_handle(
         let theme = *cx.theme();
 
         let divider = match axis {
-            SplitAxis::Horizontal => div().w(px(1.0)).h_full(),
-            SplitAxis::Vertical => div().h(px(1.0)).w_full(),
+            SplitAxis::Horizontal => div().w(px(BORDER_WIDTH)).h_full(),
+            SplitAxis::Vertical => div().h(px(BORDER_WIDTH)).w_full(),
         };
         let interactive = match axis {
             SplitAxis::Horizontal => div()

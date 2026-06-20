@@ -1,6 +1,7 @@
 use gpui::{ParentElement, Styled, div, px};
 
 use crate::{
+    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     tone::Tone,
 };
@@ -8,7 +9,7 @@ use crate::{
 pub(super) fn feedback_icon(icon: IconName, color: gpui::Hsla) -> gpui::Div {
     div()
         .size(px(18.0))
-        .mt(px(1.0))
+        .mt(px(BORDER_WIDTH))
         .flex_shrink_0()
         .flex()
         .items_center()

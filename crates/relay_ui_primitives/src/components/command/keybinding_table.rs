@@ -5,7 +5,7 @@ use gpui::{
 
 use crate::{
     command::KeyboardShortcut,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 /// One command row in a keybinding table.
@@ -104,7 +104,7 @@ fn render_row(row: KeybindingRow, last: bool, theme: crate::Theme) -> impl IntoE
                 .min_w_0()
                 .flex()
                 .flex_col()
-                .gap(px(2.0))
+                .gap(px(space::XXS))
                 .child(
                     div()
                         .truncate()

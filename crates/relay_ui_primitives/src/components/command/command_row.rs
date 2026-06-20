@@ -4,9 +4,10 @@ use gpui::{
 };
 
 use crate::{
+    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, DISABLED_OPACITY},
 };
 
 use super::KeyboardShortcut;
@@ -91,7 +92,7 @@ impl RenderOnce for CommandRow {
             .gap_2()
             .rounded(px(radius::MD))
             .when(self.selected, |this| this.bg(theme.selection))
-            .when(disabled, |this| this.opacity(0.55))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(!disabled, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover))
@@ -117,7 +118,7 @@ impl RenderOnce for CommandRow {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(1.0))
+                    .gap(px(BORDER_WIDTH))
                     .child(
                         div()
                             .truncate()

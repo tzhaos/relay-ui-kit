@@ -4,7 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    contract::MotionDirection,
+    contract::{MotionDirection, BORDER_WIDTH},
     motion::MotionExt,
     theme::{ActiveTheme, radius},
     tone::Tone,
@@ -73,7 +73,7 @@ impl RenderOnce for Toast {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(1.0))
+                    .gap(px(BORDER_WIDTH))
                     .child(
                         div()
                             .truncate()

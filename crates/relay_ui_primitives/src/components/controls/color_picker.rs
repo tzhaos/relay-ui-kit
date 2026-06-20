@@ -9,7 +9,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ColorSelectHandler, SharedColorSelectHandler},
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, radius, space},
 };
 
 /// A selectable color preset for [`ColorPicker`].
@@ -146,7 +146,7 @@ impl RenderOnce for ColorPicker {
                                 div()
                                     .flex()
                                     .flex_col()
-                                    .gap(px(2.0))
+                                    .gap(px(space::XXS))
                                     .child(
                                         div()
                                             .text_xs()

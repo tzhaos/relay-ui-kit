@@ -3,7 +3,7 @@ use gpui::{
     Window, div, px,
 };
 
-use crate::theme::{ActiveTheme, radius};
+use crate::{contract::BORDER_WIDTH, theme::{ActiveTheme, radius, space}};
 
 /// A compact horizontal group for toolbar icon controls.
 #[derive(IntoElement)]
@@ -40,10 +40,10 @@ impl RenderOnce for ToolbarGroup {
         div()
             .id(self.id)
             .h(px(30.0))
-            .px(px(2.0))
+            .px(px(space::XXS))
             .flex()
             .items_center()
-            .gap(px(1.0))
+            .gap(px(BORDER_WIDTH))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(theme.border)

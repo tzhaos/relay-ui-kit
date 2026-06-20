@@ -5,7 +5,7 @@ use gpui::{
 
 use relay_ui_primitives::{
     components::overlay::overlay,
-    contract::MotionDirection,
+    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     interaction::{SharedDismissHandler, SharedSelectHandler},
     motion::MotionExt,
@@ -59,7 +59,7 @@ impl RenderOnce for BranchPickerPanel {
             .p(px(space::XS))
             .flex()
             .flex_col()
-            .gap(px(2.0))
+            .gap(px(space::XXS))
             .rounded(px(radius::LG))
             .bg(theme.panel)
             .border_1()
@@ -137,7 +137,7 @@ impl RenderOnce for BranchPickerPanel {
                             .flex_1()
                             .flex()
                             .flex_col()
-                            .gap(px(1.0))
+                            .gap(px(BORDER_WIDTH))
                             .child(
                                 div()
                                     .truncate()
@@ -165,7 +165,7 @@ impl RenderOnce for BranchPickerPanel {
         }
 
         if !self.actions.is_empty() {
-            panel = panel.child(div().my(px(space::XS)).h(px(1.0)).w_full().bg(theme.border));
+            panel = panel.child(div().my(px(space::XS)).h(px(BORDER_WIDTH)).w_full().bg(theme.border));
         }
 
         for (index, action) in self.actions.into_iter().enumerate() {

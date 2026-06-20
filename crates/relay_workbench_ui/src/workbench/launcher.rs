@@ -10,7 +10,7 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
-    contract::MotionDirection,
+    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
     motion::MotionExt,
@@ -109,7 +109,7 @@ impl RenderOnce for LauncherMenu {
             .p(px(space::XS))
             .flex()
             .flex_col()
-            .gap(px(2.0))
+            .gap(px(space::XXS))
             .rounded(px(radius::LG))
             .bg(theme.panel)
             .border_1()
@@ -161,7 +161,7 @@ impl RenderOnce for LauncherMenu {
                         .min_w_0()
                         .flex()
                         .flex_col()
-                        .gap(px(1.0))
+                        .gap(px(BORDER_WIDTH))
                         .child(
                             div()
                                 .truncate()

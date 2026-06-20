@@ -4,6 +4,7 @@ use gpui::{
 };
 
 use relay_ui_primitives::{
+    contract::BORDER_WIDTH,
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
     theme::{ActiveTheme, radius},
@@ -98,7 +99,7 @@ impl RenderOnce for TerminalSessionRow {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(1.0))
+                    .gap(px(BORDER_WIDTH))
                     .child(
                         div()
                             .truncate()

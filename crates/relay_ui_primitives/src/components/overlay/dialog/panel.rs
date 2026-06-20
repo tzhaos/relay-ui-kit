@@ -4,7 +4,7 @@ use gpui::{
 };
 
 use crate::{
-    contract::MotionDirection,
+    contract::{MotionDirection, BORDER_WIDTH},
     icon::{Icon, IconName, IconSize},
     motion::MotionExt,
     theme::{Theme, radius, space},
@@ -86,7 +86,7 @@ fn dialog_header(
         .when_some(icon, |this, icon| {
             this.child(
                 div()
-                    .mt(px(1.0))
+                    .mt(px(BORDER_WIDTH))
                     .size(px(28.0))
                     .rounded(px(radius::MD))
                     .bg(theme.panel_alt)

@@ -3,7 +3,7 @@ use gpui::{
     prelude::FluentBuilder, px,
 };
 
-use crate::{icon::IconName, theme::ActiveTheme};
+use crate::{contract::BORDER_WIDTH, icon::IconName, theme::ActiveTheme};
 
 use super::shared::feedback_icon;
 
@@ -43,7 +43,7 @@ impl RenderOnce for InlineError {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .gap(px(1.0))
+                    .gap(px(BORDER_WIDTH))
                     .child(
                         div()
                             .text_sm()
