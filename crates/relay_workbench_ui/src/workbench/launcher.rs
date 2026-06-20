@@ -13,7 +13,7 @@ use relay_ui_primitives::{
     icon::{Icon, IconName, IconSize},
     interaction::SelectHandler,
     motion::{MotionDirection, MotionExt},
-    theme::{panel_chrome, ActiveTheme, radius, space, BORDER_WIDTH},
+    theme::{ActiveTheme, radius, space, BORDER_WIDTH},
 };
 
 /// Category shown on the right edge of a launcher row.
@@ -108,9 +108,13 @@ impl RenderOnce for LauncherMenu {
             .p(px(space::XS))
             .flex()
             .flex_col()
-            .gap(px(space::XXS));
-        panel = panel_chrome(panel, &theme);
-        panel = panel.occlude();
+            .gap(px(space::XXS))
+            .rounded(px(radius::LG))
+            .bg(theme.panel)
+            .border_1()
+            .border_color(theme.border_strong)
+            .shadow_lg()
+            .occlude();
 
         for (index, item) in self.items.into_iter().enumerate() {
             let handler = handler.clone();

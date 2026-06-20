@@ -6,7 +6,7 @@ use gpui::{
 use crate::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    theme::{panel_chrome, Theme, radius, space, BORDER_WIDTH},
+    theme::{Theme, radius, space, BORDER_WIDTH},
 };
 
 pub(super) struct DialogPanel {
@@ -23,12 +23,15 @@ pub(super) struct DialogPanel {
 impl DialogPanel {
     pub fn render(self) -> impl IntoElement {
         let theme = self.theme;
-        let panel = div()
+        div()
             .id(self.id)
             .w(px(self.width))
-            .max_w_full();
-        let panel = panel_chrome(panel, &theme);
-        panel
+            .max_w_full()
+            .rounded(px(radius::LG))
+            .bg(theme.panel)
+            .border_1()
+            .border_color(theme.border_strong)
+            .shadow_lg()
             .overflow_hidden()
             .occlude()
             .flex()

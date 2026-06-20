@@ -10,7 +10,7 @@ pub use item::MenuItem;
 use crate::{
     icon::{Icon, IconName, IconSize},
     motion::{MotionDirection, MotionExt},
-    theme::{panel_chrome, ActiveTheme, radius, space, DISABLED_OPACITY, BORDER_WIDTH},
+    theme::{ActiveTheme, radius, space, DISABLED_OPACITY, BORDER_WIDTH},
 };
 
 use super::overlay;
@@ -47,9 +47,13 @@ impl RenderOnce for Menu {
             .p(px(space::XS))
             .flex()
             .flex_col()
-            .gap(px(BORDER_WIDTH));
-        panel = panel_chrome(panel, &theme);
-        panel = panel.occlude();
+            .gap(px(BORDER_WIDTH))
+            .rounded(px(radius::LG))
+            .bg(theme.panel)
+            .border_1()
+            .border_color(theme.border_strong)
+            .shadow_lg()
+            .occlude();
 
         for (index, item) in self.items.into_iter().enumerate() {
             let MenuItem {
