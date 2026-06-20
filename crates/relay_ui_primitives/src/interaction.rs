@@ -84,3 +84,66 @@ pub type KeyCaptureHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) ->
 /// key and the chosen [`Hsla`] value.
 pub type ColorSelectHandler = Box<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
 pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
+
+// ---------------------------------------------------------------------------
+// Callback builder macros
+// ---------------------------------------------------------------------------
+
+/// Generate a `Box`-based callback builder method.
+///
+/// Usage inside a component `impl` block:
+/// ```ignore
+/// callback_builder!(on_click, on_click, &ClickEvent);
+/// ```
+///
+/// Expands to:
+/// ```ignore
+/// pub fn on_click(
+///     mut self,
+///     handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+/// ) -> Self {
+///     self.on_click = Some(Box::new(handler));
+///     self
+/// }
+/// ```
+#[macro_export]
+macro_rules! callback_builder {
+    ($method:ident, $field:ident, $($arg:ty),+ $(,)?) => {
+        #[doc = concat!(
+            "Attach a handler that receives `(",
+            $(stringify!($arg), ", ",)+
+            "&mut Window, &mut App)`."
+        )]
+        pub fn $method(
+            mut self,
+            handler: impl Fn($($arg,)+ &mut ::gpui::Window, &mut ::gpui::App) + 'static,
+        ) -> Self {
+            self.$field = Some(Box::new(handler));
+            self
+        }
+    };
+}
+
+/// Generate an `Rc`-based shared callback builder method.
+///
+/// Usage:
+/// ```ignore
+/// shared_callback_builder!(on_change, on_change, f32);
+/// ```
+#[macro_export]
+macro_rules! shared_callback_builder {
+    ($method:ident, $field:ident, $($arg:ty),+ $(,)?) => {
+        #[doc = concat!(
+            "Attach a shared handler that receives `(",
+            $(stringify!($arg), ", ",)+
+            "&mut Window, &mut App)`."
+        )]
+        pub fn $method(
+            mut self,
+            handler: impl Fn($($arg,)+ &mut ::gpui::Window, &mut ::gpui::App) + 'static,
+        ) -> Self {
+            self.$field = Some(::std::rc::Rc::new(handler));
+            self
+        }
+    };
+}

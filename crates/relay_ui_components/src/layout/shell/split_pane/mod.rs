@@ -75,7 +75,19 @@ impl SplitPane {
         self
     }
 
+    /// Set minimum sizes for each pane.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `first + second` exceeds a reasonable total
+    /// (1600 px), since the two panes would never both satisfy their minimums.
     pub fn min_sizes(mut self, first: f32, second: f32) -> Self {
+        debug_assert!(
+            first + second <= 1600.0,
+            "SplitPane min_sizes ({first} + {second} = {}) exceeds reasonable total; \
+             panes cannot both satisfy minimums",
+            first + second
+        );
         self.min_first = first;
         self.min_second = second;
         self

@@ -112,6 +112,48 @@ impl Theme {
             selection: rgb(0xe4e9e6).into(),
         }
     }
+
+    /// Dark palette: quiet, low-contrast, warm-dark surfaces.
+    ///
+    /// Surfaces invert the light hierarchy (outermost darkest), text is light,
+    /// and accent/status colors are brightened for dark backgrounds.
+    pub fn dark() -> Self {
+        Self {
+            // Background surfaces — darkest outermost
+            app_bg: rgb(0x1a1c1e).into(),
+            chrome: rgb(0x212427).into(),
+            panel: rgb(0x282a2d).into(),
+            panel_alt: rgb(0x242628).into(),
+            inset: rgb(0x1e2022).into(),
+
+            // Text — three contrast steps on dark
+            text: rgb(0xe8e8e3).into(),
+            text_secondary: rgb(0x9ba1a8).into(),
+            text_muted: rgb(0x6b727a).into(),
+
+            // Borders — subtle on dark
+            border: rgb(0x36383c).into(),
+            border_strong: rgb(0x4a4d52).into(),
+
+            // Terminal — near-black with warm tint
+            terminal_bg: rgb(0x141618).into(),
+            terminal_text: rgb(0xdadad5).into(),
+            terminal_dim: rgb(0x6b727a).into(),
+
+            // Accent — brightened for dark backgrounds
+            accent: rgb(0x22c55e).into(),
+            on_accent: rgb(0x0a0a0a).into(),
+            accent_bg: rgb(0x132e1c).into(),
+            accent_border: rgb(0x1a5c30).into(),
+            warning: rgb(0xf59e0b).into(),
+            danger: rgb(0xef4444).into(),
+            info: rgb(0x3b82f6).into(),
+
+            // Interaction
+            hover: rgb(0x36383c).into(),
+            selection: rgb(0x1e3226).into(),
+        }
+    }
 }
 
 impl Default for Theme {
@@ -126,7 +168,7 @@ impl Global for Theme {}
 ///
 /// Implemented for `App` so components can write `cx.theme()` regardless of which
 /// view is rendering them. The theme must be installed once at startup via
-/// [`init`]; until then this falls back to [`Theme::light`].
+/// [`init`] or [`init_dark`]; calling `cx.theme()` before installation will panic.
 pub trait ActiveTheme {
     fn theme(&self) -> &Theme;
 }
@@ -137,10 +179,15 @@ impl ActiveTheme for App {
     }
 }
 
-/// Install the default theme into the app globals. Call once at startup, before
-/// opening any window that renders kit components.
+/// Install the default light theme into the app globals. Call once at startup,
+/// before opening any window that renders kit components.
 pub fn init(cx: &mut App) {
     cx.set_global(Theme::light());
+}
+
+/// Install the dark theme into the app globals.
+pub fn init_dark(cx: &mut App) {
+    cx.set_global(Theme::dark());
 }
 
 // ---------------------------------------------------------------------------
