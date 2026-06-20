@@ -1,0 +1,24 @@
+# Project-level Cargo configuration for relay-ui-kit.
+# Values here are merged with the user's global ~/.cargo/config.toml;
+# project-level settings take precedence.
+
+[build]
+rustflags = ["-C", "symbol-mangling-version=v0"]
+
+# Convenience aliases — use `cargo ci-check`, `cargo build-release`, etc.
+[alias]
+ci-check = ["check", "--profile", "ci", "--workspace"]
+ci-test = ["test", "--profile", "ci", "--workspace"]
+ci-clippy = ["clippy", "--profile", "ci", "--workspace", "--", "-D", "warnings"]
+build-release = ["build", "--profile", "release", "-p", "relay_gallery"]
+
+# Windows-specific flags.
+# windows_slim_errors reduces error type size (matching gpui/zed convention).
+# crt-static ensures portable binaries that don't require the MSVC runtime redist.
+[target.'cfg(target_os = "windows")']
+rustflags = [
+    "--cfg",
+    "windows_slim_errors",
+    "-C",
+    "target-feature=+crt-static",
+]

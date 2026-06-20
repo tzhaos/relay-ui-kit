@@ -8,15 +8,57 @@ crates in strict layered architecture: `relay_ui_primitives` → `relay_ui_compo
 
 ## Build & Test
 
+Rust toolchain: **1.95.0** (pinned in `rust-toolchain.toml`)
+
+### Quick commands
+
 ```bash
+cargo run -p relay_gallery       # Launch interactive gallery (debug)
 cargo check --workspace          # Fast compilation check
-cargo test --workspace           # Run all tests (133 tests)
-cargo run -p relay_gallery       # Launch interactive gallery
+cargo test --workspace           # Run all tests
+cargo fmt --check --all          # Format check
 cargo clippy --workspace -- -D warnings
-cargo fmt --check --all
 ```
 
-Rust toolchain: **1.95.0** (pinned in `rust-toolchain.toml`)
+### CI commands (use `ci` profile — no incremental, warnings denied)
+
+```bash
+cargo ci-check                   # cargo check --profile ci --workspace
+cargo ci-test                    # cargo test --profile ci --workspace
+cargo ci-clippy                  # cargo clippy --profile ci --workspace -- -D warnings
+./script/ci-check                # Run full CI suite locally (fmt → clippy → check → test)
+```
+
+### Release build
+
+```bash
+cargo build-release              # Optimized binary → target/release/relay_gallery.exe
+```
+
+### Maintenance
+
+```bash
+./script/clear-target-dir-if-larger-than [MAX_GB] [SOFT_GB]
+# Cleans target/ when it exceeds MAX_GB (default 10); soft-cleans workspace crates
+# above SOFT_GB (default 5). Safe to run anytime.
+```
+
+### Directory conventions
+
+| Directory | Purpose | Lifecycle |
+|-----------|---------|-----------|
+| `target/` | Cargo-managed intermediate build artifacts | `cargo clean` any time |
+| `dist/`   | Final distribution artifacts (release builds) | Decoupled from `target/` |
+| `script/` | Build/maintenance helper scripts | Checked in |
+
+### Build profiles (defined in root `Cargo.toml`)
+
+| Profile | Use case |
+|---------|----------|
+| `dev` (default) | Fast iteration: incremental, `debug=limited`, split-debuginfo |
+| `ci` | CI pipelines: inherits dev, `incremental=false` |
+| `release` | Distribution: ThinLTO, `codegen-units=1`, stripped, `panic=abort` |
+| `release-fast` | Local perf testing: inherits release, no LTO, 16 codegen units |
 
 ## Architecture Rules
 

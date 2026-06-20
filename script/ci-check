@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# ci-check — run the full CI suite locally.
+#
+# Mirrors what .github/workflows/ci.yml does, using the `ci` profile.
+# Fails fast: stops at the first failing check.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+echo "=== Format check ==="
+cargo fmt --check --all
+
+echo ""
+echo "=== Clippy (warnings denied) ==="
+RUSTFLAGS="-D warnings" cargo clippy --profile ci --workspace
+
+echo ""
+echo "=== Check ==="
+cargo check --profile ci --workspace
+
+echo ""
+echo "=== Test ==="
+cargo test --profile ci --workspace
+
+echo ""
+echo "=== All CI checks passed ==="

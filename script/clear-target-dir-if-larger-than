@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# clear-target-dir-if-larger-than — clean Cargo target/ when it grows too large.
+#
+# Usage:
+#   ./script/clear-target-dir-if-larger-than [MAX_GB] [SOFT_GB]
+#
+#   MAX_GB  — if target/ exceeds this, run `cargo clean`          (default: 10)
+#   SOFT_GB — if target/ exceeds this but not MAX_GB, run
+#             `cargo clean --workspace` (cleans only workspace crates,  default: 5)
+#
+# Reference: Zed editor's script/clear-target-dir-if-larger-than
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+MAX_SIZE_GB="${1:-10}"
+SOFT_CLEAN_GB="${2:-5}"
+
+if [[ ! -d target ]]; then
+    echo "No target/ directory — nothing to clean."
+    exit 0
+fi
+
+# Get size in GB. du -sk gives KiB; divide by 1024^2 for GiB.
+size_kb=$(du -sk target 2>/dev/null | cut -f1) || true
+if [[ -z "${size_kb}" || "${size_kb}" == "0" ]]; then
+    echo "Cannot determine target/ size. Skipping cleanup."
+    exit 0
+fi
+
+current_size_gb=$((size_kb / 1024 / 1024))
+echo "target/ size: ~${current_size_gb} GB (max: ${MAX_SIZE_GB} GB, soft: ${SOFT_CLEAN_GB} GB)"
+
+if [[ ${current_size_gb} -gt ${MAX_SIZE_GB} ]]; then
+    echo "Exceeds max size (${MAX_SIZE_GB} GB). Running: cargo clean"
+    cargo clean
+    echo "Done — target/ fully cleaned."
+elif [[ ${current_size_gb} -gt ${SOFT_CLEAN_GB} ]]; then
+    echo "Above soft threshold (${SOFT_CLEAN_GB} GB). Running: cargo clean --workspace"
+    cargo clean --workspace
+    echo "Done — workspace crate artifacts cleaned (dependencies preserved)."
+else
+    echo "Size within limits — nothing to clean."
+fi

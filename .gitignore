@@ -1,3 +1,26 @@
+# --- Build artifacts ---
 /target/
+/dist/
+
+# --- Rust backup files ---
 *.rs.bk
+
+# --- Debug symbols (stray copies outside target/) ---
 *.pdb
+
+# --- IDE / Editor files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Environment / Secrets ---
+.env
+.env.local
+
+# --- Proptest regression files ---
+**/*.proptest-regressions
