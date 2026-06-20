@@ -1,18 +1,30 @@
+/// The kind of value an input control holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputValueKind {
+    /// Free-form text.
     Text,
+    /// A numeric value.
     Number,
+    /// A value chosen from a discrete set of options.
     Selection,
+    /// A boolean on/off value.
     Toggle,
 }
 
+/// An action performed on or by an input control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputActionKind {
+    /// The input value changed, carrying the kind of value that was mutated.
     Changed(InputValueKind),
+    /// The cursor or caret position moved without changing the value.
     CursorMoved,
+    /// The input was submitted (e.g. Enter key).
     Submit,
+    /// The input was cancelled (e.g. Escape key).
     Cancel,
+    /// An explicit validation was requested.
     Validate,
+    /// The action was swallowed and should be ignored.
     Ignored,
 }
 
@@ -30,10 +42,14 @@ impl InputActionKind {
     }
 }
 
+/// The validation state of an input's current value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValidationState {
+    /// The value has not yet been validated (pristine state).
     NotValidated,
+    /// The value passed validation.
     Valid,
+    /// The value failed validation.
     Invalid,
 }
 

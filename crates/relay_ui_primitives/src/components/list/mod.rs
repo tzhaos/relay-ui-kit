@@ -1,3 +1,5 @@
+//! List items, sectioned lists, and tree views.
+
 mod item;
 mod sectioned_list;
 mod tree_view;

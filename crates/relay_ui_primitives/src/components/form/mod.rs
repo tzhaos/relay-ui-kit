@@ -1,3 +1,5 @@
+//! Form field labels, descriptions, and settings row/section containers.
+
 use gpui::{
     AnyElement, App, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
     prelude::FluentBuilder, px,

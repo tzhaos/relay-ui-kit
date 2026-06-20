@@ -1,9 +1,13 @@
 use std::time::Duration;
 
+/// How long a motion animation takes to complete.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionDuration {
+    /// Near-instant animation (50 ms).
     Instant,
+    /// A quick animation (150 ms).
     Fast,
+    /// A slower, more deliberate animation (300 ms).
     Slow,
 }
 
@@ -23,11 +27,16 @@ impl From<MotionDuration> for Duration {
     }
 }
 
+/// The direction a motion animation originates from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MotionDirection {
+    /// The animation starts from the bottom and moves upward.
     FromBottom,
+    /// The animation starts from the left and moves rightward.
     FromLeft,
+    /// The animation starts from the right and moves leftward.
     FromRight,
+    /// The animation starts from the top and moves downward.
     FromTop,
 }
 
@@ -52,15 +61,29 @@ pub enum MotionDisablePolicy {
     HostDisabled,
 }
 
+/// A motion specification for a single component.
+///
+/// Each rule declares what animation a component uses, how long it
+/// lasts, which direction it moves, and under what conditions the
+/// animation may be disabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MotionRule {
+    /// The component name (used for lookups).
     pub component: &'static str,
+    /// The kind of motion (entry or continuous feedback).
     pub policy: MotionPolicy,
+    /// How long the animation takes.
     pub duration: MotionDuration,
+    /// The direction the animation originates from, when applicable.
     pub direction: Option<MotionDirection>,
+    /// When the motion may be disabled.
     pub disable_policy: MotionDisablePolicy,
 }
 
+/// The canonical set of motion rules for all components that use animation.
+///
+/// Each entry maps a component name to its motion policy, duration,
+/// direction, and disable policy.
 pub const MOTION_RULES: &[MotionRule] = &[
     MotionRule {
         component: "CommandPalette",

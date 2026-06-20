@@ -1,10 +1,20 @@
+/// Standardised event names used in component callbacks.
+///
+/// Each variant maps to a canonical `on_<name>` handler function name
+/// (e.g. [`Click`](EventKind::Click) → `on_click`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventKind {
+    /// A pointer click or equivalent activation.
     Click,
+    /// An item or value was selected from a set of options.
     Select,
+    /// The value of an input control changed.
     Change,
+    /// An overlay (menu, popover, dialog) was dismissed.
     Dismiss,
+    /// A form or action was submitted.
     Submit,
+    /// A form or action was cancelled.
     Cancel,
 }
 

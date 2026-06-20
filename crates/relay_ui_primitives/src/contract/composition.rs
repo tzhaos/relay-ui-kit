@@ -1,3 +1,8 @@
+/// The architectural layer a component belongs to.
+///
+/// Layers enforce compile- and test-verified dependency direction:
+/// [`Gallery`](Layer::Gallery) → [`Workbench`](Layer::Workbench) →
+/// [`Component`](Layer::Component) → [`Primitive`](Layer::Primitive).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layer {
     Primitive,
