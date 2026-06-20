@@ -1,6 +1,7 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use relay_foundation::{
@@ -39,7 +40,13 @@ impl TerminalAgentQuickLaunch {
         self
     }
 
-    relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for TerminalAgentQuickLaunch {
@@ -64,6 +71,9 @@ impl RenderOnce for TerminalAgentQuickLaunch {
             .when(!disabled, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.selection))
+                    .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                        window.prevent_default();
+                    })
             })
             .child(
                 Icon::new(IconName::Bot)

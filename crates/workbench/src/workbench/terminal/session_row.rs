@@ -1,6 +1,7 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use relay_foundation::{
@@ -49,13 +50,20 @@ impl TerminalSessionRow {
         self
     }
 
-    relay_foundation::callback_builder!(on_click, on_click, ClickEvent);
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for TerminalSessionRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let handler = self.on_click;
+        let clickable = handler.is_some();
 
         div()
             .id(self.id)
@@ -77,9 +85,14 @@ impl RenderOnce for TerminalSessionRow {
             } else {
                 gpui::transparent_black()
             })
-            .when(!self.active, |this| {
-                this.cursor_pointer()
-                    .hover(move |style| style.bg(theme.hover))
+            .when(clickable, |this| this.cursor_pointer())
+            .when(clickable && !self.active, |this| {
+                this.hover(move |style| style.bg(theme.hover))
+            })
+            .when(clickable, |this| {
+                this.on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
             })
             .child(
                 Icon::new(IconName::Terminal)
@@ -110,7 +123,7 @@ impl RenderOnce for TerminalSessionRow {
                     ),
             )
             .child(TerminalStatusBadge::new(self.status))
-            .when_some(handler, |this, handler| {
+            .when_some(handler.filter(|_| clickable), |this, handler| {
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
