@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use relay_foundation::{
@@ -83,7 +84,13 @@ impl Select {
         self
     }
 
-    relay_foundation::callback_builder!(on_toggle, on_toggle, ClickEvent);
+    pub fn on_toggle(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Box::new(handler));
+        self
+    }
 
     pub fn on_select(
         mut self,
@@ -93,7 +100,10 @@ impl Select {
         self
     }
 
-    relay_foundation::callback_builder!(on_dismiss, on_dismiss,);
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Box::new(handler));
+        self
+    }
 
     pub fn selected_label(&self) -> &str {
         self.options
@@ -111,6 +121,8 @@ impl RenderOnce for Select {
         let select_handler = self.on_select.map(Rc::new);
         let dismiss_handler = self.on_dismiss;
         let id = self.id.clone();
+        let toggle_handler = self.on_toggle;
+        let trigger_clickable = toggle_handler.is_some();
         let mut root = div().id(self.id).relative().flex().items_center().child(
             div()
                 .id((id.clone(), "trigger"))
@@ -134,8 +146,13 @@ impl RenderOnce for Select {
                     theme.panel
                 })
                 .text_color(theme.text)
-                .cursor_pointer()
-                .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                .when(trigger_clickable, |this| {
+                    this.cursor_pointer()
+                        .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
+                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
+                })
                 .child(
                     div()
                         .min_w_0()
@@ -150,12 +167,15 @@ impl RenderOnce for Select {
                         .size(IconSize::XSmall)
                         .color(theme.text_muted),
                 )
-                .when_some(self.on_toggle, |this, handler| {
-                    this.on_click(move |event, window, cx| {
-                        handler(event, window, cx);
-                        cx.stop_propagation();
-                    })
-                }),
+                .when_some(
+                    toggle_handler.filter(|_| trigger_clickable),
+                    |this, handler| {
+                        this.on_click(move |event, window, cx| {
+                            handler(event, window, cx);
+                            cx.stop_propagation();
+                        })
+                    },
+                ),
         );
 
         if self.open {

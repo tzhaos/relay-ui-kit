@@ -56,7 +56,10 @@ impl DropdownMenu {
         self
     }
 
-    relay_foundation::callback_builder!(on_dismiss, on_dismiss,);
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for DropdownMenu {
