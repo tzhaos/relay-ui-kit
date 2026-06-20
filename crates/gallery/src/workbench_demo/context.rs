@@ -3,7 +3,10 @@ use relay_ui_core::{
     Badge, IconButton, IconName, PanelHeader, StatusDot, TextInput, TextInputAction, Theme, Tone,
     TreeRow, radius,
 };
-use relay_ui_patterns::{Pane, PaneSurface, PaneWidth, Tab, Tabs};
+use relay_ui_patterns::{
+    Pane, PaneSurface, PaneWidth,
+    navigation::{Tab, Tabs},
+};
 use relay_workbench::{DiffView, FileKind, FileView, TerminalSessionRow};
 
 use super::{

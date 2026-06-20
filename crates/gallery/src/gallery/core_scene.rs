@@ -5,7 +5,7 @@ use relay_ui_core::{
     SectionedListGroup, Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode,
     TreeRow, TreeView,
 };
-use relay_ui_patterns::{Tab, Tabs};
+use relay_ui_patterns::navigation::{Tab, Tabs};
 use relay_workbench::{TaskRow, TaskRowData};
 
 use super::{
