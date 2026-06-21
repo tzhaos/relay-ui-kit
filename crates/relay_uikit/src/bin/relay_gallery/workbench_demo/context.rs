@@ -1,33 +1,33 @@
-use gpui::{Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
+use gpui::{App, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px};
 use relay_uikit::patterns::{
     Pane, PaneSurface, PaneWidth,
     navigation::{Tab, Tabs},
 };
 use relay_uikit::workbench::{DiffView, FileKind, FileView, TerminalSessionRow};
 use relay_uikit::{
-    Badge, IconButton, IconName, PanelHeader, StatusDot, TextInput, TextInputAction, Theme, Tone,
+    Badge, IconButton, IconName, PanelHeader, StatusDot, TextInput, Theme, Tone,
     TreeRow, radius,
 };
 
 use super::{
-    WorkbenchApp, WorkbenchState,
+    WorkbenchState,
     data::{DEMO_FILES, active_session},
 };
 
 pub(super) fn right_context(
     state: &WorkbenchState,
-    host: &Entity<WorkbenchApp>,
     window: &Window,
     theme: Theme,
+    cx: &App,
 ) -> impl IntoElement {
-    let tab = state.context_tab;
+    let tab = state.context_tab.get(cx);
     let body = div()
         .size_full()
         .flex()
         .flex_col()
         .child(
             div().px_2().pt_2().child(
-                Tabs::new(
+                Tabs::bound(
                     "ctx-tabs",
                     vec![
                         Tab::new("files", "Files").icon(IconName::FileText),
@@ -36,25 +36,16 @@ pub(super) fn right_context(
                             .icon(IconName::MessageSquareText)
                             .count(3),
                     ],
-                )
-                .active(tab)
-                .on_select({
-                    let host = host.clone();
-                    move |key, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.context_tab = key;
-                            cx.notify();
-                        });
-                    }
-                }),
+                    state.context_tab.clone(),
+                ),
             ),
         )
         .when(tab == "files", |this| {
-            this.child(files_tab(state, host, window))
+            this.child(files_tab(state, window, cx))
         })
         .when(tab == "diff", |this| this.child(diff_tab()))
         .when(tab == "review", |this| {
-            this.child(review_tab(state, host, theme))
+            this.child(review_tab(state, theme, cx))
         });
 
     Pane::new(PaneWidth::Flex, body)
@@ -69,22 +60,19 @@ pub(super) fn right_context(
                         .gap_1()
                         .child(
                             IconButton::new("ctx-refresh", IconName::RefreshCw).on_click({
-                                let host = host.clone();
+                                let filter = state.filter.clone();
                                 move |_event, _window, cx| {
-                                    host.update(cx, |this, cx| {
-                                        this.state.filter.clear();
-                                        cx.notify();
+                                    filter.update(cx, |state| {
+                                        state.clear();
+                                        true
                                     });
                                 }
                             }),
                         )
                         .child(IconButton::new("ctx-more", IconName::Ellipsis).on_click({
-                            let host = host.clone();
+                            let context_tab = state.context_tab.clone();
                             move |_event, _window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.context_tab = "review";
-                                    cx.notify();
-                                });
+                                context_tab.set(cx, "review");
                             }
                         })),
                 ),
@@ -93,12 +81,11 @@ pub(super) fn right_context(
 
 fn files_tab(
     state: &WorkbenchState,
-    host: &Entity<WorkbenchApp>,
     window: &Window,
+    cx: &App,
 ) -> impl IntoElement {
-    let host_for_key = host.clone();
     let filter_focused = state.filter_focus.is_focused(window);
-    let filter_text = state.filter.value().to_lowercase();
+    let filter_text = state.filter.get(cx).value().to_lowercase();
     let files = DEMO_FILES
         .iter()
         .filter(|file| filter_text.is_empty() || file.name.to_lowercase().contains(&filter_text))
@@ -121,22 +108,10 @@ fn files_tab(
         .flex_col()
         .child(
             div().px_2().py_2().child(
-                TextInput::new("file-filter", state.filter_focus.clone(), &state.filter)
+                TextInput::bound("file-filter", state.filter_focus.clone(), state.filter.clone())
                     .placeholder("Filter files")
                     .leading_icon(IconName::Funnel)
-                    .focused(filter_focused)
-                    .on_key(move |event, _window, cx| {
-                        host_for_key.update(cx, |this, cx| {
-                            match this.state.filter.handle_key(event) {
-                                TextInputAction::Cancel => {
-                                    this.state.filter.clear();
-                                    cx.notify();
-                                }
-                                action if action.should_notify() => cx.notify(),
-                                _ => {}
-                            }
-                        });
-                    }),
+                    .focused(filter_focused),
             ),
         )
         .child(
@@ -165,9 +140,13 @@ fn diff_tab() -> impl IntoElement {
 
 fn review_tab(
     state: &WorkbenchState,
-    host: &Entity<WorkbenchApp>,
     theme: Theme,
+    cx: &App,
 ) -> impl IntoElement {
+    let session = active_session(state.active_session.get(cx));
+    let route = state.route.clone();
+    let context_tab = state.context_tab.clone();
+
     div()
         .flex_1()
         .min_h_0()
@@ -176,23 +155,17 @@ fn review_tab(
         .flex_col()
         .gap_2()
         .child(
-            TerminalSessionRow::new(
-                "review-session",
-                active_session(state).label,
-                active_session(state).subtitle,
-            )
-            .status(active_session(state).tone)
-            .active(true)
-            .on_click({
-                let host = host.clone();
-                move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.route = "terminal";
-                        this.state.context_tab = "files";
-                        cx.notify();
-                    });
-                }
-            }),
+            TerminalSessionRow::new("review-session", session.label, session.subtitle)
+                .status(session.tone)
+                .active(true)
+                .on_click({
+                    let route = route.clone();
+                    let context_tab = context_tab.clone();
+                    move |_event, _window, cx| {
+                        route.set(cx, "terminal");
+                        context_tab.set(cx, "files");
+                    }
+                }),
         )
         .child(
             div()

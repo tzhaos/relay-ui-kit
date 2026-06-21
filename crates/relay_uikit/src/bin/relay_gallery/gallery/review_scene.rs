@@ -30,14 +30,17 @@ pub(super) fn render(
                 .child(section(
                     cx,
                     "Review state",
-                    review_state_sample(host, theme),
+                    review_state_sample(state, theme),
                 )),
         )
-        .child(div().flex_1().min_w_0().child(section(
-            cx,
-            "Preview and diff",
-            viewer_sample(state, host),
-        )))
+        .child({
+            let viewer = viewer_sample(state, host, cx);
+            div().flex_1().min_w_0().child(section(
+                cx,
+                "Preview and diff",
+                viewer,
+            ))
+        })
 }
 
 fn file_tree_sample(
@@ -87,7 +90,7 @@ fn file_tree_sample(
         )
 }
 
-fn review_state_sample(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoElement {
+fn review_state_sample(state: &GalleryState, theme: Theme) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -110,12 +113,9 @@ fn review_state_sample(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl In
             Button::new("review-open-terminal", "Open Terminal")
                 .icon(IconName::Terminal)
                 .on_click({
-                    let host = host.clone();
+                    let session = state.terminal_session.clone();
                     move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.terminal_session = "codex";
-                            cx.notify();
-                        });
+                        session.set(cx, "codex");
                     }
                 }),
         )

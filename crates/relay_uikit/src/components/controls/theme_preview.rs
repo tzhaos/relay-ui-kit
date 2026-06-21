@@ -3,6 +3,7 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     linear_color_stop, linear_gradient, prelude::FluentBuilder, px, rgb,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -43,6 +44,7 @@ pub struct ThemePreviewCard {
     kind: ThemePreviewKind,
     label: String,
     selected: bool,
+    binding: Option<Binding<&'static str>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -53,6 +55,22 @@ impl ThemePreviewCard {
             kind,
             label: kind.label().into(),
             selected: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        kind: ThemePreviewKind,
+        binding: Binding<&'static str>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            kind,
+            label: kind.label().into(),
+            selected: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -83,13 +101,17 @@ impl ThemePreviewCard {
 impl RenderOnce for ThemePreviewCard {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let border = if self.selected {
+        let binding = self.binding;
+        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx) == self.kind.key());
+        let border = if selected {
             theme.accent
         } else {
             theme.border
         };
         let id = self.id;
         let handler = self.on_click;
+        let kind = self.kind;
+        let interactive = binding.is_some() || handler.is_some();
 
         div()
             .id(id.clone())
@@ -101,19 +123,19 @@ impl RenderOnce for ThemePreviewCard {
             .rounded(px(radius::LG))
             .border_1()
             .border_color(border)
-            .bg(if self.selected {
+            .bg(if selected {
                 theme.accent_bg
             } else {
                 theme.panel
             })
-            .when(handler.is_some(), |this| {
+            .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                         window.prevent_default();
                     })
             })
-            .child(preview_frame((id.clone(), "preview"), self.kind, theme))
+            .child(preview_frame((id.clone(), "preview"), kind, theme))
             .child(
                 div()
                     .px_1()
@@ -128,7 +150,7 @@ impl RenderOnce for ThemePreviewCard {
                             .text_color(theme.text)
                             .child(self.label),
                     )
-                    .when(self.selected, |this| {
+                    .when(selected, |this| {
                         this.child(
                             div()
                                 .size(px(16.0))
@@ -145,9 +167,14 @@ impl RenderOnce for ThemePreviewCard {
                         )
                     }),
             )
-            .when_some(handler, |this, handler| {
+            .when(interactive, |this| {
                 this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.set(cx, kind.key());
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })

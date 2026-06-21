@@ -1,4 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
+use relay::Binding;
 use relay_uikit::patterns::navigation::{Tab, Tabs};
 use relay_uikit::patterns::overlay::{DropdownMenu, MenuItem};
 use relay_uikit::workbench::{TaskRow, TaskRowData};
@@ -22,19 +23,16 @@ pub(super) fn render(
 ) -> impl IntoElement {
     let contrast = state.contrast.get(cx);
 
+    let stepper_body = stepper_filter_samples(state, contrast, cx);
+    let input_body = input_choice_samples(state, host, theme);
+    let label_body = label_badge_samples(state, cx);
+    let list_body = list_core_samples(state, theme, cx);
+
     scene_stack()
-        .child(section(cx, "Buttons", button_samples(host)))
-        .child(section(cx, "Icon buttons", icon_button_samples(host)))
-        .child(section(
-            cx,
-            "Steppers and filters",
-            stepper_filter_samples(state, host, contrast),
-        ))
-        .child(section(
-            cx,
-            "Inputs and choices",
-            input_choice_samples(state, host, theme),
-        ))
+        .child(section(cx, "Buttons", button_samples(state, host)))
+        .child(section(cx, "Icon buttons", icon_button_samples(state, host)))
+        .child(section(cx, "Steppers and filters", stepper_body))
+        .child(section(cx, "Inputs and choices", input_body))
         .child(section(
             cx,
             "Status and icons",
@@ -62,11 +60,7 @@ pub(super) fn render(
                         .child(icon_sample(theme, IconName::MessageSquareText)),
                 ),
         ))
-        .child(section(
-            cx,
-            "Labels, badges, disclosure",
-            label_badge_samples(state, host),
-        ))
+        .child(section(cx, "Labels, badges, disclosure", label_body))
         .child(section(
             cx,
             "Navigation rows",
@@ -79,19 +73,14 @@ pub(super) fn render(
                 .child(tree_rows_sample())
                 .child(task_rows_sample()),
         ))
-        .child(section(
-            cx,
-            "Core list patterns",
-            list_core_samples(state, host, theme),
-        ))
-        .child(section(
-            cx,
-            "Tabs and empty state",
-            tab_samples(state, host),
-        ))
+        .child(section(cx, "Core list patterns", list_body))
+        .child(section(cx, "Tabs and empty state", tab_samples(state)))
 }
 
-fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn label_badge_samples(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     div()
         .flex()
         .flex_col()
@@ -121,24 +110,15 @@ fn label_badge_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                 .flex_col()
                 .gap_1()
                 .child(
-                    Disclosure::new(
+                    Disclosure::bound(
                         "core-disclosure",
                         "Recent terminal sessions",
-                        state.core_disclosure_open,
+                        state.core_disclosure_open.clone(),
                     )
                     .detail("host-owned state")
-                    .count(3)
-                    .on_toggle({
-                        let host = host.clone();
-                        move |_event, _window, cx| {
-                            host.update(cx, |this, cx| {
-                                this.state.core_disclosure_open = !this.state.core_disclosure_open;
-                                cx.notify();
-                            });
-                        }
-                    }),
+                    .count(3),
                 )
-                .when(state.core_disclosure_open, |this| {
+                .when(state.core_disclosure_open.get(cx), |this| {
                     this.child(
                         div()
                             .ml_6()
@@ -200,22 +180,24 @@ fn input_choice_samples(
                 .flex_col()
                 .gap_2()
                 .child(FieldLabel::new("Radio"))
-                .child(
-                    Radio::new(
-                        "core-radio-system",
-                        state.radio_choice == "system",
-                        "System",
-                    )
-                    .on_click(set_radio_choice(host, "system")),
-                )
-                .child(
-                    Radio::new("core-radio-light", state.radio_choice == "light", "Light")
-                        .on_click(set_radio_choice(host, "light")),
-                )
-                .child(
-                    Radio::new("core-radio-dark", state.radio_choice == "dark", "Dark")
-                        .on_click(set_radio_choice(host, "dark")),
-                ),
+                .child(Radio::bound(
+                    "core-radio-system",
+                    state.radio_choice.clone(),
+                    "system",
+                    "System",
+                ))
+                .child(Radio::bound(
+                    "core-radio-light",
+                    state.radio_choice.clone(),
+                    "light",
+                    "Light",
+                ))
+                .child(Radio::bound(
+                    "core-radio-dark",
+                    state.radio_choice.clone(),
+                    "dark",
+                    "Dark",
+                )),
         )
         .child(
             div()
@@ -237,32 +219,16 @@ fn input_choice_samples(
         )
 }
 
-fn set_radio_choice(
-    host: &Entity<GalleryScenesApp>,
-    key: &'static str,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
-    move |_event, _window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.radio_choice = key;
-            cx.notify();
-        });
-    }
-}
-
-fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
             Button::new("btn-primary", "Launch Agent")
                 .primary()
                 .icon(IconName::Play)
                 .on_click({
-                    let host = host.clone();
+                    let terminal_session = state.terminal_session.clone();
                     move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.terminal_session = "codex";
-                            cx.notify();
-                        });
+                        terminal_session.set(cx, "codex");
                     }
                 }),
         )
@@ -284,14 +250,10 @@ fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                 .ghost()
                 .icon(IconName::Archive)
                 .on_click({
-                    let host = host.clone();
+                    let auto_archive = state.auto_archive.clone();
                     move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.auto_archive.update(cx, |auto_archive| {
-                                *auto_archive = !*auto_archive;
-                                true
-                            });
-                        });
+                        let current = auto_archive.get(cx);
+                        auto_archive.set(cx, !current);
                     }
                 }),
         )
@@ -302,18 +264,15 @@ fn button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
         )
 }
 
-fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn icon_button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
             ToolbarGroup::new("core-toolbar-group")
                 .child(
                     IconButton::new("ib-filter", IconName::ListFilter).on_click({
-                        let host = host.clone();
+                        let seg_tab = state.seg_tab.clone();
                         move |_event, _window, cx| {
-                            host.update(cx, |this, cx| {
-                                this.state.seg_tab = "files";
-                                cx.notify();
-                            });
+                            seg_tab.set(cx, "files");
                         }
                     }),
                 )
@@ -330,12 +289,9 @@ fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                 )
                 .child(
                     IconButton::new("ib-settings", IconName::Settings).on_click({
-                        let host = host.clone();
+                        let launcher_choice = state.launcher_choice.clone();
                         move |_event, _window, cx| {
-                            host.update(cx, |this, cx| {
-                                this.state.launcher_choice = "settings";
-                                cx.notify();
-                            });
+                            launcher_choice.set(cx, "settings");
                         }
                     }),
                 ),
@@ -345,32 +301,30 @@ fn icon_button_samples(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
 
 fn stepper_filter_samples(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
     contrast: f32,
-) -> impl IntoElement {
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     div()
         .flex()
         .flex_col()
         .gap_3()
         .child(
             FilterBar::new("core-filter-bar")
-                .child(session_filter_menu(state, host))
+                .child(session_filter_menu(state, cx))
                 .child(
                     FilterChip::new("filter-running", "Running")
                         .icon(IconName::CircleDot)
-                        .selected(state.filter_choice == "running")
+                        .selected(state.filter_choice.get(cx) == "running")
                         .on_click({
-                            let host = host.clone();
+                            let filter_choice = state.filter_choice.clone();
+                            let filter_menu_open = state.filter_menu_open.clone();
                             move |_event, _window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.filter_choice = "running";
-                                    this.state.filter_menu_open = "";
-                                    cx.notify();
-                                });
+                                filter_choice.set(cx, "running");
+                                filter_menu_open.set(cx, "");
                             }
                         }),
                 )
-                .child(project_filter_menu(state, host)),
+                .child(project_filter_menu(state, cx)),
         )
         .child(
             Stepper::new("core-stepper", format!("{}%", contrast.round() as i32))
@@ -397,13 +351,17 @@ fn stepper_filter_samples(
         )
 }
 
-fn session_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    let open = state.filter_menu_open == "sessions";
+fn session_filter_menu(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let open = state.filter_menu_open.get(cx) == "sessions";
+    let current_choice = state.filter_choice.get(cx);
     DropdownMenu::new(
         "core-session-filter-menu",
         FilterChip::new(
             "filter-all-sessions",
-            match state.filter_choice {
+            match current_choice {
                 "running" => "Running",
                 "failed" => "Failed",
                 _ => "All sessions",
@@ -411,108 +369,133 @@ fn session_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
         )
         .icon(IconName::ListFilter)
         .count(4)
-        .selected(state.filter_choice != "all")
+        .selected(current_choice != "all")
         .open(open)
         .dropdown(true)
-        .on_click(toggle_filter_menu(host, "sessions", open)),
+        .on_click(toggle_filter_menu(state.filter_menu_open.clone(), "sessions", open)),
         vec![
-            filter_action(host, "all", "All sessions", IconName::ListFilter),
-            filter_action(host, "running", "Running", IconName::CircleDot),
-            filter_action(host, "failed", "Failed", IconName::Archive),
+            filter_action(
+                state.filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "all",
+                "All sessions",
+                IconName::ListFilter,
+            ),
+            filter_action(
+                state.filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "running",
+                "Running",
+                IconName::CircleDot,
+            ),
+            filter_action(
+                state.filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "failed",
+                "Failed",
+                IconName::Archive,
+            ),
         ],
     )
     .open(open)
     .min_width(190.0)
-    .on_dismiss(close_filter_menu(host))
+    .on_dismiss(close_filter_menu(state.filter_menu_open.clone()))
 }
 
-fn project_filter_menu(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    let open = state.filter_menu_open == "projects";
+fn project_filter_menu(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let open = state.filter_menu_open.get(cx) == "projects";
+    let current_choice = state.project_filter_choice.get(cx);
     DropdownMenu::new(
         "core-project-filter-menu",
         FilterChip::new(
             "filter-projects",
-            match state.project_filter_choice {
+            match current_choice {
                 "relay" => "Relay",
                 "gallery" => "Gallery",
                 _ => "All projects",
             },
         )
         .icon(IconName::Folder)
-        .selected(state.project_filter_choice != "all-projects")
+        .selected(current_choice != "all-projects")
         .open(open)
         .dropdown(true)
-        .on_click(toggle_filter_menu(host, "projects", open)),
+        .on_click(toggle_filter_menu(
+            state.filter_menu_open.clone(),
+            "projects",
+            open,
+        )),
         vec![
-            project_filter_action(host, "all-projects", "All projects"),
-            project_filter_action(host, "relay", "Relay"),
-            project_filter_action(host, "gallery", "Gallery"),
+            project_filter_action(
+                state.project_filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "all-projects",
+                "All projects",
+            ),
+            project_filter_action(
+                state.project_filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "relay",
+                "Relay",
+            ),
+            project_filter_action(
+                state.project_filter_choice.clone(),
+                state.filter_menu_open.clone(),
+                "gallery",
+                "Gallery",
+            ),
         ],
     )
     .open(open)
     .min_width(180.0)
-    .on_dismiss(close_filter_menu(host))
+    .on_dismiss(close_filter_menu(state.filter_menu_open.clone()))
 }
 
 fn toggle_filter_menu(
-    host: &Entity<GalleryScenesApp>,
+    filter_menu_open: Binding<&'static str>,
     menu: &'static str,
     open: bool,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
     move |_event, _window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.filter_menu_open = if open { "" } else { menu };
-            cx.notify();
-        });
+        filter_menu_open.set(cx, if open { "" } else { menu });
     }
 }
 
 fn close_filter_menu(
-    host: &Entity<GalleryScenesApp>,
+    filter_menu_open: Binding<&'static str>,
 ) -> impl Fn(&mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
     move |_window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.filter_menu_open = "";
-            cx.notify();
-        });
+        filter_menu_open.set(cx, "");
     }
 }
 
 fn filter_action(
-    host: &Entity<GalleryScenesApp>,
+    filter_choice: Binding<&'static str>,
+    filter_menu_open: Binding<&'static str>,
     key: &'static str,
     label: &'static str,
     icon: IconName,
 ) -> MenuItem {
-    MenuItem::new(label).icon(icon).on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.filter_choice = key;
-                this.state.filter_menu_open = "";
-                cx.notify();
-            });
-        }
+    MenuItem::new(label).icon(icon).on_click(move |_event, _window, cx| {
+        filter_choice.set(cx, key);
+        filter_menu_open.set(cx, "");
     })
 }
 
 fn project_filter_action(
-    host: &Entity<GalleryScenesApp>,
+    project_filter_choice: Binding<&'static str>,
+    filter_menu_open: Binding<&'static str>,
     key: &'static str,
     label: &'static str,
 ) -> MenuItem {
-    MenuItem::new(label).icon(IconName::Folder).on_click({
-        let host = host.clone();
-        move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.project_filter_choice = key;
-                this.state.filter_menu_open = "";
-                cx.notify();
-            });
-        }
-    })
+    MenuItem::new(label)
+        .icon(IconName::Folder)
+        .on_click(move |_event, _window, cx| {
+            project_filter_choice.set(cx, key);
+            filter_menu_open.set(cx, "");
+        })
 }
 
 fn nav_rows_sample() -> impl IntoElement {
@@ -592,39 +575,37 @@ fn task_rows_sample() -> impl IntoElement {
 
 fn list_core_samples(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
     theme: Theme,
-) -> impl IntoElement {
-    let selected = state.viewer_tab;
-    let tree_nodes = core_tree_nodes(state);
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let selected = state.viewer_tab.get(cx);
+    let tree_nodes = core_tree_nodes(state, cx);
     let select_tree = {
-        let host = host.clone();
+        let viewer_tab = state.viewer_tab.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
-            host.update(cx, |this, cx| {
-                this.state.viewer_tab = key;
-                cx.notify();
-            });
+            viewer_tab.set(cx, key);
         }
     };
     let toggle_tree = {
-        let host = host.clone();
+        let core_tree_src_open = state.core_tree_src_open.clone();
+        let core_tree_components_open = state.core_tree_components_open.clone();
+        let core_tree_list_open = state.core_tree_list_open.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
-            host.update(cx, |this, cx| {
-                match key {
-                    "tree:src" => {
-                        this.state.core_tree_src_open = !this.state.core_tree_src_open;
-                    }
-                    "tree:components" => {
-                        this.state.core_tree_components_open =
-                            !this.state.core_tree_components_open;
-                    }
-                    "tree:list" => {
-                        this.state.core_tree_list_open = !this.state.core_tree_list_open;
-                    }
-                    _ => {}
+            match key {
+                "tree:src" => {
+                    let current = core_tree_src_open.get(cx);
+                    core_tree_src_open.set(cx, !current);
                 }
-                cx.notify();
-            });
+                "tree:components" => {
+                    let current = core_tree_components_open.get(cx);
+                    core_tree_components_open.set(cx, !current);
+                }
+                "tree:list" => {
+                    let current = core_tree_list_open.get(cx);
+                    core_tree_list_open.set(cx, !current);
+                }
+                _ => {}
+            }
         }
     };
 
@@ -643,82 +624,87 @@ fn list_core_samples(
         .child(div().w(gpui::px(340.0)).child(SectionedList::new(
             "core-sectioned-list",
             vec![
-                    SectionedListGroup::new("Recent")
-                        .count(2)
-                        .child(
-                            ListItem::new("recent-terminal")
-                                .height(gpui::px(48.0))
-                                .selected(selected == "recent:terminal")
-                                .start_slot(Icon::new(IconName::Terminal))
-                                .on_click(select_core_item(host, "recent:terminal"))
-                                .child(list_item_text(
-                                    "Terminal surface",
-                                    "PTY host shell preview",
-                                    theme,
-                                )),
-                        )
-                        .child(
-                            ListItem::new("recent-diff")
-                                .height(gpui::px(48.0))
-                                .selected(selected == "recent:diff")
-                                .start_slot(Icon::new(IconName::FileDiff))
-                                .on_click(select_core_item(host, "recent:diff"))
-                                .child(list_item_text("Diff viewer", "Unified file delta", theme)),
-                        ),
-                    SectionedListGroup::new("Pinned").child(
-                        ListItem::new("pinned-command")
+                SectionedListGroup::new("Recent")
+                    .count(2)
+                    .child(
+                        ListItem::new("recent-terminal")
                             .height(gpui::px(48.0))
-                            .start_slot(Icon::new(IconName::Zap))
-                            .selected(selected == "pinned:command")
-                            .on_click(select_core_item(host, "pinned:command"))
+                            .selected(selected == "recent:terminal")
+                            .start_slot(Icon::new(IconName::Terminal))
+                            .on_click(select_core_item(
+                                state.viewer_tab.clone(),
+                                "recent:terminal",
+                            ))
                             .child(list_item_text(
-                                "Command palette",
-                                "Keyboard-first launcher",
+                                "Terminal surface",
+                                "PTY host shell preview",
                                 theme,
                             )),
+                    )
+                    .child(
+                        ListItem::new("recent-diff")
+                            .height(gpui::px(48.0))
+                            .selected(selected == "recent:diff")
+                            .start_slot(Icon::new(IconName::FileDiff))
+                            .on_click(select_core_item(state.viewer_tab.clone(), "recent:diff"))
+                            .child(list_item_text("Diff viewer", "Unified file delta", theme)),
                     ),
-                ],
+                SectionedListGroup::new("Pinned").child(
+                    ListItem::new("pinned-command")
+                        .height(gpui::px(48.0))
+                        .start_slot(Icon::new(IconName::Zap))
+                        .selected(selected == "pinned:command")
+                        .on_click(select_core_item(
+                            state.viewer_tab.clone(),
+                            "pinned:command",
+                        ))
+                        .child(list_item_text(
+                            "Command palette",
+                            "Keyboard-first launcher",
+                            theme,
+                        )),
+                ),
+            ],
         )))
 }
 
 fn select_core_item(
-    host: &Entity<GalleryScenesApp>,
+    viewer_tab: Binding<&'static str>,
     key: &'static str,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
     move |_event, _window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.viewer_tab = key;
-            cx.notify();
-        });
+        viewer_tab.set(cx, key);
     }
 }
 
-fn core_tree_nodes(state: &GalleryState) -> Vec<TreeNode> {
-    let mut nodes =
-        vec![TreeNode::new("tree:src", IconName::Folder, "src").expanded(state.core_tree_src_open)];
+fn core_tree_nodes(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> Vec<TreeNode> {
+    let mut nodes = vec![TreeNode::new("tree:src", IconName::Folder, "src")
+        .expanded(state.core_tree_src_open.get(cx))];
 
-    if state.core_tree_src_open {
+    if state.core_tree_src_open.get(cx) {
         nodes.push(
             TreeNode::new("tree:components", IconName::Folder, "components")
                 .depth(1)
-                .expanded(state.core_tree_components_open),
+                .expanded(state.core_tree_components_open.get(cx)),
         );
     }
 
-    if state.core_tree_src_open && state.core_tree_components_open {
+    if state.core_tree_src_open.get(cx) && state.core_tree_components_open.get(cx) {
         nodes.push(
             TreeNode::new("tree:list", IconName::Folder, "list")
                 .depth(2)
-                .expanded(state.core_tree_list_open),
+                .expanded(state.core_tree_list_open.get(cx)),
         );
     }
 
-    if state.core_tree_src_open && state.core_tree_components_open && state.core_tree_list_open {
+    if state.core_tree_src_open.get(cx)
+        && state.core_tree_components_open.get(cx)
+        && state.core_tree_list_open.get(cx)
+    {
         nodes.push(
             TreeNode::new("tree:item", IconName::FileText, "item.rs")
                 .depth(3)
-                .selected(state.viewer_tab == "tree:item"),
+                .selected(state.viewer_tab.get(cx) == "tree:item"),
         );
     }
 
@@ -747,54 +733,32 @@ fn list_item_text(title: &'static str, detail: &'static str, theme: Theme) -> im
         )
 }
 
-fn tab_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn tab_samples(state: &GalleryState) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
         .gap_3()
+        .child(Tabs::bound(
+            "demo-tabs",
+            vec![
+                Tab::new("files", "Files").icon(IconName::FileText),
+                Tab::new("diff", "Diff").icon(IconName::FileDiff).count(12),
+                Tab::new("review", "Review")
+                    .icon(IconName::MessageSquareText)
+                    .count(3),
+            ],
+            state.seg_tab.clone(),
+        ))
         .child(
-            Tabs::new(
-                "demo-tabs",
+            strip().child(SegmentedControl::bound(
+                "seg-demo",
                 vec![
-                    Tab::new("files", "Files").icon(IconName::FileText),
-                    Tab::new("diff", "Diff").icon(IconName::FileDiff).count(12),
-                    Tab::new("review", "Review")
-                        .icon(IconName::MessageSquareText)
-                        .count(3),
+                    Segment::new("files", "Files"),
+                    Segment::new("diff", "Diff"),
+                    Segment::new("review", "Review"),
                 ],
-            )
-            .active(state.seg_tab)
-            .on_select({
-                let host = host.clone();
-                move |key, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.seg_tab = key;
-                        cx.notify();
-                    });
-                }
-            }),
-        )
-        .child(
-            strip().child(
-                SegmentedControl::new(
-                    "seg-demo",
-                    vec![
-                        Segment::new("files", "Files"),
-                        Segment::new("diff", "Diff"),
-                        Segment::new("review", "Review"),
-                    ],
-                )
-                .active(state.seg_tab)
-                .on_select({
-                    let host = host.clone();
-                    move |key, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.seg_tab = key;
-                            cx.notify();
-                        });
-                    }
-                }),
-            ),
+                state.seg_tab.clone(),
+            )),
         )
         .child(Divider::horizontal())
         .child(

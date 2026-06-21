@@ -2,6 +2,7 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
     div, prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     StatusDot,
@@ -27,6 +28,7 @@ pub struct TaskRow {
     id: ElementId,
     data: TaskRowData,
     selected: bool,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -36,6 +38,17 @@ impl TaskRow {
             id: id.into(),
             data,
             selected: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, data: TaskRowData, binding: Binding<bool>) -> Self {
+        Self {
+            id: id.into(),
+            data,
+            selected: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -59,11 +72,14 @@ impl RenderOnce for TaskRow {
         let theme = *cx.theme();
         let data = self.data;
         let meta = task_meta(&data);
+        let binding = self.binding;
+        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let handler = self.on_click;
 
         let mut row = ListItem::new(self.id)
             .spacing(ListItemSpacing::Relaxed)
             .height(px(space::TASK_ROW))
-            .selected(self.selected)
+            .selected(selected)
             .child(
                 div()
                     .w_full()
@@ -109,9 +125,18 @@ impl RenderOnce for TaskRow {
                     }),
             );
 
-        if let Some(handler) = self.on_click {
+        let has_click = binding.is_some() || handler.is_some();
+        if has_click {
             row = row.on_click(move |event, window, cx| {
-                handler(event, window, cx);
+                if let Some(binding) = &binding {
+                    binding.update(cx, |selected| {
+                        *selected = !*selected;
+                        true
+                    });
+                }
+                if let Some(handler) = &handler {
+                    handler(event, window, cx);
+                }
             });
         }
 

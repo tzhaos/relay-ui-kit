@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
@@ -22,6 +23,8 @@ pub struct BranchSelector {
     branches: Vec<BranchOption>,
     actions: Vec<BranchPickerAction>,
     open: bool,
+    selected_binding: Option<Binding<&'static str>>,
+    open_binding: Option<Binding<bool>>,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SharedSelectHandler>,
     on_action: Option<SharedSelectHandler>,
@@ -40,11 +43,38 @@ impl BranchSelector {
             branches,
             actions: default_picker_actions(),
             open: false,
+            selected_binding: None,
+            open_binding: None,
             on_toggle: None,
             on_select: None,
             on_action: None,
             on_dismiss: None,
         }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        branches: Vec<BranchOption>,
+        selected: Binding<&'static str>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            selected_key: "",
+            branches,
+            actions: default_picker_actions(),
+            open: false,
+            selected_binding: Some(selected),
+            open_binding: None,
+            on_toggle: None,
+            on_select: None,
+            on_action: None,
+            on_dismiss: None,
+        }
+    }
+
+    pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
+        self.open_binding = Some(binding);
+        self
     }
 
     pub fn open(mut self, open: bool) -> Self {
@@ -97,13 +127,21 @@ impl BranchSelector {
 impl RenderOnce for BranchSelector {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selected_label = self.selected_label().to_string();
-        let selected_key = self.selected_key;
+        let selected_binding = self.selected_binding;
+        let open_binding = self.open_binding;
+        let selected_key = selected_binding.as_ref().map_or(self.selected_key, |b| b.get(cx));
+        let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
+        let selected_label = self
+            .branches
+            .iter()
+            .find(|branch| branch.key == selected_key)
+            .map_or(selected_key, |branch| branch.label.as_str())
+            .to_string();
         let select_handler = self.on_select;
         let action_handler = self.on_action;
         let dismiss_handler = self.on_dismiss;
         let trigger_handler = self.on_toggle;
-        let trigger_clickable = trigger_handler.is_some();
+        let trigger_clickable = open_binding.is_some() || trigger_handler.is_some();
         let trigger = div()
             .id("branch-selector-trigger")
             .h(px(28.0))
@@ -114,12 +152,12 @@ impl RenderOnce for BranchSelector {
             .gap_1()
             .rounded(px(radius::MD))
             .border_1()
-            .border_color(if self.open {
+            .border_color(if open {
                 theme.border_strong
             } else {
                 theme.border
             })
-            .bg(if self.open {
+            .bg(if open {
                 theme.panel_alt
             } else {
                 theme.panel
@@ -150,15 +188,21 @@ impl RenderOnce for BranchSelector {
                     .size(IconSize::XSmall)
                     .color(theme.text_muted),
             )
-            .when_some(
-                trigger_handler.filter(|_| trigger_clickable),
-                |this, handler| {
-                    this.on_click(move |event, window, cx| {
+            .when(trigger_clickable, |this| {
+                let open_binding = open_binding.clone();
+                this.on_click(move |event, window, cx| {
+                    if let Some(binding) = &open_binding {
+                        binding.update(cx, |open| {
+                            *open = !*open;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &trigger_handler {
                         handler(event, window, cx);
-                        cx.stop_propagation();
-                    })
-                },
-            );
+                    }
+                    cx.stop_propagation();
+                })
+            });
 
         let mut overlay = AnchoredOverlay::new(
             self.id,
@@ -167,14 +211,22 @@ impl RenderOnce for BranchSelector {
                 selected_key,
                 self.branches,
                 self.actions,
+                selected_binding.clone(),
                 select_handler,
                 action_handler,
             ),
         )
-        .open(self.open);
+        .open(open);
 
         if let Some(dismiss_handler) = dismiss_handler {
             overlay = overlay.on_dismiss(move |window, cx| dismiss_handler(window, cx));
+        } else {
+            let dismiss_binding = open_binding.clone();
+            overlay = overlay.on_dismiss(move |_window, cx| {
+                if let Some(binding) = &dismiss_binding {
+                    binding.set(cx, false);
+                }
+            });
         }
 
         overlay

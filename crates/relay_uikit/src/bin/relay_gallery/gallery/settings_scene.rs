@@ -59,12 +59,12 @@ pub(super) fn render(
                 .row(
                     SettingsRow::new("Theme")
                         .description("Preview cards and select share the same host state")
-                        .control(theme_controls(state, host)),
+                        .control(theme_controls(state, cx)),
                 )
                 .row(
                     SettingsRow::new("Accent color")
                         .description("Preset picker emits the selected key and color")
-                        .control(accent_picker(state, host)),
+                        .control(accent_picker(state, cx)),
                 )
                 .row(
                     SettingsRow::new("UI font size")
@@ -106,12 +106,9 @@ pub(super) fn render(
                         .tone(Tone::Warning)
                         .action(
                             Button::new("feedback-banner-action", "Open settings").on_click({
-                                let host = host.clone();
+                                let launcher = state.launcher_choice.clone();
                                 move |_event, _window, cx| {
-                                    host.update(cx, |this, cx| {
-                                        this.state.launcher_choice = "settings";
-                                        cx.notify();
-                                    });
+                                    launcher.set(cx, "settings");
                                 }
                             }),
                         ),
@@ -174,7 +171,6 @@ pub(super) fn render(
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
                                         this.add_feedback_toast(cx);
-                                        cx.notify();
                                     });
                                 }
                             }),
@@ -226,54 +222,54 @@ pub(super) fn render(
                 })
                 .child(div().text_xs().text_color(theme.text_muted).child(format!(
                     "Current launcher choice: {}",
-                    state.launcher_choice
+                    state.launcher_choice.get(cx)
                 ))),
         ))
 }
 
-fn theme_select(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    Select::new(
+fn theme_select(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement {
+    let open_binding = state.settings_select_open.clone();
+    let is_open = open_binding.get(cx);
+
+    Select::bound(
         "settings-theme-select",
-        state.theme_choice,
+        state.theme_choice.clone(),
         vec![
             SelectOption::new("system", "System").detail("Follow OS appearance"),
             SelectOption::new("light", "Light"),
             SelectOption::new("dark", "Dark"),
         ],
     )
-    .open(state.settings_select_open)
+    .open(is_open)
     .on_toggle({
-        let host = host.clone();
-        let open = state.settings_select_open;
+        let open = open_binding.clone();
         move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.settings_select_open = !open;
-                cx.notify();
+            open.update(cx, |v| {
+                *v = !*v;
+                true
             });
         }
     })
     .on_select({
-        let host = host.clone();
-        move |key, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.theme_choice = key;
-                this.state.settings_select_open = false;
-                cx.notify();
-            });
+        let open = open_binding.clone();
+        move |_key, _window, cx| {
+            open.set(cx, false);
         }
     })
     .on_dismiss({
-        let host = host.clone();
         move |_window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.settings_select_open = false;
-                cx.notify();
-            });
+            open_binding.set(cx, false);
         }
     })
 }
 
-fn theme_controls(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn theme_controls(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement {
     div()
         .flex()
         .items_start()
@@ -282,67 +278,41 @@ fn theme_controls(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl
             div()
                 .flex()
                 .gap_2()
-                .child(theme_card(
+                .child(ThemePreviewCard::bound(
                     "settings-theme-system",
                     ThemePreviewKind::System,
-                    state,
-                    host,
+                    state.theme_choice.clone(),
                 ))
-                .child(theme_card(
+                .child(ThemePreviewCard::bound(
                     "settings-theme-light",
                     ThemePreviewKind::Light,
-                    state,
-                    host,
+                    state.theme_choice.clone(),
                 ))
-                .child(theme_card(
+                .child(ThemePreviewCard::bound(
                     "settings-theme-dark",
                     ThemePreviewKind::Dark,
-                    state,
-                    host,
+                    state.theme_choice.clone(),
                 )),
         )
-        .child(theme_select(state, host))
+        .child(theme_select(state, cx))
 }
 
-fn theme_card(
-    id: &'static str,
-    kind: ThemePreviewKind,
+fn accent_picker(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
-) -> impl IntoElement {
-    ThemePreviewCard::new(id, kind)
-        .selected(state.theme_choice == kind.key())
-        .on_click({
-            let host = host.clone();
-            move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.theme_choice = kind.key();
-                    this.state.settings_select_open = false;
-                    cx.notify();
-                });
-            }
-        })
-}
-
-fn accent_picker(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    ColorPicker::new(
-        "settings-accent-picker",
-        state.accent_choice,
-        vec![
-            ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
-            ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
-            ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
-            ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
-            ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
-        ],
-    )
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let accent_choice = state.accent_choice.clone();
+    ColorPicker::new("settings-accent-picker", accent_choice.get(cx), vec![
+        ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
+        ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
+        ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
+        ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
+        ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
+    ])
     .on_select({
-        let host = host.clone();
-        move |key, _color, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.accent_choice = key;
-                cx.notify();
-            });
+        let accent_choice = accent_choice.clone();
+        move |key, _hsla, _window, cx| {
+            accent_choice.set(cx, key);
         }
     })
 }

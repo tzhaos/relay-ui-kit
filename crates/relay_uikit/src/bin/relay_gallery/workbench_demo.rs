@@ -6,6 +6,8 @@ mod data;
 mod rail;
 
 use gpui::{AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
+use gpui::App;
+use relay::{Binding, ReactiveAppExt, ReactiveContextExt, Signal};
 use relay_uikit::patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
 use relay_uikit::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
 
@@ -28,13 +30,13 @@ impl WorkbenchApp {
 
 /// Interactive state for the Workbench page.
 pub struct WorkbenchState {
-    pub active_task: usize,
-    pub active_session: usize,
-    pub context_tab: &'static str,
-    pub route: &'static str,
-    pub filter: TextInputState,
+    pub active_task: Signal<usize>,
+    pub active_session: Signal<usize>,
+    pub context_tab: Binding<&'static str>,
+    pub route: Binding<&'static str>,
+    pub filter: Binding<TextInputState>,
     pub filter_focus: FocusHandle,
-    pub launcher_open: bool,
+    pub launcher_open: Binding<bool>,
     pub left_split: Entity<SplitPaneState>,
     pub terminal_split: Entity<SplitPaneState>,
 }
@@ -42,13 +44,13 @@ pub struct WorkbenchState {
 impl WorkbenchState {
     pub fn new(cx: &mut Context<WorkbenchApp>) -> Self {
         Self {
-            active_task: 0,
-            active_session: 0,
-            context_tab: "files",
-            route: "terminal",
-            filter: TextInputState::new(),
+            active_task: cx.signal(0),
+            active_session: cx.signal(0),
+            context_tab: cx.binding("files"),
+            route: cx.binding("terminal"),
+            filter: cx.binding(TextInputState::new()),
             filter_focus: cx.focus_handle(),
-            launcher_open: false,
+            launcher_open: cx.binding(false),
             left_split: cx.new(|_| SplitPaneState::new(space::RAIL_WIDTH)),
             terminal_split: cx.new(|_| SplitPaneState::new(760.0)),
         }
@@ -58,28 +60,29 @@ impl WorkbenchState {
 impl Render for WorkbenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
-        let host = cx.entity();
         let state = &self.state;
-        let left = left_rail(state, &host, theme);
-        let center = center_pane(state, &host, theme);
-        let right = right_context(state, &host, window, theme);
-        let center_and_context = SplitPane::new("center-context-split", center, right)
-            .state(state.terminal_split.clone())
-            .min_sizes(560.0, 320.0)
-            .first_size(760.0);
+        cx.tracked(|cx| {
+            let left = left_rail(state, theme, cx);
+            let center = center_pane(state, theme, cx);
+            let right = right_context(state, window, theme, cx);
+            let center_and_context = SplitPane::new("center-context-split", center, right)
+                .state(state.terminal_split.clone())
+                .min_sizes(560.0, 320.0)
+                .first_size(760.0);
 
-        let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
-            .state(state.left_split.clone())
-            .min_sizes(260.0, 780.0)
-            .first_size(space::RAIL_WIDTH);
+            let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
+                .state(state.left_split.clone())
+                .min_sizes(260.0, 780.0)
+                .first_size(space::RAIL_WIDTH);
 
-        AppShell::new(workbench).status_bar(status_bar(state))
+            AppShell::new(workbench).status_bar(status_bar(state, cx))
+        })
     }
 }
 
-fn status_bar(state: &WorkbenchState) -> impl IntoElement {
-    let task = active_task(state);
-    let session = active_session(state);
+fn status_bar(state: &WorkbenchState, cx: &App) -> impl IntoElement {
+    let task = active_task(state.active_task.get(cx));
+    let session = active_session(state.active_session.get(cx));
 
     StatusBar::new()
         .left(
@@ -87,7 +90,7 @@ fn status_bar(state: &WorkbenchState) -> impl IntoElement {
                 .icon(IconName::Terminal)
                 .tone(Tone::Info),
         )
-        .left(StatusItem::new("Focus", state.route).tone(Tone::Secondary))
+        .left(StatusItem::new("Focus", state.route.get(cx)).tone(Tone::Secondary))
         .left(StatusItem::new("Worktree", task.worktree).tone(task.tone))
         .right(StatusItem::new("Session", session.label).tone(session.tone))
         .right(StatusItem::new("Changes", task.changed.to_string()).tone(Tone::Secondary))

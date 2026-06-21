@@ -1,8 +1,6 @@
 use relay_uikit::workbench::{TerminalLine, TerminalLineStyle};
 use relay_uikit::{IconName, Tone};
 
-use super::WorkbenchState;
-
 #[derive(Clone, Copy)]
 pub(super) struct DemoTask {
     pub title: &'static str,
@@ -184,14 +182,12 @@ pub(super) const DEMO_FILES: [DemoFile; 13] = [
     },
 ];
 
-pub(super) fn active_task(state: &WorkbenchState) -> &'static DemoTask {
-    DEMO_TASKS.get(state.active_task).unwrap_or(&DEMO_TASKS[0])
+pub(super) fn active_task(index: usize) -> &'static DemoTask {
+    DEMO_TASKS.get(index).unwrap_or(&DEMO_TASKS[0])
 }
 
-pub(super) fn active_session(state: &WorkbenchState) -> &'static DemoSession {
-    DEMO_SESSIONS
-        .get(state.active_session)
-        .unwrap_or(&DEMO_SESSIONS[0])
+pub(super) fn active_session(index: usize) -> &'static DemoSession {
+    DEMO_SESSIONS.get(index).unwrap_or(&DEMO_SESSIONS[0])
 }
 
 pub(super) fn session_index_for_key(key: &str) -> usize {

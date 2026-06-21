@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -15,6 +16,7 @@ use crate::{
 pub struct Stepper {
     id: ElementId,
     value: String,
+    binding: Option<Binding<i32>>,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
     on_reset: Option<ClickHandler>,
@@ -25,6 +27,19 @@ impl Stepper {
         Self {
             id: id.into(),
             value: value.into(),
+            binding: None,
+            on_decrement: None,
+            on_increment: None,
+            on_reset: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, binding: Binding<i32>) -> Self {
+        let value = binding.signal().get_untracked().to_string();
+        Self {
+            id: id.into(),
+            value,
+            binding: Some(binding),
             on_decrement: None,
             on_increment: None,
             on_reset: None,
@@ -64,6 +79,10 @@ impl RenderOnce for Stepper {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let id = self.id;
+        let binding = self.binding;
+        let display = binding
+            .as_ref()
+            .map_or(self.value.clone(), |b| format!("{}", b.get(cx)));
         let reset = self.on_reset;
 
         div()
@@ -85,14 +104,18 @@ impl RenderOnce for Stepper {
                     .child(stepper_button(
                         (id.clone(), "decrement"),
                         IconName::Minus,
+                        binding.clone(),
+                        -1,
                         self.on_decrement,
                         theme.hover,
                         theme.text_muted,
                     ))
-                    .child(stepper_value(self.value, theme.text, theme.border))
+                    .child(stepper_value(display, theme.text, theme.border))
                     .child(stepper_button(
                         (id.clone(), "increment"),
                         IconName::Plus,
+                        binding,
+                        1,
                         self.on_increment,
                         theme.hover,
                         theme.text_muted,
@@ -126,10 +149,13 @@ impl RenderOnce for Stepper {
 fn stepper_button(
     id: impl Into<ElementId>,
     icon: IconName,
+    binding: Option<Binding<i32>>,
+    delta: i32,
     handler: Option<ClickHandler>,
     hover_bg: gpui::Hsla,
     color: gpui::Hsla,
 ) -> impl IntoElement {
+    let interactive = binding.is_some() || handler.is_some();
     div()
         .id(id)
         .w(px(30.0))
@@ -137,14 +163,22 @@ fn stepper_button(
         .flex()
         .items_center()
         .justify_center()
-        .when_some(handler, |this, handler| {
+        .when(interactive, |this| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
                 .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                     window.prevent_default();
                 })
                 .on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |value| {
+                            *value += delta;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
         })

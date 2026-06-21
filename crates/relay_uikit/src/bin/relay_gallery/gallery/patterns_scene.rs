@@ -15,36 +15,38 @@ use super::{
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
+    let overlay_event_text = state.overlay_event.get(cx);
+
     let mut stack = scene_stack()
-        .child(section(cx, "Layout patterns", layout_patterns(host, theme)))
+        .child(section(cx, "Layout patterns", layout_patterns(state, theme)))
         .child(section(
             cx,
             "Display patterns",
-            display_patterns(host, theme),
+            display_patterns(state, theme),
         ))
         .child(section(
             cx,
             "Navigation patterns",
-            navigation_patterns(state, host),
+            navigation_patterns(state),
         ))
         .child(section(
             cx,
             "Overlay patterns",
-            overlay_patterns(state, host, theme),
+            overlay_patterns(state, theme, overlay_event_text),
         ));
 
-    if state.pattern_dialog_open {
-        stack = stack.child(settings_dialog(host));
+    if state.pattern_dialog_open.get(cx) {
+        stack = stack.child(settings_dialog(state));
     }
 
     stack
 }
 
-fn layout_patterns(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoElement {
+fn layout_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -78,17 +80,17 @@ fn layout_patterns(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoEl
                 .child(
                     Button::new("layout-left-action", "Focus")
                         .icon(IconName::PanelLeft)
-                        .on_click(pattern_event(host, "Layout toolbar focused")),
+                        .on_click(pattern_event(state, "Layout toolbar focused")),
                 )
                 .child(
                     Button::new("layout-right-action", "Refresh")
                         .icon(IconName::RefreshCw)
-                        .on_click(pattern_event(host, "Layout toolbar refreshed")),
+                        .on_click(pattern_event(state, "Layout toolbar refreshed")),
                 ),
         )
 }
 
-fn display_patterns(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoElement {
+fn display_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
     div()
         .grid()
         .grid_cols(2)
@@ -99,7 +101,7 @@ fn display_patterns(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoE
                 .trailing(
                     Button::new("metadata-copy", "Copy")
                         .ghost()
-                        .on_click(pattern_event(host, "Metadata copied")),
+                        .on_click(pattern_event(state, "Metadata copied")),
                 )
                 .child(
                     div()
@@ -140,9 +142,9 @@ fn display_patterns(host: &Entity<GalleryScenesApp>, theme: Theme) -> impl IntoE
         )
 }
 
-fn navigation_patterns(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn navigation_patterns(state: &GalleryState) -> impl IntoElement {
     div().max_w(px(640.0)).child(
-        Tabs::new(
+        Tabs::bound(
             "patterns-navigation-tabs",
             vec![
                 Tab::new("files", "Files").icon(IconName::FileText),
@@ -151,25 +153,15 @@ fn navigation_patterns(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                     .icon(IconName::MessageSquareText)
                     .count(3),
             ],
-        )
-        .active(state.seg_tab)
-        .on_select({
-            let host = host.clone();
-            move |key, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.seg_tab = key;
-                    this.state.overlay_event = format!("Navigation tab: {key}");
-                    cx.notify();
-                });
-            }
-        }),
+            state.seg_tab.clone(),
+        ),
     )
 }
 
 fn overlay_patterns(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
     theme: Theme,
+    overlay_event_text: String,
 ) -> impl IntoElement {
     div()
         .relative()
@@ -180,57 +172,24 @@ fn overlay_patterns(
         .flex_wrap()
         .child(
             div().w(px(260.0)).child(
-                Select::new(
+                Select::bound(
                     "patterns-overlay-select",
-                    state.theme_choice,
+                    state.theme_choice.clone(),
                     vec![
                         SelectOption::new("system", "System").detail("Follow OS appearance"),
                         SelectOption::new("light", "Light"),
                         SelectOption::new("dark", "Dark"),
                     ],
-                )
-                .open(state.pattern_select_open)
-                .on_toggle({
-                    let host = host.clone();
-                    move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.pattern_select_open = !this.state.pattern_select_open;
-                            cx.notify();
-                        });
-                    }
-                })
-                .on_select({
-                    let host = host.clone();
-                    move |key, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.theme_choice = key;
-                            this.state.pattern_select_open = false;
-                            this.state.overlay_event = format!("Select: {key}");
-                            cx.notify();
-                        });
-                    }
-                })
-                .on_dismiss({
-                    let host = host.clone();
-                    move |_window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.pattern_select_open = false;
-                            cx.notify();
-                        });
-                    }
-                }),
+                ),
             ),
         )
         .child(
             Button::new("patterns-dialog-open", "Open Dialog")
                 .icon(IconName::Settings)
                 .on_click({
-                    let host = host.clone();
+                    let dialog_open = state.pattern_dialog_open.clone();
                     move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.pattern_dialog_open = true;
-                            cx.notify();
-                        });
+                        dialog_open.set(cx, true);
                     }
                 }),
         )
@@ -262,10 +221,10 @@ fn overlay_patterns(
                         "patterns-context-menu",
                         vec![
                             MenuItem::header("Terminal"),
-                            menu_action(host, "Split right", IconName::ArrowRight),
-                            menu_action(host, "Rename", IconName::Settings),
+                            menu_action(state, "Split right", IconName::ArrowRight),
+                            menu_action(state, "Rename", IconName::Settings),
                             MenuItem::separator(),
-                            menu_action(host, "Close", IconName::Archive).danger(),
+                            menu_action(state, "Close", IconName::Archive).danger(),
                         ],
                     )
                     .offset(24.0, 64.0)
@@ -276,11 +235,11 @@ fn overlay_patterns(
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child(format!("Pattern event: {}", state.overlay_event)),
+                .child(format!("Pattern event: {}", overlay_event_text)),
         )
 }
 
-fn settings_dialog(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn settings_dialog(state: &GalleryState) -> impl IntoElement {
     Dialog::new("patterns-settings-dialog", "Pattern settings")
         .description("Dialog uses the overlay layer and host-owned dismiss state.")
         .icon(IconName::Settings)
@@ -302,46 +261,41 @@ fn settings_dialog(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                 .child(
                     Button::new("patterns-dialog-cancel", "Cancel")
                         .ghost()
-                        .on_click(close_dialog(host, "Dialog cancelled")),
+                        .on_click(close_dialog(state, "Dialog cancelled")),
                 )
                 .child(
                     Button::new("patterns-dialog-save", "Save")
                         .primary()
-                        .on_click(close_dialog(host, "Dialog saved")),
+                        .on_click(close_dialog(state, "Dialog saved")),
                 ),
         )
-        .on_dismiss(close_dialog(host, "Dialog dismissed"))
+        .on_dismiss(close_dialog(state, "Dialog dismissed"))
 }
 
-fn menu_action(host: &Entity<GalleryScenesApp>, label: &'static str, icon: IconName) -> MenuItem {
+fn menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> MenuItem {
     MenuItem::new(label)
         .icon(icon)
-        .on_click(pattern_event(host, label))
+        .on_click(pattern_event(state, label))
 }
 
 fn pattern_event(
-    host: &Entity<GalleryScenesApp>,
+    state: &GalleryState,
     message: &'static str,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
+    let overlay_event = state.overlay_event.clone();
     move |_event, _window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.overlay_event = message.to_string();
-            cx.notify();
-        });
+        overlay_event.set(cx, message.to_string());
     }
 }
 
 fn close_dialog(
-    host: &Entity<GalleryScenesApp>,
+    state: &GalleryState,
     message: &'static str,
 ) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    let host = host.clone();
+    let dialog_open = state.pattern_dialog_open.clone();
+    let overlay_event = state.overlay_event.clone();
     move |_event, _window, cx| {
-        host.update(cx, |this, cx| {
-            this.state.pattern_dialog_open = false;
-            this.state.overlay_event = message.to_string();
-            cx.notify();
-        });
+        dialog_open.set(cx, false);
+        overlay_event.set(cx, message.to_string());
     }
 }

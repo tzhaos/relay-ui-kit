@@ -3,6 +3,7 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -62,6 +63,7 @@ pub struct FilterChip {
     selected: bool,
     open: bool,
     dropdown: bool,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -75,6 +77,21 @@ impl FilterChip {
             selected: false,
             open: false,
             dropdown: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, label: impl Into<String>, binding: Binding<bool>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            icon: None,
+            count: None,
+            selected: false,
+            open: false,
+            dropdown: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -116,7 +133,9 @@ impl FilterChip {
 impl RenderOnce for FilterChip {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let active = self.selected || self.open;
+        let binding = self.binding;
+        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let active = selected || self.open;
         let fg = if active {
             theme.text
         } else {
@@ -127,6 +146,8 @@ impl RenderOnce for FilterChip {
         } else {
             theme.text_muted
         };
+        let handler = self.on_click;
+        let clickable = binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -145,14 +166,22 @@ impl RenderOnce for FilterChip {
             })
             .bg(if active { theme.panel_alt } else { theme.panel })
             .text_color(fg)
-            .when_some(self.on_click, |this, handler| {
+            .when(clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                         window.prevent_default();
                     })
                     .on_click(move |event, window, cx| {
-                        handler(event, window, cx);
+                        if let Some(binding) = &binding {
+                            binding.update(cx, |selected| {
+                                *selected = !*selected;
+                                true
+                            });
+                        }
+                        if let Some(handler) = &handler {
+                            handler(event, window, cx);
+                        }
                         cx.stop_propagation();
                     })
             })
@@ -196,6 +225,9 @@ impl RenderOnce for FilterChip {
 
 #[cfg(test)]
 mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
@@ -210,5 +242,13 @@ mod tests {
         let chip = FilterChip::new("all", "All sessions").count(8);
 
         assert_eq!(chip.count, Some(8));
+    }
+
+    #[test]
+    fn bound_filter_chip_stores_binding() {
+        let mut app = TestApp::new();
+        let chip = app.update(|cx| FilterChip::bound("all", "All", cx.binding(false)));
+
+        assert!(chip.binding.is_some());
     }
 }

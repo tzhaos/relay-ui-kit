@@ -2,6 +2,7 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
     div, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -18,6 +19,7 @@ pub struct NavRow {
     label: String,
     count: Option<usize>,
     selected: bool,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -29,6 +31,24 @@ impl NavRow {
             label: label.into(),
             count: None,
             selected: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        icon: IconName,
+        label: impl Into<String>,
+        binding: Binding<bool>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            icon,
+            label: label.into(),
+            count: None,
+            selected: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -55,15 +75,18 @@ impl NavRow {
 impl RenderOnce for NavRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let (fg, icon_color) = if self.selected {
+        let binding = self.binding;
+        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let (fg, icon_color) = if selected {
             (theme.text, theme.accent)
         } else {
             (theme.text_secondary, theme.text_muted)
         };
+        let handler = self.on_click;
 
         let mut row = ListItem::new(self.id)
             .height(px(space::ROW_MD))
-            .selected(self.selected)
+            .selected(selected)
             .start_slot(Icon::new(self.icon).size(IconSize::Small).color(icon_color))
             .child(
                 div()
@@ -71,7 +94,7 @@ impl RenderOnce for NavRow {
                     .min_w_0()
                     .truncate()
                     .text_sm()
-                    .font_weight(if self.selected {
+                    .font_weight(if selected {
                         FontWeight::SEMIBOLD
                     } else {
                         FontWeight::MEDIUM
@@ -98,8 +121,19 @@ impl RenderOnce for NavRow {
             );
         }
 
-        if let Some(handler) = self.on_click {
-            row = row.on_click_handler(handler);
+        let has_click = binding.is_some() || handler.is_some();
+        if has_click {
+            row = row.on_click(move |event, window, cx| {
+                if let Some(binding) = &binding {
+                    binding.update(cx, |selected| {
+                        *selected = !*selected;
+                        true
+                    });
+                }
+                if let Some(handler) = &handler {
+                    handler(event, window, cx);
+                }
+            });
         }
 
         row

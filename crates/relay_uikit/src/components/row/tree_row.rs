@@ -2,6 +2,7 @@ use gpui::{
     App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -20,6 +21,8 @@ pub struct TreeRow {
     expandable: bool,
     expanded: bool,
     selected: bool,
+    selected_binding: Option<Binding<bool>>,
+    expanded_binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -33,8 +36,35 @@ impl TreeRow {
             expandable: false,
             expanded: false,
             selected: false,
+            selected_binding: None,
+            expanded_binding: None,
             on_click: None,
         }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        icon: IconName,
+        label: impl Into<String>,
+        selected: Binding<bool>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            icon,
+            label: label.into(),
+            depth: 0,
+            expandable: false,
+            expanded: false,
+            selected: false,
+            selected_binding: Some(selected),
+            expanded_binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn expanded_bound(mut self, binding: Binding<bool>) -> Self {
+        self.expanded_binding = Some(binding);
+        self
     }
 
     pub fn depth(mut self, depth: usize) -> Self {
@@ -65,13 +95,17 @@ impl TreeRow {
 impl RenderOnce for TreeRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let fg = if self.selected {
+        let selected_binding = self.selected_binding;
+        let expanded_binding = self.expanded_binding;
+        let selected = selected_binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let expanded = expanded_binding.as_ref().map_or(self.expanded, |b| b.get(cx));
+        let fg = if selected {
             theme.text
         } else {
             theme.text_secondary
         };
         let chevron = if self.expandable {
-            Some(if self.expanded {
+            Some(if expanded {
                 IconName::ChevronDown
             } else {
                 IconName::ChevronRight
@@ -107,7 +141,7 @@ impl RenderOnce for TreeRow {
         let mut row = ListItem::new(self.id)
             .height(px(space::ROW_SM))
             .indent(self.depth, 14.0)
-            .selected(self.selected)
+            .selected(selected)
             .start_slot(start_slot)
             .child(
                 div()
@@ -119,8 +153,26 @@ impl RenderOnce for TreeRow {
                     .child(self.label),
             );
 
-        if let Some(handler) = self.on_click {
-            row = row.on_click_handler(handler);
+        let has_click = selected_binding.is_some() || expanded_binding.is_some() || self.on_click.is_some();
+        if has_click {
+            let handler = self.on_click;
+            row = row.on_click(move |event, window, cx| {
+                if let Some(binding) = &selected_binding {
+                    binding.update(cx, |selected| {
+                        *selected = !*selected;
+                        true
+                    });
+                }
+                if let Some(binding) = &expanded_binding {
+                    binding.update(cx, |expanded| {
+                        *expanded = !*expanded;
+                        true
+                    });
+                }
+                if let Some(handler) = &handler {
+                    handler(event, window, cx);
+                }
+            });
         }
 
         row

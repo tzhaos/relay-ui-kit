@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -21,6 +22,7 @@ pub struct TerminalSessionRow {
     subtitle: String,
     status: Tone,
     active: bool,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -36,6 +38,24 @@ impl TerminalSessionRow {
             subtitle: subtitle.into(),
             status: Tone::Muted,
             active: false,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        title: impl Into<String>,
+        subtitle: impl Into<String>,
+        binding: Binding<bool>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            subtitle: subtitle.into(),
+            status: Tone::Muted,
+            active: false,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -62,8 +82,10 @@ impl TerminalSessionRow {
 impl RenderOnce for TerminalSessionRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let active = binding.as_ref().map_or(self.active, |b| b.get(cx));
         let handler = self.on_click;
-        let clickable = handler.is_some();
+        let clickable = binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -75,18 +97,18 @@ impl RenderOnce for TerminalSessionRow {
             .gap_2()
             .rounded(px(radius::MD))
             .border_1()
-            .border_color(if self.active {
+            .border_color(if active {
                 theme.accent_border
             } else {
                 gpui::transparent_black()
             })
-            .bg(if self.active {
+            .bg(if active {
                 theme.accent_bg
             } else {
                 gpui::transparent_black()
             })
             .when(clickable, |this| this.cursor_pointer())
-            .when(clickable && !self.active, |this| {
+            .when(clickable && !active, |this| {
                 this.hover(move |style| style.bg(theme.hover))
             })
             .when(clickable, |this| {
@@ -123,9 +145,17 @@ impl RenderOnce for TerminalSessionRow {
                     ),
             )
             .child(TerminalStatusBadge::new(self.status))
-            .when_some(handler.filter(|_| clickable), |this, handler| {
+            .when(clickable, |this| {
                 this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |active| {
+                            *active = !*active;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })

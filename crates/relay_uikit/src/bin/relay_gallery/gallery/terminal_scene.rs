@@ -16,18 +16,12 @@ pub(super) fn render(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     let shell_split = shell_sample(state, host, cx);
+    let terminal_body = terminal_sample(state, host, theme, cx);
+    let launcher_body = launcher_sample(state, host, theme, cx);
 
     scene_stack()
-        .child(section(
-            cx,
-            "Terminal session",
-            terminal_sample(state, host, theme),
-        ))
-        .child(section(
-            cx,
-            "Session launcher",
-            launcher_sample(state, host, theme),
-        ))
+        .child(section(cx, "Terminal session", terminal_body))
+        .child(section(cx, "Session launcher", launcher_body))
         .child(section(
             cx,
             "Agent composer",
@@ -90,12 +84,9 @@ fn composer_sample(
             .primary()
             .icon(IconName::Play)
             .on_click({
-                let host = host.clone();
+                let terminal_session = state.terminal_session.clone();
                 move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.terminal_session = "codex";
-                        cx.notify();
-                    });
+                    terminal_session.set(cx, "codex");
                 }
             }),
     )

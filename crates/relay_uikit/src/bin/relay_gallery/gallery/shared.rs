@@ -1,6 +1,7 @@
 use gpui::{Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
-use relay_uikit::patterns::overlay::AnchoredOverlay;
-use relay_uikit::workbench::{BranchActionKind, BranchActionsMenu, BranchOption, BranchSelector};
+use relay::Binding;
+use relay::Signal;
+use relay_uikit::workbench::{BranchOption, BranchSelector};
 use relay_uikit::{
     ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
     Tone, radius, space,
@@ -8,11 +9,11 @@ use relay_uikit::{
 
 use super::GalleryScenesApp;
 
-pub(super) fn section(
+pub(super) fn section<T: IntoElement>(
     cx: &mut Context<GalleryScenesApp>,
     title: &str,
-    body: impl IntoElement,
-) -> impl IntoElement {
+    body: T,
+) -> impl IntoElement + use<T> {
     let theme = *cx.theme();
     div()
         .flex()
@@ -79,27 +80,28 @@ pub(super) fn text_input_field(
 }
 
 pub(super) fn branch_controls(
-    host: &Entity<GalleryScenesApp>,
-    selected: &'static str,
-    picker_open: bool,
-    actions_open: bool,
+    _host: &Entity<GalleryScenesApp>,
+    branch_choice: &Binding<&'static str>,
+    picker_open: &Binding<bool>,
+    actions_open: &Binding<bool>,
+    branch_event: &Signal<String>,
 ) -> impl IntoElement {
     div()
         .flex()
         .items_center()
         .gap_1()
-        .child(branch_selector(host, selected, picker_open))
-        .child(branch_actions_menu(host, actions_open))
+        .child(branch_selector(branch_choice, picker_open, branch_event))
+        .child(branch_actions_button(actions_open, branch_event))
 }
 
 fn branch_selector(
-    host: &Entity<GalleryScenesApp>,
-    selected: &'static str,
-    open: bool,
+    branch_choice: &Binding<&'static str>,
+    open: &Binding<bool>,
+    branch_event: &Signal<String>,
 ) -> impl IntoElement {
     BranchSelector::new(
         "gallery-branch-selector",
-        selected,
+        branch_choice.signal().get_untracked(),
         vec![
             BranchOption::new("main", "main").detail("default branch"),
             BranchOption::new("ui-kit-branch-controls", "ui-kit/branch-controls")
@@ -109,93 +111,59 @@ fn branch_selector(
             BranchOption::new("review-viewers", "review/viewers").detail("diff and file views"),
         ],
     )
-    .open(open)
+    .open(open.signal().get_untracked())
     .on_toggle({
-        let host = host.clone();
+        let open = open.clone();
         move |_event, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.branch_picker_open = !open;
-                this.state.branch_actions_open = false;
-                cx.notify();
+            open.update(cx, |v| {
+                *v = !*v;
+                true
             });
         }
     })
     .on_select({
-        let host = host.clone();
+        let choice = branch_choice.clone();
+        let open = open.clone();
+        let event = branch_event.clone();
         move |key, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.branch_choice = key;
-                this.state.branch_picker_open = false;
-                this.state.branch_event = format!("Switched to {key}");
-                cx.notify();
-            });
+            choice.set(cx, key);
+            open.set(cx, false);
+            event.set(cx, format!("Switched to {key}"));
         }
     })
     .on_action({
-        let host = host.clone();
+        let open = open.clone();
+        let event = branch_event.clone();
         move |key, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.branch_picker_open = false;
-                this.state.branch_event = match key {
-                    "branch:create" => "Create branch requested".into(),
-                    "worktree:create" => "New worktree requested".into(),
-                    _ => format!("Branch picker action: {key}"),
-                };
-                cx.notify();
+            open.set(cx, false);
+            event.set(cx, match key {
+                "branch:create" => "Create branch requested".into(),
+                "worktree:create" => "New worktree requested".into(),
+                _ => format!("Branch picker action: {key}"),
             });
         }
     })
     .on_dismiss({
-        let host = host.clone();
+        let open = open.clone();
         move |_window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.branch_picker_open = false;
-                cx.notify();
-            });
+            open.set(cx, false);
         }
     })
 }
 
-fn branch_actions_button(host: &Entity<GalleryScenesApp>, open: bool) -> impl IntoElement {
+fn branch_actions_button(open: &Binding<bool>, _branch_event: &Signal<String>) -> impl IntoElement {
+    let open_val = open.signal().get_untracked();
     IconButton::new("gallery-branch-actions", IconName::Ellipsis)
-        .active(open)
+        .active(open_val)
         .on_click({
-            let host = host.clone();
+            let open = open.clone();
             move |_event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.branch_actions_open = !open;
-                    this.state.branch_picker_open = false;
-                    cx.notify();
+                open.update(cx, |v| {
+                    *v = !*v;
+                    true
                 });
             }
         })
-}
-
-fn branch_actions_menu(host: &Entity<GalleryScenesApp>, open: bool) -> impl IntoElement {
-    AnchoredOverlay::new(
-        "gallery-branch-actions-overlay",
-        branch_actions_button(host, open),
-        BranchActionsMenu::new("gallery-branch-actions-menu").on_select({
-            let host = host.clone();
-            move |action: BranchActionKind, _window, cx| {
-                host.update(cx, |this, cx| {
-                    this.state.branch_actions_open = false;
-                    this.state.branch_event = action.label().to_string();
-                    cx.notify();
-                });
-            }
-        }),
-    )
-    .open(open)
-    .on_dismiss({
-        let host = host.clone();
-        move |_window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.branch_actions_open = false;
-                cx.notify();
-            });
-        }
-    })
 }
 
 pub(super) fn dot_label(theme: Theme, tone: Tone, label: &str) -> impl IntoElement {

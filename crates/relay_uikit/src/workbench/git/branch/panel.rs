@@ -2,6 +2,7 @@ use gpui::{
     App, ClickEvent, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -16,6 +17,7 @@ pub(super) fn branch_picker_panel(
     selected_key: &'static str,
     branches: Vec<BranchOption>,
     actions: Vec<BranchPickerAction>,
+    selected_binding: Option<Binding<&'static str>>,
     select_handler: Option<SharedSelectHandler>,
     action_handler: Option<SharedSelectHandler>,
 ) -> impl IntoElement {
@@ -23,6 +25,7 @@ pub(super) fn branch_picker_panel(
         selected_key,
         branches,
         actions,
+        selected_binding,
         select_handler,
         action_handler,
     }
@@ -33,6 +36,7 @@ struct BranchPickerPanel {
     selected_key: &'static str,
     branches: Vec<BranchOption>,
     actions: Vec<BranchPickerAction>,
+    selected_binding: Option<Binding<&'static str>>,
     select_handler: Option<SharedSelectHandler>,
     action_handler: Option<SharedSelectHandler>,
 }
@@ -40,6 +44,9 @@ struct BranchPickerPanel {
 impl RenderOnce for BranchPickerPanel {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let selected_binding = self.selected_binding;
+        let selected_key = selected_binding.as_ref().map_or(self.selected_key, |b| b.get(cx));
+        let select_handler = self.select_handler;
         let mut panel = div()
             .id("branch-picker-panel")
             .w(px(320.0))
@@ -75,14 +82,16 @@ impl RenderOnce for BranchPickerPanel {
             );
 
         for (index, branch) in self.branches.into_iter().enumerate() {
-            let handler = self.select_handler.clone();
-            let selected = branch.key == self.selected_key;
+            let selected = branch.key == selected_key;
             let key = branch.key;
+            let handler = select_handler.clone();
+            let binding = selected_binding.clone();
             let row_fg = if selected {
                 theme.text
             } else {
                 theme.text_secondary
             };
+            let clickable = binding.is_some() || handler.is_some();
 
             panel = panel.child(
                 div()
@@ -95,7 +104,7 @@ impl RenderOnce for BranchPickerPanel {
                     .gap_2()
                     .rounded(px(radius::MD))
                     .text_color(row_fg)
-                    .cursor_pointer()
+                    .when(clickable, |this| this.cursor_pointer())
                     .when(selected, |this| this.bg(theme.selection))
                     .when(!selected, |this| {
                         this.hover(move |style| style.bg(theme.hover))
@@ -142,9 +151,14 @@ impl RenderOnce for BranchPickerPanel {
                                 )
                             }),
                     )
-                    .when_some(handler, |this, handler| {
+                    .when(clickable, |this| {
                         this.on_click(move |_event: &ClickEvent, window, cx| {
-                            handler(key, window, cx);
+                            if let Some(binding) = &binding {
+                                binding.set(cx, key);
+                            }
+                            if let Some(handler) = &handler {
+                                handler(key, window, cx);
+                            }
                             cx.stop_propagation();
                         })
                     }),

@@ -16,7 +16,7 @@ use super::{GalleryScenesApp, GalleryState};
 
 pub(super) fn shell_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     cx: &mut Context<GalleryScenesApp>,
 ) -> Div {
     let split_size = state.shell_split.read(cx).first_size();
@@ -83,12 +83,9 @@ pub(super) fn shell_sample(
                             "Shell".into(),
                         ]))
                         .actions(Button::new("shell-action", "Open").on_click({
-                            let host = host.clone();
+                            let seg_tab = state.seg_tab.clone();
                             move |_event, _window, cx| {
-                                host.update(cx, |this, cx| {
-                                    this.state.seg_tab = "files";
-                                    cx.notify();
-                                });
+                                seg_tab.set(cx, "files");
                             }
                         }))
                         .window_controls(false),
@@ -103,17 +100,15 @@ pub(super) fn shell_sample(
 
 pub(super) fn terminal_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     theme: Theme,
-) -> impl IntoElement {
-    let active = state.terminal_session;
-    let set_session = |key: &'static str, host: &Entity<GalleryScenesApp>| {
-        let host = host.clone();
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let active = state.terminal_session.get(cx);
+    let set_session = |key: &'static str| {
+        let terminal_session = state.terminal_session.clone();
         move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut gpui::App| {
-            host.update(cx, |this, cx| {
-                this.state.terminal_session = key;
-                cx.notify();
-            });
+            terminal_session.set(cx, key);
         }
     };
 
@@ -131,13 +126,13 @@ pub(super) fn terminal_sample(
                     TerminalTab::new("sample-tab-shell", "PowerShell")
                         .active(active == "shell")
                         .status(Tone::Info)
-                        .on_click(set_session("shell", host)),
+                        .on_click(set_session("shell")),
                 )
                 .tab(
                     TerminalTab::new("sample-tab-codex", "Codex")
                         .active(active == "codex")
                         .status(Tone::Accent)
-                        .on_click(set_session("codex", host)),
+                        .on_click(set_session("codex")),
                 )
                 .actions(TerminalStatusBadge::new(if active == "codex" {
                     Tone::Accent
@@ -157,11 +152,11 @@ pub(super) fn terminal_sample(
                 .gap_2()
                 .child(
                     TerminalAgentQuickLaunch::new("sample-codex", "Codex", "codex")
-                        .on_click(set_session("codex", host)),
+                        .on_click(set_session("codex")),
                 )
                 .child(
                     TerminalAgentQuickLaunch::new("sample-claude", "Claude", "claude")
-                        .on_click(set_session("claude", host)),
+                        .on_click(set_session("claude")),
                 ),
         )
         .child(
@@ -195,17 +190,16 @@ fn terminal_sample_lines(active: &'static str) -> Vec<TerminalLine> {
 pub(super) fn command_sample(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
-) -> impl IntoElement {
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     let command_handler = {
-        let host = host.clone();
+        let launcher_choice = state.launcher_choice.clone();
+        let terminal_session = state.terminal_session.clone();
         move |key: &'static str, _window: &mut Window, cx: &mut gpui::App| {
-            host.update(cx, |this, cx| {
-                this.state.launcher_choice = key;
-                if key == "agent:codex" {
-                    this.state.terminal_session = "codex";
-                }
-                cx.notify();
-            });
+            launcher_choice.set(cx, key);
+            if key == "agent:codex" {
+                terminal_session.set(cx, "codex");
+            }
         }
     };
 
@@ -243,7 +237,7 @@ pub(super) fn command_sample(
                 .detail("Open a shell session in the active workspace")
                 .icon(IconName::Terminal)
                 .shortcut(KeybindingShortcut::new(["Ctrl", "Shift", "T"]))
-                .selected(state.launcher_choice == "terminal:new")
+                .selected(state.launcher_choice.get(cx) == "terminal:new")
                 .on_select(command_handler_a),
         )
         .row(
@@ -251,29 +245,30 @@ pub(super) fn command_sample(
                 .detail("Attach Codex to the selected task terminal")
                 .icon(IconName::Bot)
                 .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
-                .selected(state.launcher_choice == "agent:codex")
+                .selected(state.launcher_choice.get(cx) == "agent:codex")
                 .on_select(command_handler_b),
         )
         .row(
             CommandRow::new("cmd-settings", "settings:agent", "Agent Settings")
                 .detail("Open the agent configuration surface")
                 .icon(IconName::Settings)
-                .selected(state.launcher_choice == "settings:agent")
+                .selected(state.launcher_choice.get(cx) == "settings:agent")
                 .on_select(command_handler_c),
         )
         .footer(
             div()
                 .text_xs()
                 .text_color(Theme::light().text_muted)
-                .child(format!("Selected: {}", state.launcher_choice)),
+                .child(format!("Selected: {}", state.launcher_choice.get(cx))),
         )
 }
 
 pub(super) fn launcher_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     theme: Theme,
-) -> impl IntoElement {
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     div()
         .w(px(340.0))
         .flex()
@@ -295,16 +290,14 @@ pub(super) fn launcher_sample(
                 ],
             )
             .on_select({
-                let host = host.clone();
+                let launcher_choice = state.launcher_choice.clone();
+                let terminal_session = state.terminal_session.clone();
                 move |key, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.launcher_choice = key;
-                        this.state.terminal_session = match key {
-                            "codex" => "codex",
-                            "claude" => "claude",
-                            _ => "shell",
-                        };
-                        cx.notify();
+                    launcher_choice.set(cx, key);
+                    terminal_session.set(cx, match key {
+                        "codex" => "codex",
+                        "claude" => "claude",
+                        _ => "shell",
                     });
                 }
             }),
@@ -312,10 +305,10 @@ pub(super) fn launcher_sample(
         .child(
             TerminalSessionRow::new(
                 "launcher-session",
-                format!("Selected {}", state.launcher_choice),
+                format!("Selected {}", state.launcher_choice.get(cx)),
                 "Session history row",
             )
-            .status(match state.launcher_choice {
+            .status(match state.launcher_choice.get(cx) {
                 "codex" => Tone::Accent,
                 "claude" => Tone::Warning,
                 _ => Tone::Info,

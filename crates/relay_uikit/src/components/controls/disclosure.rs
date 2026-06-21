@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     components::display::CountBadge,
@@ -12,7 +13,7 @@ use crate::{
     tone::Tone,
 };
 
-/// A host-owned disclosure row for collapsible groups.
+/// A disclosure row for collapsible groups.
 #[derive(IntoElement)]
 pub struct Disclosure {
     id: ElementId,
@@ -20,6 +21,7 @@ pub struct Disclosure {
     open: bool,
     detail: Option<String>,
     count: Option<usize>,
+    binding: Option<Binding<bool>>,
     on_toggle: Option<ClickHandler>,
 }
 
@@ -31,6 +33,23 @@ impl Disclosure {
             open,
             detail: None,
             count: None,
+            binding: None,
+            on_toggle: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        binding: Binding<bool>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            open: false,
+            detail: None,
+            count: None,
+            binding: Some(binding),
             on_toggle: None,
         }
     }
@@ -57,7 +76,10 @@ impl Disclosure {
 impl RenderOnce for Disclosure {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let open = binding.as_ref().map_or(self.open, |b| b.get(cx));
         let handler = self.on_toggle;
+        let interactive = binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -68,7 +90,7 @@ impl RenderOnce for Disclosure {
             .gap_2()
             .rounded(px(radius::MD))
             .text_color(theme.text_secondary)
-            .when(handler.is_some(), |this| {
+            .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover))
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
@@ -76,7 +98,7 @@ impl RenderOnce for Disclosure {
                     })
             })
             .child(
-                Icon::new(if self.open {
+                Icon::new(if open {
                     IconName::ChevronDown
                 } else {
                     IconName::ChevronRight
@@ -106,9 +128,17 @@ impl RenderOnce for Disclosure {
             .when_some(self.count, |this, count| {
                 this.child(CountBadge::new(count).tone(Tone::Secondary))
             })
-            .when_some(handler, |this, handler| {
+            .when(interactive, |this| {
                 this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |open| {
+                            *open = !*open;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })
@@ -117,6 +147,9 @@ impl RenderOnce for Disclosure {
 
 #[cfg(test)]
 mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
@@ -124,5 +157,13 @@ mod tests {
         let disclosure = Disclosure::new("group", "Sessions", true);
 
         assert!(disclosure.open);
+    }
+
+    #[test]
+    fn bound_disclosure_stores_binding() {
+        let mut app = TestApp::new();
+        let disclosure = app.update(|cx| Disclosure::bound("group", "Sessions", cx.binding(false)));
+
+        assert!(disclosure.binding.is_some());
     }
 }

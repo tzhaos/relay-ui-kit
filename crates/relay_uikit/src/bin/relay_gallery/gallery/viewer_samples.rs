@@ -1,4 +1,4 @@
-use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
+use gpui::{App, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
 use relay_uikit::workbench::{CodeView, DiffView, FileKind, FileView, MarkdownView};
 use relay_uikit::{Segment, SegmentedControl};
 
@@ -6,9 +6,10 @@ use super::{GalleryScenesApp, GalleryState};
 
 pub(super) fn viewer_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
-) -> impl IntoElement {
-    let active = state.viewer_tab;
+    _host: &Entity<GalleryScenesApp>,
+    cx: &mut App,
+) -> impl IntoElement + use<> {
+    let active = state.viewer_tab.get(cx);
 
     div()
         .h(px(340.0))
@@ -16,24 +17,15 @@ pub(super) fn viewer_sample(
         .flex_col()
         .gap_2()
         .child(
-            SegmentedControl::new(
+            SegmentedControl::bound(
                 "viewer-kind",
                 vec![
                     Segment::new("code", "Code"),
                     Segment::new("markdown", "Markdown"),
                     Segment::new("diff", "Diff"),
                 ],
-            )
-            .active(active)
-            .on_select({
-                let host = host.clone();
-                move |key, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.viewer_tab = key;
-                        cx.notify();
-                    });
-                }
-            }),
+                state.viewer_tab.clone(),
+            ),
         )
         .child(
             div()

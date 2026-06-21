@@ -5,6 +5,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, hsla, linear_color_stop, linear_gradient,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -48,6 +49,7 @@ pub struct ColorPicker {
     id: ElementId,
     selected_key: &'static str,
     presets: Vec<ColorPreset>,
+    binding: Option<Binding<&'static str>>,
     on_select: Option<ColorSelectHandler>,
 }
 
@@ -61,6 +63,21 @@ impl ColorPicker {
             id: id.into(),
             selected_key,
             presets,
+            binding: None,
+            on_select: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        binding: Binding<&'static str>,
+        presets: Vec<ColorPreset>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            selected_key: "",
+            presets,
+            binding: Some(binding),
             on_select: None,
         }
     }
@@ -87,8 +104,12 @@ impl ColorPicker {
 impl RenderOnce for ColorPicker {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let selected_key = binding.as_ref().map_or(self.selected_key, |b| b.get(cx));
         let selected = self
-            .selected_preset()
+            .presets
+            .iter()
+            .find(|p| p.key == selected_key)
             .cloned()
             .or_else(|| self.presets.first().cloned());
         let selected_color = selected
@@ -103,12 +124,15 @@ impl RenderOnce for ColorPicker {
         let mut grid = div().flex().flex_wrap().gap_2();
 
         for preset in self.presets {
-            let is_selected = preset.key == self.selected_key;
+            let is_selected = preset.key == selected_key;
+            let preset_binding = binding.clone();
+            let preset_handler = select_handler.clone();
             grid = grid.child(preset_button(
                 (self.id.clone(), preset.key),
                 preset,
                 is_selected,
-                select_handler.clone(),
+                preset_binding,
+                preset_handler,
             ));
         }
 
@@ -180,10 +204,12 @@ fn preset_button(
     id: impl Into<ElementId>,
     preset: ColorPreset,
     selected: bool,
+    binding: Option<Binding<&'static str>>,
     handler: Option<SharedColorSelectHandler>,
 ) -> impl IntoElement {
     let key = preset.key;
     let color = preset.color;
+    let interactive = binding.is_some() || handler.is_some();
 
     div()
         .id(id)
@@ -204,11 +230,13 @@ fn preset_button(
         } else {
             gpui::transparent_black()
         })
-        .cursor_pointer()
-        .hover(move |style| {
-            style
-                .bg(color.opacity(0.12))
-                .border_color(color.opacity(0.72))
+        .when(interactive, |this| {
+            this.cursor_pointer()
+                .hover(move |style| {
+                    style
+                        .bg(color.opacity(0.12))
+                        .border_color(color.opacity(0.72))
+                })
         })
         .child(
             div()
@@ -231,9 +259,14 @@ fn preset_button(
                     .color(color),
             )
         })
-        .when_some(handler, |this, handler| {
+        .when(interactive, |this| {
             this.on_click(move |_event, window, cx| {
-                handler(key, color, window, cx);
+                if let Some(binding) = &binding {
+                    binding.set(cx, key);
+                }
+                if let Some(handler) = &handler {
+                    handler(key, color, window, cx);
+                }
                 cx.stop_propagation();
             })
         })

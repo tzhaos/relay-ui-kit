@@ -1,5 +1,5 @@
 use gpui::{
-    Anchor, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px,
+    Anchor, App, IntoElement, ParentElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use relay_uikit::patterns::{AnchoredOverlay, Pane, PaneSurface, PaneWidth};
 use relay_uikit::workbench::{
@@ -12,7 +12,7 @@ use relay_uikit::{
 };
 
 use super::{
-    WorkbenchApp, WorkbenchState,
+    WorkbenchState,
     data::{
         DEMO_SESSIONS, DemoTask, active_session, active_task, prompt_prefix, session_index_for_key,
         session_lines,
@@ -21,21 +21,21 @@ use super::{
 
 pub(super) fn center_pane(
     state: &WorkbenchState,
-    host: &Entity<WorkbenchApp>,
     theme: Theme,
+    cx: &App,
 ) -> impl IntoElement {
-    let active = active_task(state);
-    let route = state.route;
+    let active = active_task(state.active_task.get(cx));
+    let route = state.route.get(cx);
     let header = PanelHeader::new(active.title)
         .icon(IconName::Terminal)
-        .trailing(route_switch(host, route));
+        .trailing(route_switch(state));
 
     let body = div()
         .size_full()
         .flex()
         .flex_col()
         .when(route == "terminal", |this| {
-            this.child(terminal_body(state, host, theme))
+            this.child(terminal_body(state, theme, cx))
         })
         .when(route == "preview", |this| this.child(preview_body(active)));
 
@@ -44,40 +44,31 @@ pub(super) fn center_pane(
         .header(header)
 }
 
-fn route_switch(host: &Entity<WorkbenchApp>, route: &'static str) -> impl IntoElement {
-    SegmentedControl::new(
+fn route_switch(state: &WorkbenchState) -> impl IntoElement {
+    SegmentedControl::bound(
         "route",
         vec![
             Segment::new("terminal", "Terminal"),
             Segment::new("preview", "Preview"),
         ],
+        state.route.clone(),
     )
-    .active(route)
-    .on_select({
-        let host = host.clone();
-        move |key, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.route = key;
-                cx.notify();
-            });
-        }
-    })
 }
 
 fn terminal_body(
     state: &WorkbenchState,
-    host: &Entity<WorkbenchApp>,
     theme: Theme,
+    cx: &App,
 ) -> impl IntoElement {
-    let session = active_session(state);
+    let session = active_session(state.active_session.get(cx));
 
     div()
         .size_full()
         .min_h_0()
         .flex()
         .flex_col()
-        .child(terminal_toolbar(state, host))
-        .child(agent_quick_launches(host, theme))
+        .child(terminal_toolbar(state, cx))
+        .child(agent_quick_launches(state, theme))
         .child(
             div()
                 .h(px(30.0))
@@ -121,28 +112,33 @@ fn terminal_body(
         )
 }
 
-fn terminal_toolbar(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
+fn terminal_toolbar(
+    state: &WorkbenchState,
+    cx: &App,
+) -> impl IntoElement {
+    let active_session = state.active_session.clone();
+    let launcher_open = state.launcher_open.clone();
     let mut toolbar = TerminalToolbar::new();
     for (index, session) in DEMO_SESSIONS.iter().enumerate() {
-        let host = host.clone();
+        let active_session = active_session.clone();
+        let launcher_open = launcher_open.clone();
         toolbar = toolbar.tab(
             TerminalTab::new(("terminal-tab", index), session.label)
-                .active(index == state.active_session)
+                .active(index == state.active_session.get(cx))
                 .status(session.tone)
                 .on_click(move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.active_session = index;
-                        this.state.launcher_open = false;
-                        cx.notify();
-                    });
+                    active_session.set(cx, index);
+                    launcher_open.set(cx, false);
                 }),
         );
     }
 
-    toolbar.actions(terminal_actions(state, host))
+    toolbar.actions(terminal_actions(state, cx))
 }
 
-fn terminal_actions(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl IntoElement {
+fn terminal_actions(state: &WorkbenchState, cx: &App) -> impl IntoElement {
+    let launcher_open = state.launcher_open.clone();
+
     div()
         .flex()
         .items_center()
@@ -153,43 +149,38 @@ fn terminal_actions(state: &WorkbenchState, host: &Entity<WorkbenchApp>) -> impl
                 Button::new("terminal-new", "New")
                     .icon(IconName::Plus)
                     .on_click({
-                        let host = host.clone();
+                        let launcher_open = launcher_open.clone();
                         move |_event, _window, cx| {
-                            host.update(cx, |this, cx| {
-                                this.state.launcher_open = !this.state.launcher_open;
-                                cx.notify();
-                            });
+                            launcher_open.set(cx, !launcher_open.get(cx));
                         }
                     }),
-                launcher_menu(host),
+                launcher_menu(state),
             )
-            .open(state.launcher_open)
+            .open(state.launcher_open.get(cx))
             .anchor(Anchor::TopRight)
             .attach(Anchor::BottomRight)
             .on_dismiss({
-                let host = host.clone();
+                let launcher_open = launcher_open.clone();
                 move |_window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.launcher_open = false;
-                        cx.notify();
-                    });
+                    launcher_open.set(cx, false);
                 }
             }),
         )
         .child(
             IconButton::new("terminal-refresh", IconName::RefreshCw).on_click({
-                let host = host.clone();
+                let launcher_open = launcher_open.clone();
                 move |_event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        this.state.launcher_open = false;
-                        cx.notify();
-                    });
+                    launcher_open.set(cx, false);
                 }
             }),
         )
 }
 
-fn launcher_menu(host: &Entity<WorkbenchApp>) -> impl IntoElement {
+fn launcher_menu(state: &WorkbenchState) -> impl IntoElement {
+    let active_session = state.active_session.clone();
+    let route = state.route.clone();
+    let launcher_open = state.launcher_open.clone();
+
     LauncherMenu::new(
         "terminal-launcher",
         vec![
@@ -204,31 +195,17 @@ fn launcher_menu(host: &Entity<WorkbenchApp>) -> impl IntoElement {
                 .kind(LauncherItemKind::Agent),
         ],
     )
-    .on_select({
-        let host = host.clone();
-        move |key, _window, cx| {
-            host.update(cx, |this, cx| {
-                this.state.active_session = session_index_for_key(key);
-                this.state.route = "terminal";
-                this.state.launcher_open = false;
-                cx.notify();
-            });
-        }
+    .on_select(move |key, _window, cx| {
+        active_session.set(cx, session_index_for_key(key));
+        route.set(cx, "terminal");
+        launcher_open.set(cx, false);
     })
 }
 
-fn agent_quick_launches(host: &Entity<WorkbenchApp>, theme: Theme) -> impl IntoElement {
-    let launch = |key: &'static str, host: &Entity<WorkbenchApp>| {
-        let host = host.clone();
-        move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut gpui::App| {
-            host.update(cx, |this, cx| {
-                this.state.active_session = session_index_for_key(key);
-                this.state.route = "terminal";
-                this.state.launcher_open = false;
-                cx.notify();
-            });
-        }
-    };
+fn agent_quick_launches(state: &WorkbenchState, theme: Theme) -> impl IntoElement {
+    let active_session = state.active_session.clone();
+    let route = state.route.clone();
+    let launcher_open = state.launcher_open.clone();
 
     div()
         .h(px(40.0))
@@ -240,12 +217,28 @@ fn agent_quick_launches(host: &Entity<WorkbenchApp>, theme: Theme) -> impl IntoE
         .items_center()
         .gap_2()
         .child(
-            TerminalAgentQuickLaunch::new("quick-codex", "Codex", "codex")
-                .on_click(launch("codex", host)),
+            TerminalAgentQuickLaunch::new("quick-codex", "Codex", "codex").on_click({
+                let active_session = active_session.clone();
+                let route = route.clone();
+                let launcher_open = launcher_open.clone();
+                move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut App| {
+                    active_session.set(cx, session_index_for_key("codex"));
+                    route.set(cx, "terminal");
+                    launcher_open.set(cx, false);
+                }
+            }),
         )
         .child(
-            TerminalAgentQuickLaunch::new("quick-claude", "Claude", "claude")
-                .on_click(launch("claude", host)),
+            TerminalAgentQuickLaunch::new("quick-claude", "Claude", "claude").on_click({
+                let active_session = active_session.clone();
+                let route = route.clone();
+                let launcher_open = launcher_open.clone();
+                move |_event: &gpui::ClickEvent, _window: &mut Window, cx: &mut App| {
+                    active_session.set(cx, session_index_for_key("claude"));
+                    route.set(cx, "terminal");
+                    launcher_open.set(cx, false);
+                }
+            }),
         )
         .child(
             div()

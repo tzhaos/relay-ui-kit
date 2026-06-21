@@ -2,6 +2,7 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -22,6 +23,7 @@ pub struct CommandRow {
     shortcut: Option<KeybindingShortcut>,
     selected: bool,
     disabled: bool,
+    binding: Option<Binding<&'static str>>,
     on_select: Option<SelectHandler>,
 }
 
@@ -36,6 +38,27 @@ impl CommandRow {
             shortcut: None,
             selected: false,
             disabled: false,
+            binding: None,
+            on_select: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        key: &'static str,
+        label: impl Into<String>,
+        binding: Binding<&'static str>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            key,
+            label: label.into(),
+            detail: None,
+            icon: None,
+            shortcut: None,
+            selected: false,
+            disabled: false,
+            binding: Some(binding),
             on_select: None,
         }
     }
@@ -77,8 +100,10 @@ impl CommandRow {
 impl RenderOnce for CommandRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx) == self.key);
         let handler = self.on_select;
-        let disabled = self.disabled || handler.is_none();
+        let disabled = self.disabled || (handler.is_none() && binding.is_none());
         let key = self.key;
 
         div()
@@ -90,7 +115,7 @@ impl RenderOnce for CommandRow {
             .items_center()
             .gap_2()
             .rounded(px(radius::MD))
-            .when(self.selected, |this| this.bg(theme.selection))
+            .when(selected, |this| this.bg(theme.selection))
             .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(!disabled, |this| {
                 this.cursor_pointer()
@@ -137,9 +162,14 @@ impl RenderOnce for CommandRow {
                     }),
             )
             .when_some(self.shortcut, |this, shortcut| this.child(shortcut))
-            .when_some(handler.filter(|_| !disabled), |this, handler| {
+            .when(!disabled, |this| {
                 this.on_click(move |_: &ClickEvent, window, cx| {
-                    handler(key, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.set(cx, key);
+                    }
+                    if let Some(handler) = &handler {
+                        handler(key, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })

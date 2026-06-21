@@ -3,6 +3,7 @@ use gpui::{
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay::Binding;
 
 use crate::{
     display::StatusDot,
@@ -18,6 +19,7 @@ pub struct TerminalTab {
     label: String,
     active: bool,
     status: Tone,
+    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -28,6 +30,18 @@ impl TerminalTab {
             label: label.into(),
             active: false,
             status: Tone::Muted,
+            binding: None,
+            on_click: None,
+        }
+    }
+
+    pub fn bound(id: impl Into<ElementId>, label: impl Into<String>, binding: Binding<bool>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            active: false,
+            status: Tone::Muted,
+            binding: Some(binding),
             on_click: None,
         }
     }
@@ -54,8 +68,10 @@ impl TerminalTab {
 impl RenderOnce for TerminalTab {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let binding = self.binding;
+        let active = binding.as_ref().map_or(self.active, |b| b.get(cx));
         let handler = self.on_click;
-        let clickable = handler.is_some();
+        let clickable = binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -67,23 +83,23 @@ impl RenderOnce for TerminalTab {
             .gap_2()
             .rounded(px(radius::MD))
             .border_1()
-            .border_color(if self.active {
+            .border_color(if active {
                 theme.accent_border
             } else {
                 theme.border
             })
-            .bg(if self.active {
+            .bg(if active {
                 theme.panel
             } else {
                 theme.panel_alt
             })
-            .text_color(if self.active {
+            .text_color(if active {
                 theme.text
             } else {
                 theme.text_secondary
             })
             .when(clickable, |this| this.cursor_pointer())
-            .when(clickable && !self.active, |this| {
+            .when(clickable && !active, |this| {
                 this.hover(move |style| style.bg(theme.hover))
             })
             .when(clickable, |this| {
@@ -100,9 +116,17 @@ impl RenderOnce for TerminalTab {
                     .font_weight(FontWeight::MEDIUM)
                     .child(self.label),
             )
-            .when_some(handler.filter(|_| clickable), |this, handler| {
+            .when(clickable, |this| {
                 this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |active| {
+                            *active = !*active;
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(event, window, cx);
+                    }
                     cx.stop_propagation();
                 })
             })

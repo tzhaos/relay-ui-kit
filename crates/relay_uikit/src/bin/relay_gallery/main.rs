@@ -24,14 +24,12 @@
 mod gallery;
 mod workbench_demo;
 
-use std::cell::Cell;
-use std::rc::Rc;
-
 use gpui::{
     AnyElement, AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
-    StyleRefinement, Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
+    Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
+use relay::{ReactiveAppExt, ReactiveContextExt, Signal};
 use relay_uikit::patterns::{TitleBar, WorkspaceBreadcrumb};
 use relay_uikit::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
 
@@ -46,8 +44,8 @@ pub enum Page {
 }
 
 pub struct GalleryApp {
-    page: Page,
-    dark_mode: Rc<Cell<bool>>,
+    page: Signal<Page>,
+    dark_mode: Signal<bool>,
     gallery: gpui::Entity<gallery::GalleryScenesApp>,
     workbench: gpui::Entity<workbench_demo::WorkbenchApp>,
 }
@@ -55,36 +53,35 @@ pub struct GalleryApp {
 impl GalleryApp {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
-            page: Page::Product,
-            dark_mode: Rc::new(Cell::new(false)),
+            page: cx.signal(Page::Product),
+            dark_mode: cx.signal(false),
             gallery: cx.new(gallery::GalleryScenesApp::new),
             workbench: cx.new(workbench_demo::WorkbenchApp::new),
         }
     }
 
-    fn set_page(&mut self, page: Page, cx: &mut Context<Self>) {
-        self.page = page;
+    fn set_page(&self, page: Page, cx: &mut App) {
+        self.page.set(cx, page);
         if let Some(surface) = page.gallery_surface() {
-            self.gallery.update(cx, |gallery, cx| {
+            self.gallery.update(cx, |gallery, _cx| {
                 gallery.set_surface(surface);
-                cx.notify();
             });
         }
-        cx.notify();
     }
 
-    fn top_bar(&self) -> impl IntoElement {
+    fn top_bar(&self, cx: &mut App) -> impl IntoElement {
+        let page = self.page.get(cx);
         TitleBar::new("Relay")
             .project("UI Kit")
             .center(WorkspaceBreadcrumb::new(vec![
                 "Relay".into(),
                 "Studio".into(),
-                self.page_label().into(),
+                self.label_for(page).into(),
             ]))
     }
 
-    fn page_label(&self) -> &'static str {
-        match self.page {
+    fn label_for(&self, page: Page) -> &'static str {
+        match page {
             Page::Product => "Product Workbench",
             Page::Core => "Core Kit",
             Page::Patterns => "Patterns Kit",
@@ -115,6 +112,7 @@ impl GalleryApp {
 
     fn catalog(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
+        let page = self.page.get(cx);
         div()
             .w(px(space::RAIL_WIDTH))
             .flex_shrink_0()
@@ -127,18 +125,18 @@ impl GalleryApp {
             .border_r_1()
             .border_color(theme.border)
             .bg(theme.chrome)
-            .child(self.catalog_row(Page::Product, cx))
-            .child(self.catalog_row(Page::Core, cx))
-            .child(self.catalog_row(Page::Patterns, cx))
-            .child(self.catalog_row(Page::Workbench, cx))
-            .child(self.catalog_row(Page::Stress, cx))
+            .child(self.catalog_row(Page::Product, page, cx))
+            .child(self.catalog_row(Page::Core, page, cx))
+            .child(self.catalog_row(Page::Patterns, page, cx))
+            .child(self.catalog_row(Page::Workbench, page, cx))
+            .child(self.catalog_row(Page::Stress, page, cx))
             .child(div().flex_1())
             .child(self.theme_toggle(cx))
     }
 
     fn theme_toggle(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
-        let is_dark = self.dark_mode.get();
+        let is_dark = self.dark_mode.get(cx);
         let label = if is_dark { "☀  Light" } else { "☾  Dark" };
         let dark_mode = self.dark_mode.clone();
 
@@ -149,8 +147,8 @@ impl GalleryApp {
             .border_color(theme.border)
             .child(Button::new("theme-toggle", label).ghost().on_click(
                 move |_event, _window, cx: &mut App| {
-                    let was_dark = dark_mode.get();
-                    dark_mode.set(!was_dark);
+                    let was_dark = dark_mode.get(cx);
+                    dark_mode.set(cx, !was_dark);
                     if was_dark {
                         theme::init(cx);
                     } else {
@@ -160,13 +158,13 @@ impl GalleryApp {
             ))
     }
 
-    fn catalog_row(&self, page: Page, cx: &mut Context<Self>) -> impl IntoElement {
+    fn catalog_row(&self, page: Page, current: Page, cx: &mut Context<Self>) -> impl IntoElement {
         let mut row = NavRow::new(
             Self::page_key(page),
             Self::page_icon(page),
-            self.page_label_for(page),
+            self.label_for(page),
         )
-        .selected(self.page == page)
+        .selected(current == page)
         .on_click(cx.listener(move |this, _, _, cx| {
             this.set_page(page, cx);
         }));
@@ -186,43 +184,37 @@ impl GalleryApp {
         }
     }
 
-    fn page_label_for(&self, page: Page) -> &'static str {
-        match page {
-            Page::Product => "Product Workbench",
-            Page::Core => "Core Kit",
-            Page::Patterns => "Patterns Kit",
-            Page::Workbench => "Workbench Kit",
-            Page::Stress => "Stress Lab",
-        }
-    }
 }
 
 impl Render for GalleryApp {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = *cx.theme();
-        let body = match self.page {
-            Page::Product => cached_scene(self.workbench.clone()),
-            Page::Core | Page::Patterns | Page::Workbench | Page::Stress => {
-                cached_scene(self.gallery.clone())
-            }
-        };
+        cx.tracked(|cx| {
+            let theme = *cx.theme();
+            let page = self.page.get(cx);
+            let body = match page {
+                Page::Product => cached_scene(self.workbench.clone()),
+                Page::Core | Page::Patterns | Page::Workbench | Page::Stress => {
+                    cached_scene(self.gallery.clone())
+                }
+            };
 
-        div()
-            .size_full()
-            .bg(theme.app_bg)
-            .text_color(theme.text)
-            .font_family(theme::ui_family())
-            .flex()
-            .flex_col()
-            .child(self.top_bar())
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .child(self.catalog(cx))
-                    .child(div().flex_1().min_w_0().min_h_0().child(body)),
-            )
+            div()
+                .size_full()
+                .bg(theme.app_bg)
+                .text_color(theme.text)
+                .font_family(theme::ui_family())
+                .flex()
+                .flex_col()
+                .child(self.top_bar(cx))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .flex()
+                        .child(self.catalog(cx))
+                        .child(div().flex_1().min_w_0().min_h_0().child(body)),
+                )
+        })
     }
 }
 
@@ -241,7 +233,7 @@ impl Page {
 fn cached_scene(scene: impl Into<AnyView>) -> AnyElement {
     scene
         .into()
-        .cached(StyleRefinement::default().size_full())
+        .cached(gpui::StyleRefinement::default().size_full())
         .into_any_element()
 }
 

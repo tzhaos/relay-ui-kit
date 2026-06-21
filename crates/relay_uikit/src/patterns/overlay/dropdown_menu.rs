@@ -1,4 +1,5 @@
 use gpui::{AnyElement, App, ElementId, IntoElement, Pixels, Point, RenderOnce, Window, point, px};
+use relay::Binding;
 
 use crate::interaction::DismissHandler;
 
@@ -13,6 +14,7 @@ pub struct DropdownMenu {
     auto_dismiss: bool,
     min_width: f32,
     offset: Point<Pixels>,
+    open_binding: Option<Binding<bool>>,
     on_dismiss: Option<DismissHandler>,
 }
 
@@ -26,6 +28,26 @@ impl DropdownMenu {
             auto_dismiss: true,
             min_width: 180.0,
             offset: point(px(0.0), px(0.0)),
+            open_binding: None,
+            on_dismiss: None,
+        }
+    }
+
+    pub fn bound(
+        id: impl Into<ElementId>,
+        trigger: impl IntoElement,
+        items: Vec<MenuItem>,
+        binding: Binding<bool>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            trigger: trigger.into_any_element(),
+            items,
+            open: false,
+            auto_dismiss: true,
+            min_width: 180.0,
+            offset: point(px(0.0), px(0.0)),
+            open_binding: Some(binding),
             on_dismiss: None,
         }
     }
@@ -57,17 +79,26 @@ impl DropdownMenu {
 }
 
 impl RenderOnce for DropdownMenu {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let menu_id = (self.id.clone(), "menu");
         let menu = Menu::new(menu_id, self.items).min_width(self.min_width);
+        let open_binding = self.open_binding;
+        let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
         let mut overlay = AnchoredOverlay::new(self.id, self.trigger, menu)
-            .open(self.open)
+            .open(open)
             .offset(self.offset);
 
-        if self.auto_dismiss
-            && let Some(on_dismiss) = self.on_dismiss
-        {
-            overlay = overlay.on_dismiss(on_dismiss);
+        if self.auto_dismiss {
+            let dismiss_binding = open_binding.clone();
+            let user_dismiss = self.on_dismiss;
+            overlay = overlay.on_dismiss(move |window, cx| {
+                if let Some(binding) = &dismiss_binding {
+                    binding.set(cx, false);
+                }
+                if let Some(handler) = &user_dismiss {
+                    handler(window, cx);
+                }
+            });
         }
 
         overlay

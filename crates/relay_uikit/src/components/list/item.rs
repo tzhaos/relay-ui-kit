@@ -102,10 +102,6 @@ impl ListItem {
         self
     }
 
-    pub(crate) fn on_click_handler(mut self, handler: ClickHandler) -> Self {
-        self.on_click = Some(handler);
-        self
-    }
 }
 
 impl ParentElement for ListItem {
