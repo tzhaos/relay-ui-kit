@@ -73,6 +73,22 @@ impl<T> Signal<T> {
         }
     }
 
+    /// Mutate the signal without notifying dependents.
+    ///
+    /// Use this when an effect needs to write back to a signal it also reads,
+    /// or when coordinating internal state that should not trigger a refresh on
+    /// its own. Prefer [`Signal::update`] for ordinary mutations.
+    pub fn update_silent(&self, f: impl FnOnce(&mut T)) {
+        f(&mut self.value.borrow_mut());
+    }
+
+    /// Set the signal value without notifying dependents.
+    ///
+    /// See [`Signal::update_silent`] for when to use this.
+    pub fn set_silent(&self, value: T) {
+        *self.value.borrow_mut() = value;
+    }
+
     /// Split the signal into read and write handles.
     pub fn split(&self) -> (ReadSignal<T>, WriteSignal<T>) {
         (
@@ -179,5 +195,118 @@ impl<T> Clone for WriteSignal<T> {
         Self {
             signal: self.signal.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::Cell, rc::Rc};
+
+    use gpui::{Context, IntoElement, ParentElement, Render, TestApp, Window, div};
+
+    use crate::{Signal, effect, init, track};
+
+    struct SilentView {
+        signal: Signal<i32>,
+    }
+
+    impl SilentView {
+        fn new(cx: &mut Context<Self>) -> Self {
+            init(cx);
+            Self {
+                signal: Signal::new(cx, 0),
+            }
+        }
+    }
+
+    impl Render for SilentView {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            track(cx, |cx| div().child(self.signal.get(cx).to_string()))
+        }
+    }
+
+    #[test]
+    fn update_silent_does_not_notify() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| SilentView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _subscription = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        app.update_entity(&root, |view, _cx| {
+            view.signal.update_silent(|v| *v = 42);
+        });
+
+        assert_eq!(notifications.get(), 0);
+        app.update_entity(&root, |view, _cx| {
+            assert_eq!(view.signal.get_untracked(), 42);
+        });
+    }
+
+    #[test]
+    fn set_silent_does_not_notify() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| SilentView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _subscription = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        app.update_entity(&root, |view, _cx| {
+            view.signal.set_silent(7);
+        });
+
+        assert_eq!(notifications.get(), 0);
+        app.update_entity(&root, |view, _cx| {
+            assert_eq!(view.signal.get_untracked(), 7);
+        });
+    }
+
+    #[test]
+    fn update_silent_then_visible_update_notifies() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let runs = runs.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    signal.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+
+        assert_eq!(runs.get(), 1);
+
+        app.update(|_cx| signal.update_silent(|v| *v = 1));
+        assert_eq!(runs.get(), 1);
+
+        app.update(|cx| signal.set(cx, 2));
+        assert_eq!(runs.get(), 2);
     }
 }

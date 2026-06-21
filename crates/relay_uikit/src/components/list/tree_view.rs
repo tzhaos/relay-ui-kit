@@ -6,6 +6,7 @@ use crate::{
 
 use super::ListItem;
 
+#[derive(Clone, PartialEq)]
 pub struct TreeNode {
     key: &'static str,
     icon: IconName,

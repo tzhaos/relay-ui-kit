@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 
 use gpui::{App, Context};
 
-use crate::{Binding, Effect, Memo, Resource, Signal, effect_in, init, track};
+use crate::{Binding, Effect, Memo, Resource, Signal, effect_in, init, track, untrack};
 
 /// Convenience constructors for relay primitives on GPUI app contexts.
 pub trait ReactiveAppExt {
@@ -27,6 +27,24 @@ pub trait ReactiveAppExt {
 
     /// Create an errored async resource.
     fn error_resource<T, E>(&mut self, error: E) -> Resource<T, E>;
+
+    /// Run a closure without recording signal reads as dependencies.
+    ///
+    /// Convenience wrapper around [`crate::untrack`].
+    fn untrack<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R;
+
+    /// Create a derived value that updates when its dependencies change.
+    ///
+    /// This is a semantic alias for [`ReactiveAppExt::memo`], intended for call
+    /// sites where the value expresses a *derivation* (e.g. filtered list,
+    /// selected item detail, form validity) rather than a generic cached
+    /// computation. Use `derived` in application code for clarity.
+    fn derived<T>(&mut self, compute: impl Fn(&App) -> T + 'static) -> Memo<T>
+    where
+        T: PartialEq + 'static,
+    {
+        self.memo(compute)
+    }
 }
 
 impl<C> ReactiveAppExt for C
@@ -59,6 +77,10 @@ where
     fn error_resource<T, E>(&mut self, error: E) -> Resource<T, E> {
         Resource::error(self.borrow_mut(), error)
     }
+
+    fn untrack<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
+        untrack(self.borrow_mut(), f)
+    }
 }
 
 /// Reactive helpers that need the current GPUI entity.
@@ -68,6 +90,31 @@ pub trait ReactiveContextExt<T: 'static> {
 
     /// Create an effect that is disposed when the current entity is released.
     fn effect_scoped(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect;
+
+    /// Create an effect that is disposed when the current entity is released.
+    ///
+    /// The closure runs immediately and re-runs whenever any signal it reads
+    /// changes. Prefer this over `effect_scoped` when the side effect should
+    /// read signals and react to them — it documents intent at the call site.
+    fn effect_in(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect;
+
+    /// Watch signals for changes and run a side effect.
+    ///
+    /// `sources` reads the dependencies (and is re-evaluated each run so
+    /// conditional dependencies work). `react` runs the side effect after the
+    /// sources are collected. The effect is scoped to the current entity and
+    /// disposed when it is released.
+    ///
+    /// Unlike [`ReactiveContextExt::effect_in`], this separates dependency
+    /// declaration from the side effect, making "when X changes, do Y" explicit.
+    fn watch<S, R>(
+        &mut self,
+        sources: S,
+        react: R,
+    ) -> Effect
+    where
+        S: Fn(&App) + 'static,
+        R: Fn(&mut App) + 'static;
 }
 
 impl<T: 'static> ReactiveContextExt<T> for Context<'_, T> {
@@ -77,6 +124,26 @@ impl<T: 'static> ReactiveContextExt<T> for Context<'_, T> {
 
     fn effect_scoped(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect {
         effect_in(self, f)
+    }
+
+    fn effect_in(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect {
+        effect_in(self, f)
+    }
+
+    fn watch<S, R>(&mut self, sources: S, react: R) -> Effect
+    where
+        S: Fn(&App) + 'static,
+        R: Fn(&mut App) + 'static,
+    {
+        // Store both closures in shared cells so the effect callback can invoke
+        // them on every run without moving them out. Each run reads the sources
+        // (establishing dependencies) then fires the side effect.
+        let sources: std::rc::Rc<S> = std::rc::Rc::new(sources);
+        let react: std::rc::Rc<R> = std::rc::Rc::new(react);
+        effect_in(self, move |cx| {
+            (sources)(cx);
+            (react)(cx);
+        })
     }
 }
 
@@ -111,5 +178,200 @@ mod tests {
         app.read(|cx| {
             assert_eq!(resource.get(cx), ResourceState::Ready(7));
         });
+    }
+
+    #[test]
+    fn app_ext_untrack_does_not_subscribe() {
+        use gpui::{Context, IntoElement, Render, Window, div};
+
+        use crate::{Signal, init, track};
+
+        struct UntrackView {
+            signal: Signal<i32>,
+            other: Signal<i32>,
+        }
+
+        impl UntrackView {
+            fn new(cx: &mut Context<Self>) -> Self {
+                init(cx);
+                Self {
+                    signal: Signal::new(cx, 0),
+                    other: Signal::new(cx, 100),
+                }
+            }
+        }
+
+        impl Render for UntrackView {
+            fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                track(cx, |cx| {
+                    // tracked read
+                    let _a = self.signal.get(cx);
+                    // untracked read via ext
+                    let _b = cx.untrack(|cx| self.other.get(cx));
+                    div()
+                })
+            }
+        }
+
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| UntrackView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = std::rc::Rc::new(std::cell::Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        app.update_entity(&root, |view, cx| {
+            view.other.set(cx, 200);
+        });
+
+        // `other` is untracked, so changing it should not notify.
+        assert_eq!(notifications.get(), 0);
+    }
+
+    #[test]
+    fn derived_updates_when_source_changes() {
+        let mut app = TestApp::new();
+        let (source, derived) = app.update(|cx| {
+            crate::init(cx);
+            let source: crate::Signal<i32> = cx.signal(3);
+            let derived = cx.derived({
+                let source = source.clone();
+                move |cx| source.get(cx) * 2
+            });
+            (source, derived)
+        });
+
+        app.read(|cx| {
+            assert_eq!(derived.get(cx), 6);
+        });
+
+        app.update(|cx| source.set(cx, 5));
+
+        app.read(|cx| {
+            assert_eq!(derived.get(cx), 10);
+        });
+    }
+
+    #[test]
+    fn watch_fires_when_sources_change() {
+        use gpui::{Context, IntoElement, ParentElement, Render, Window, div};
+
+        use crate::{ReactiveContextExt, Signal, init, track};
+
+        struct WatchView {
+            a: Signal<i32>,
+            b: Signal<i32>,
+        }
+
+        impl WatchView {
+            fn new(cx: &mut Context<Self>, last_sum: std::rc::Rc<std::cell::Cell<i32>>) -> Self {
+                init(cx);
+                let a = cx.signal(1);
+                let b = cx.signal(2);
+                let a_for_effect = a.clone();
+                let b_for_effect = b.clone();
+                let a_for_react = a.clone();
+                let b_for_react = b.clone();
+                cx.watch(
+                    move |cx| {
+                        let _ = a_for_effect.get(cx);
+                        let _ = b_for_effect.get(cx);
+                    },
+                    move |cx| {
+                        let sum = a_for_react.get(cx) + b_for_react.get(cx);
+                        last_sum.set(sum);
+                    },
+                );
+                Self { a, b }
+            }
+        }
+
+        impl Render for WatchView {
+            fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                track(cx, |cx| div().child((self.a.get(cx) + self.b.get(cx)).to_string()))
+            }
+        }
+
+        let last_sum = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| WatchView::new(cx, last_sum.clone()));
+        window.draw();
+
+        // Initial run of the effect happened during new(); sum should be 3.
+        assert_eq!(last_sum.get(), 3);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.a.set(cx, 10);
+        });
+
+        // Effect re-ran because `a` (a source) changed.
+        assert_eq!(last_sum.get(), 12);
+    }
+
+    #[test]
+    fn watch_does_not_fire_for_non_source_signals() {
+        use gpui::{Context, IntoElement, ParentElement, Render, Window, div};
+
+        use crate::{ReactiveContextExt, Signal, init, track};
+
+        struct WatchView {
+            watched: Signal<i32>,
+            ignored: Signal<i32>,
+        }
+
+        impl WatchView {
+            fn new(cx: &mut Context<Self>, fires: std::rc::Rc<std::cell::Cell<i32>>) -> Self {
+                init(cx);
+                let watched = cx.signal(0);
+                let ignored = cx.signal(0);
+                let watched_for_effect = watched.clone();
+                cx.watch(
+                    move |cx| {
+                        let _ = watched_for_effect.get(cx);
+                    },
+                    move |_cx| {
+                        fires.set(fires.get() + 1);
+                    },
+                );
+                Self { watched, ignored }
+            }
+        }
+
+        impl Render for WatchView {
+            fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                track(cx, |cx| div().child(self.watched.get(cx).to_string()))
+            }
+        }
+
+        let fires = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| WatchView::new(cx, fires.clone()));
+        window.draw();
+
+        // Initial run during new() → fires == 1.
+        assert_eq!(fires.get(), 1);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.ignored.set(cx, 99);
+        });
+
+        // `ignored` is not a source, so the effect should not fire.
+        assert_eq!(fires.get(), 1);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.watched.set(cx, 7);
+        });
+
+        // `watched` is a source, so the effect fires again.
+        assert_eq!(fires.get(), 2);
     }
 }

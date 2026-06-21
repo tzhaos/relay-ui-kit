@@ -47,7 +47,7 @@ pub use input::{
     InputActionKind, InputValueKind, NumberInput, NumberInputLayout, SearchField, TextArea,
     TextInput, TextInputAction, TextInputState, ValidationState,
 };
-pub use list::{ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
+pub use list::{ForEach, ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
 pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
 pub use patterns::overlay::{
     AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,

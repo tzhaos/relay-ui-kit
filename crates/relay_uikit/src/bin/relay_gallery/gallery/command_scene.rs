@@ -44,27 +44,32 @@ pub(super) fn render(
                         .child(format!("Shortcut event: {}", state.overlay_event.get(cx))),
                 ),
         ))
-        .child(section(
-            cx,
-            "Branch controls",
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(branch_controls(
-                    host,
-                    &state.branch_choice,
-                    &state.branch_picker_open,
-                    &state.branch_actions_open,
-                    &state.branch_event,
-                ))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(theme.text_muted)
-                        .child(format!("Branch event: {}", state.branch_event.get(cx))),
-                ),
-        ))
+        .child({
+            let branch_controls = branch_controls(
+                host,
+                cx,
+                &state.branch_choice,
+                &state.branch_picker_open,
+                &state.branch_actions_open,
+                &state.branch_event,
+            );
+            let branch_event_text = state.branch_event.get(cx).to_string();
+            section(
+                cx,
+                "Branch controls",
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(branch_controls)
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.text_muted)
+                            .child(format!("Branch event: {branch_event_text}")),
+                    ),
+            )
+        })
         .child(section(cx, "Overlays", overlay_body))
         .child(section(
             cx,

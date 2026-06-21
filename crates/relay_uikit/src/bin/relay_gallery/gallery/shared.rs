@@ -1,6 +1,5 @@
-use gpui::{Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
-use relay::Binding;
-use relay::Signal;
+use gpui::{AnyElement, App, Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
+use relay::{Binding, ReactiveAppExt, Signal};
 use relay_uikit::workbench::{BranchOption, BranchSelector};
 use relay_uikit::{
     ActiveTheme, Icon, IconButton, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme,
@@ -81,27 +80,34 @@ pub(super) fn text_input_field(
 
 pub(super) fn branch_controls(
     _host: &Entity<GalleryScenesApp>,
+    cx: &mut App,
     branch_choice: &Binding<&'static str>,
     picker_open: &Binding<bool>,
     actions_open: &Binding<bool>,
     branch_event: &Signal<String>,
-) -> impl IntoElement {
+) -> AnyElement {
     div()
         .flex()
         .items_center()
         .gap_1()
-        .child(branch_selector(branch_choice, picker_open, branch_event))
-        .child(branch_actions_button(actions_open, branch_event))
+        .child(branch_selector(cx, branch_choice, picker_open, branch_event))
+        .child(branch_actions_button(cx, actions_open, branch_event))
+        .into_any_element()
 }
 
 fn branch_selector(
+    cx: &mut App,
     branch_choice: &Binding<&'static str>,
     open: &Binding<bool>,
     branch_event: &Signal<String>,
-) -> impl IntoElement {
+) -> AnyElement {
+    // Snapshot reads are untracked: BranchSelector::new takes a value, not a
+    // binding, so subscribing here would only cause redundant re-renders. The
+    // component refreshes via the surrounding tracked render instead.
+    let (selected_key, open_val) = cx.untrack(|cx| (branch_choice.get(cx), open.get(cx)));
     BranchSelector::new(
         "gallery-branch-selector",
-        branch_choice.signal().get_untracked(),
+        selected_key,
         vec![
             BranchOption::new("main", "main").detail("default branch"),
             BranchOption::new("ui-kit-branch-controls", "ui-kit/branch-controls")
@@ -111,7 +117,7 @@ fn branch_selector(
             BranchOption::new("review-viewers", "review/viewers").detail("diff and file views"),
         ],
     )
-    .open(open.signal().get_untracked())
+    .open(open_val)
     .on_toggle({
         let open = open.clone();
         move |_event, _window, cx| {
@@ -149,10 +155,15 @@ fn branch_selector(
             open.set(cx, false);
         }
     })
+    .into_any_element()
 }
 
-fn branch_actions_button(open: &Binding<bool>, _branch_event: &Signal<String>) -> impl IntoElement {
-    let open_val = open.signal().get_untracked();
+fn branch_actions_button(
+    cx: &mut App,
+    open: &Binding<bool>,
+    _branch_event: &Signal<String>,
+) -> AnyElement {
+    let open_val = cx.untrack(|cx| open.get(cx));
     IconButton::new("gallery-branch-actions", IconName::Ellipsis)
         .active(open_val)
         .on_click({
@@ -164,6 +175,7 @@ fn branch_actions_button(open: &Binding<bool>, _branch_event: &Signal<String>) -
                 });
             }
         })
+        .into_any_element()
 }
 
 pub(super) fn dot_label(theme: Theme, tone: Tone, label: &str) -> impl IntoElement {

@@ -7,7 +7,7 @@ use relay_uikit::{
     Badge, Button, ButtonVariant, ColorField, ColorSwatch, CountBadge, Disclosure, Divider,
     EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton, IconName,
     Label, LabelSize, ListItem, NavRow, Radio, SearchField, SectionedList, SectionedListGroup,
-    Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
+    Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeRow, TreeView,
 };
 
 use super::{
@@ -579,7 +579,7 @@ fn list_core_samples(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     let selected = state.viewer_tab.get(cx);
-    let tree_nodes = core_tree_nodes(state, cx);
+    let tree_nodes = state.core_tree_nodes.get(cx);
     let select_tree = {
         let viewer_tab = state.viewer_tab.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
@@ -675,40 +675,6 @@ fn select_core_item(
     move |_event, _window, cx| {
         viewer_tab.set(cx, key);
     }
-}
-
-fn core_tree_nodes(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> Vec<TreeNode> {
-    let mut nodes = vec![TreeNode::new("tree:src", IconName::Folder, "src")
-        .expanded(state.core_tree_src_open.get(cx))];
-
-    if state.core_tree_src_open.get(cx) {
-        nodes.push(
-            TreeNode::new("tree:components", IconName::Folder, "components")
-                .depth(1)
-                .expanded(state.core_tree_components_open.get(cx)),
-        );
-    }
-
-    if state.core_tree_src_open.get(cx) && state.core_tree_components_open.get(cx) {
-        nodes.push(
-            TreeNode::new("tree:list", IconName::Folder, "list")
-                .depth(2)
-                .expanded(state.core_tree_list_open.get(cx)),
-        );
-    }
-
-    if state.core_tree_src_open.get(cx)
-        && state.core_tree_components_open.get(cx)
-        && state.core_tree_list_open.get(cx)
-    {
-        nodes.push(
-            TreeNode::new("tree:item", IconName::FileText, "item.rs")
-                .depth(3)
-                .selected(state.viewer_tab.get(cx) == "tree:item"),
-        );
-    }
-
-    nodes
 }
 
 fn list_item_text(title: &'static str, detail: &'static str, theme: Theme) -> impl IntoElement {

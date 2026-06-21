@@ -2,6 +2,7 @@ use gpui::{
     Anchor, Context, Entity, IntoElement, ParentElement, Styled, Window, div,
     prelude::FluentBuilder, px, rgb,
 };
+use relay::SignalVecExt;
 use relay_uikit::patterns::overlay::{Select, SelectOption, overlay};
 use relay_uikit::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
@@ -178,19 +179,19 @@ pub(super) fn render(
                         .child(
                             Button::new("feedback-hide-toast", "Clear")
                                 .ghost()
-                                .disabled(state.feedback_toasts.is_empty())
+                                .disabled(state.feedback_toasts.read(cx, |t| t.is_empty()))
                                 .on_click({
-                                    let host = host.clone();
+                                    let toasts = state.feedback_toasts.clone();
                                     move |_event, _window, cx| {
-                                        host.update(cx, |this, cx| {
-                                            this.state.feedback_toasts.clear();
-                                            cx.notify();
-                                        });
+                                        // SignalVecExt::clear notifies the view
+                                        // automatically — no cx.notify() needed.
+                                        toasts.clear(cx);
                                     }
                                 }),
                         ),
                 )
-                .when(!state.feedback_toasts.is_empty(), |this| {
+                .when(!state.feedback_toasts.read(cx, |t| t.is_empty()), |this| {
+                    let toasts = state.feedback_toasts.get(cx);
                     this.child(
                         overlay(
                             div()
@@ -198,7 +199,7 @@ pub(super) fn render(
                                 .flex_col()
                                 .items_end()
                                 .gap_2()
-                                .children(state.feedback_toasts.iter().map(|toast| {
+                                .children(toasts.iter().map(|toast| {
                                     let id = toast.id;
                                     Toast::new(
                                         format!("feedback-floating-toast-{id}"),
@@ -210,8 +211,9 @@ pub(super) fn render(
                                         let host = host.clone();
                                         move |_event, _window, cx| {
                                             host.update(cx, |this, cx| {
-                                                this.dismiss_feedback_toast(id);
-                                                cx.notify();
+                                                // dismiss_feedback_toast now takes
+                                                // cx and notifies via the signal.
+                                                this.dismiss_feedback_toast(id, cx);
                                             });
                                         }
                                     })

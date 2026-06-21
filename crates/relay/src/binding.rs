@@ -31,6 +31,20 @@ impl<T> Binding<T> {
         self.signal.update(cx, update);
     }
 
+    /// Mutate the bound value without notifying dependents.
+    ///
+    /// See [`crate::Signal::update_silent`] for when to use this.
+    pub fn update_silent(&self, f: impl FnOnce(&mut T)) {
+        self.signal.update_silent(f);
+    }
+
+    /// Set the bound value without notifying dependents.
+    ///
+    /// See [`crate::Signal::update_silent`] for when to use this.
+    pub fn set_silent(&self, value: T) {
+        self.signal.set_silent(value);
+    }
+
     /// Set the bound value and notify dependents when it changed.
     pub fn set(&self, cx: &mut App, value: T)
     where

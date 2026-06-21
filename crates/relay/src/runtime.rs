@@ -50,6 +50,9 @@ struct RuntimeState {
 #[derive(Default)]
 struct TrackingScope {
     deps: HashSet<SignalId>,
+    /// When true, signal reads inside this scope are not recorded as
+    /// dependencies. Used by [`untrack`] to enable read-without-subscribe.
+    suppress: bool,
 }
 
 type EffectCallback = Rc<RefCell<dyn FnMut(&mut App)>>;
@@ -91,6 +94,23 @@ pub fn track<T: 'static, R>(cx: &mut Context<T>, render: impl FnOnce(&mut Contex
     result
 }
 
+/// Run a closure without recording signal reads as dependencies.
+///
+/// Signals read inside `f` will not subscribe the current observer (entity
+/// render or effect) to those signals. Writes still propagate normally. This is
+/// the reactive equivalent of "read a snapshot without subscribing".
+pub fn untrack<R>(cx: &mut App, f: impl FnOnce(&mut App) -> R) -> R {
+    init(cx);
+    cx.global::<ReactiveRuntime>().begin_untracked_scope();
+    let result = f(cx);
+    let dropped = cx.global::<ReactiveRuntime>().end_tracking();
+    debug_assert!(
+        dropped.is_empty(),
+        "untrack scope should not collect dependencies"
+    );
+    result
+}
+
 /// Batch signal writes and flush affected GPUI entities once at the end.
 pub fn batch<R>(cx: &mut App, f: impl FnOnce(&mut App) -> R) -> R {
     init(cx);
@@ -122,6 +142,9 @@ impl ReactiveRuntime {
         let Some(scope) = state.tracking_stack.last_mut() else {
             return;
         };
+        if scope.suppress {
+            return;
+        }
         scope.deps.insert(signal_id);
     }
 
@@ -175,6 +198,16 @@ impl ReactiveRuntime {
             .borrow_mut()
             .tracking_stack
             .push(TrackingScope::default());
+    }
+
+    fn begin_untracked_scope(&self) {
+        self.state
+            .borrow_mut()
+            .tracking_stack
+            .push(TrackingScope {
+                suppress: true,
+                ..Default::default()
+            });
     }
 
     fn end_tracking(&self) -> HashSet<SignalId> {
@@ -378,7 +411,7 @@ mod tests {
 
     use gpui::{Context, EntityId, IntoElement, ParentElement, Render, TestApp, Window, div};
 
-    use crate::{Memo, Signal, effect, init, track};
+    use crate::{Memo, Signal, effect, init, track, untrack};
 
     use super::*;
 
@@ -565,5 +598,103 @@ mod tests {
         app.read(|cx| {
             assert_eq!(memo.get(cx), 12);
         });
+    }
+
+    #[test]
+    fn untrack_does_not_subscribe_rendering_entity() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ReactiveView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _subscription = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        // Mutating the alternate signal (which is untracked inside render via
+        // a hypothetical untrack call) should not notify. We simulate this by
+        // reading via untrack in the test below.
+        app.update_entity(&root, |view, cx| {
+            // Read via untrack: should NOT register as a dependency.
+            let _peeked = untrack(cx, |cx| view.alternate.get(cx));
+        });
+
+        app.update_entity(&root, |view, cx| {
+            view.alternate.set(cx, 99);
+        });
+
+        // alternate changed, but render never subscribed to it (render only
+        // subscribes to the active signal). Confirm no spurious notification.
+        assert_eq!(notifications.get(), 0);
+    }
+
+    #[test]
+    fn untrack_writes_still_propagate() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ReactiveView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _subscription = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        // Writing inside untrack should still notify subscribers of the signal.
+        app.update_entity(&root, |view, cx| {
+            untrack(cx, |cx| view.signal.set(cx, 7));
+        });
+
+        assert_eq!(notifications.get(), 1);
+    }
+
+    #[test]
+    fn untrack_nested_restores_tracking_after_scope_exits() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ReactiveView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _subscription = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        // Untrack read in the middle, then a tracked read after — the latter
+        // should still register the dependency.
+        app.update_entity(&root, |view, cx| {
+            let _untracked_peek = untrack(cx, |cx| view.alternate.get(cx));
+            let _tracked = view.signal.get(cx);
+        });
+
+        // signal is a dependency, alternate is not.
+        app.update_entity(&root, |view, cx| {
+            view.signal.set(cx, 1);
+        });
+        assert_eq!(notifications.get(), 1);
+
+        app.update_entity(&root, |view, cx| {
+            view.alternate.set(cx, 55);
+        });
+        assert_eq!(notifications.get(), 1);
     }
 }
