@@ -35,6 +35,10 @@ window lifecycles as the source of truth.
 - Existing keyed hosts use `Selector::select_next` for cycling active rows, so
   ordered selection behavior lives in Relay instead of being reimplemented by
   each app host.
+- The compiled `keyed_subviews` Relay example now pairs `KeyedSubViews` with
+  `Selector<u64>` and host-level arrow-key handling. Its tests verify row
+  entity reuse while selection moves, previous-selection wraparound, and Enter
+  acting on the selected row.
 
 ## List Boundary
 
@@ -68,14 +72,16 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Apply the keyed host pattern to the first real workbench/session surface
-   outside gallery that owns dynamic item collections. Keep presentation
-   components value-first; use keyed entity retention only when rows have state
-   or enough render cost.
-2. Wire keyboard/command-list navigation to `Selector::select_next` /
-   `select_previous` when a real focusable command or picker surface needs it.
-   Do this at the app host level first; only add UIKit adapters if repeated
-   call sites prove the component API needs them.
+1. Promote the verified `keyed_subviews` shape to the first real
+   workbench/session surface outside gallery that owns dynamic item
+   collections. Keep presentation components value-first; use keyed entity
+   retention only when rows have state or enough render cost. The existing
+   `workbench_demo.rs` draft is not a completion target until it is wired into
+   a compiled binary with its missing modules present.
+2. Wire keyboard/command-list navigation at host level with
+   `Selector::select_next` / `select_previous` when a real focusable command or
+   picker surface needs it. Only add UIKit adapters if repeated call sites prove
+   the component API needs them.
 3. Add a shared async UI boundary only after at least two app surfaces repeat
    the same `fold_latest` render shape. Until then, `Resource` should remain a
    UI-agnostic state primitive.

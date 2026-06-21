@@ -189,6 +189,7 @@ let selected = cx.selector(Some(1_u64));
 let active = selected.is_selected(cx, row_id);
 selected.select(cx, next_id);
 selected.select_next(cx, tasks.iter().map(|task| task.id));
+selected.select_previous(cx, tasks.iter().map(|task| task.id));
 selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 ```
 
@@ -211,7 +212,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `component_hooks` | `WindowSignalExt::use_signal` — component-internal state |
 | `reactive_struct` | `#[derive(Reactive)]` — field-level reactivity |
 | `subview` | `SubView` cached child entity splitting |
-| `keyed_subviews` | `KeyedSubViews` retained row entities |
+| `keyed_subviews` | `KeyedSubViews` retained row entities with `Selector` navigation |
 
 ```sh
 cargo run -p relay --example counter

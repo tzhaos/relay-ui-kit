@@ -190,6 +190,7 @@ let selected = cx.selector(Some(1_u64));
 let active = selected.is_selected(cx, row_id);
 selected.select(cx, next_id);
 selected.select_next(cx, tasks.iter().map(|task| task.id));
+selected.select_previous(cx, tasks.iter().map(|task| task.id));
 selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 ```
 
@@ -212,7 +213,7 @@ selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 | `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |
 | `reactive_struct` | `#[derive(Reactive)]` — 字段级响应 |
 | `subview` | `SubView` cached 子 Entity 拆分 |
-| `keyed_subviews` | `KeyedSubViews` 稳定 row entity |
+| `keyed_subviews` | `KeyedSubViews` 稳定 row entity 与 `Selector` 导航 |
 
 ```sh
 cargo run -p relay --example counter
