@@ -1,15 +1,15 @@
 # relay
 
-`relay` 是 GPUI 的响应式状态运行时层。它提供 signal、derived state、effect、binding 和 async resource，把状态读取记录到当前 GPUI entity，并在状态写入时通过 GPUI 的 `cx.notify` 路径触发刷新。
+`relay` is a reactive state runtime layer for [GPUI](https://github.com/zed-industries/zed). It provides signals, derived state, effects, bindings, async resources, reactive collections, declarative side effects, cross-layer context, and form aggregation — recording signal reads to the current GPUI entity and triggering refreshes through GPUI's `cx.notify` path on writes.
 
-## 定位
+## Design
 
-- 面向 GPUI：API 显式接收 `App` / `Context`，生命周期和刷新都跟随 GPUI。
-- 状态优先：核心是 `Signal<T>`、`Memo<T>`、`Effect`、`Resource<T, E>` 和 `Binding<T>`。
-- UI 线程优先：默认使用单线程状态模型，适配 GPUI 渲染和前台任务。
-- 可被上层组件适配：后续组件层可以把 `Binding` / `Resource` 接到具体控件，但运行时本身只负责状态和调度。
+- **GPUI-native**: APIs explicitly take `App` / `Context`; lifecycle and refresh follow GPUI.
+- **State-first**: core primitives are `Signal<T>`, `Memo<T>`, `Effect`, `Resource<T, E>`, and `Binding<T>`.
+- **UI-thread-first**: single-threaded state model by default, suited to GPUI rendering and foreground tasks.
+- **Adaptable by upper layers**: component crates can wire `Binding` / `Resource` to concrete controls; the runtime itself only handles state and scheduling.
 
-## 最小用法
+## Minimal usage
 
 ```rust
 use gpui::{Context, IntoElement, Render, Window, div, prelude::*};
@@ -35,9 +35,9 @@ impl Render for Counter {
 }
 ```
 
-## GPUI 便利 API
+## GPUI convenience API
 
-`ReactiveAppExt` 给 `App` / `Context` 增加创建方法：
+`ReactiveAppExt` adds creation methods to `App` / `Context`:
 
 ```rust
 let count = cx.signal(0);
@@ -48,7 +48,7 @@ let doubled = cx.memo({
 });
 ```
 
-`ReactiveContextExt` 给 GPUI view 增加 entity-scoped 用法：
+`ReactiveContextExt` adds entity-scoped usage to GPUI views:
 
 ```rust
 cx.tracked(|cx| {
@@ -56,35 +56,34 @@ cx.tracked(|cx| {
 });
 ```
 
-UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元素和事件系统。
+UIKit components can receive `Binding<T>` for two-way binding; the underlying layer still goes through GPUI's element and event system.
 
-## 应用层原语
+## Application-layer primitives
 
-除 `Signal` / `Binding` / `Memo` / `Effect` / `Resource` 外，relay 还提供以下
-应用层便利原语：
+Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides these application-layer convenience primitives:
 
-- **`untrack(cx, |cx| ...)`** — 在作用域内读取信号但不建立依赖。适合"读快照但
-  不订阅"的场景，替代 `get_untracked()` 反模式。也通过 `cx.untrack(...)` 暴露。
-- **`Signal::update_silent` / `set_silent`** — 静默写入，不通知依赖。用于 effect
-  回写自身读取的信号、内部协调等避免 ping-pong 的场景。`Binding` 也有同名方法。
-- **`derived`** — `memo` 的语义别名，强调"派生值"。在 view 的 `new()` 里用
-  `cx.derived(|cx| ...)` 注册派生计算，渲染时 `derived.get(cx)` 读取，依赖变化才重算。
-- **`watch(cx, sources, react)`** — 声明式副作用。`sources` 闭包读取依赖，`react`
-  闭包执行副作用，分离声明与执行。对标 Vue `watch`。
-- **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `insert` / `remove` /
-  `retain` / `clear` / `set_all`，每个操作走正常通知路径。
-- **`ForEach`** (relay_uikit) — 响应式列表组件，接收 `Signal<Vec<T>>` + key fn +
-  render fn，自动订阅信号刷新。
+- **`untrack(cx, |cx| ...)`** — read signals within a scope without establishing dependencies. Replaces the `get_untracked()` anti-pattern for "read snapshot but don't subscribe". Also exposed as `cx.untrack(...)`.
+- **`Signal::update_silent` / `set_silent`** — silent writes that don't notify dependents. For effect write-back, internal coordination, and avoiding ping-pong. `Binding` has the same methods.
+- **`derived`** — semantic alias for `memo`, emphasizing "derived value". Register derived computation in `new()` with `cx.derived(|cx| ...)`, read via `derived.get(cx)` in render; recomputes only when dependencies change.
+- **`watch(cx, sources, react)`** — declarative side effects. `sources` closure reads dependencies; `react` closure executes the side effect. Separates declaration from execution. Vue `watch` equivalent.
+- **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path.
+- **`ForEach`** (relay_uikit) — reactive list component. Takes `Signal<Vec<T>>` + key fn + render fn; subscribes to the signal and refreshes automatically.
+- **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
+- **`Form`** — form aggregation model. Register multiple `Binding<T>` fields; provides `is_dirty()` (returns `Memo<bool>`), `reset(cx)`, and `commit(cx)`. Suited for settings panels, edit forms, and other dirty-check/reset/submit scenarios.
 
-## 应用层范式
+## Application-layer patterns
 
 ```rust
-use relay::{Binding, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt};
+use relay::{
+    Binding, Form, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    provide_context, use_context,
+};
 
 struct SettingsView {
     enabled: Binding<bool>,
     count: Signal<i32>,
     todos: Signal<Vec<String>>,
+    settings_dirty: Memo<bool>,
 }
 
 impl SettingsView {
@@ -94,22 +93,51 @@ impl SettingsView {
         let count = cx.signal(0);
         let todos: Signal<Vec<String>> = cx.signal(Vec::new());
 
-        // 声明式联动：count 变化时派生 label
+        // Declarative side effect: derive an event string when count changes.
         let _ = cx.watch(
             |cx| { let _ = count.get(cx); },
-            move |cx| { /* e.g. update a derived label */ },
+            move |cx| { /* e.g. update a label signal */ },
         );
 
-        Self { enabled, count, todos }
+        // Form aggregation: register fields, derive is_dirty.
+        let mut form = Form::new();
+        form.field("enabled", enabled.clone(), cx);
+        let settings_dirty = form.build_is_dirty(cx);
+        std::mem::forget(form);
+
+        // Provide a reactive context for cross-layer sharing.
+        let _ = provide_context(cx, "default-theme".to_string());
+
+        Self { enabled, count, todos, settings_dirty }
     }
 
     fn add_todo(&self, text: String, cx: &mut App) {
-        self.todos.push(cx, text); // 响应式集合操作，自动通知
+        self.todos.push(cx, text); // reactive collection op, auto-notifies
     }
+}
+
+// In a child component (no prop drilling):
+fn child_render(cx: &App) {
+    let theme = use_context::<String>(cx); // auto-subscribes, notified on change
 }
 ```
 
-运行示例：
+## Examples
+
+Each example demonstrates a specific API or pattern. Run with `cargo run -p relay --example <name>`:
+
+| Example | Covers |
+|---|---|
+| `counter` | `Signal`, `Memo`, `tracked` render |
+| `binding` | `Binding` two-way binding |
+| `untrack` | `untrack`, `set_silent` / `update_silent` |
+| `effect` | `Effect`, `effect_in` entity-scoped effects |
+| `derived` | `derived` / `memo` derived values |
+| `watch` | `watch` declarative side effects |
+| `signal_vec` | `SignalVecExt` reactive list operations |
+| `resource` | `Resource` async pending/ready/error |
+| `context` | `provide_context` / `use_context` cross-layer sharing |
+| `form` | `Form` aggregation, `is_dirty`, `reset`, `commit` |
 
 ```sh
 cargo run -p relay --example counter
