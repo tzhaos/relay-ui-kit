@@ -1,15 +1,24 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
-use relay::ResourceState;
+use gpui::{
+    AnyElement, AnyView, App, ClickEvent, Context, Entity, IntoElement, ParentElement, Render,
+    Styled, Window, div, px,
+};
+use relay::{
+    KeyedSubViews, ReactiveAppExt, ReactiveView, ResourceState, Selector, Signal,
+    view::reactive_render,
+};
 use relay_uikit::patterns::{
     PaneToolbar, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
     layout::ListSection,
     navigation::{Tab, Tabs},
     overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
-    InputComposer, OutputLine, OutputLineStyle, OutputLog, OutputSurface, QuickAction, SessionRow,
-    SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
+    OutputLine, OutputLineStyle, OutputLog, OutputSurface, QuickAction, SessionRow, SourceView,
+    TabStrip, TaskRow, TaskRowData,
 };
-use relay_uikit::{Button, IconButton, IconName, Label, ListItem, TextInputState, Theme, Tone};
+use relay_uikit::{
+    ActiveTheme, Button, IconButton, IconName, Label, ListItem, ListItemSpacing, StatusDot, Theme,
+    Tone,
+};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -157,19 +166,275 @@ fn quick_action_sample(state: &GalleryState) -> impl IntoElement {
     div().flex().gap_2().flex_wrap()
         .child(QuickAction::new("qa-codex", "Launch Codex", "codex").on_click({
             let log = log.clone();
-            move |_, _, cx: &mut gpui::App| { log.set(cx, "QuickAction: Launch Codex".into()); }
+            move |_, _, cx: &mut App| { log.set(cx, "QuickAction: Launch Codex".into()); }
         }))
         .child(QuickAction::new("qa-build", "Build", "cargo build").on_click({
-            move |_, _, cx: &mut gpui::App| { log.set(cx, "QuickAction: Build".into()); }
+            move |_, _, cx: &mut App| { log.set(cx, "QuickAction: Build".into()); }
         }))
 }
 
-fn picker_sample(state: &GalleryState) -> impl IntoElement {
-    div().flex().gap_2()
-        .child(Button::new("picker-btn", "Open Picker").on_click({
-            let picker = state.command_context_open.clone();
-            move |_, _, cx: &mut gpui::App| { picker.update(cx, |v| { *v = !*v; true }); }
-        }))
+fn picker_sample(state: &GalleryState) -> AnyElement {
+    cached_project_picker(state.pattern_project_picker.clone())
+}
+
+fn cached_project_picker(picker: Entity<PatternProjectPicker>) -> AnyElement {
+    let view: AnyView = picker.into();
+    view.cached(gpui::StyleRefinement::default().w_full())
+        .into_any_element()
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct PatternProject {
+    id: u64,
+    label: String,
+    detail: String,
+    tone: Tone,
+    status: &'static str,
+}
+
+impl PatternProject {
+    fn new(
+        id: u64,
+        label: impl Into<String>,
+        detail: impl Into<String>,
+        tone: Tone,
+        status: &'static str,
+    ) -> Self {
+        Self {
+            id,
+            label: label.into(),
+            detail: detail.into(),
+            tone,
+            status,
+        }
+    }
+}
+
+pub(super) struct PatternProjectPicker {
+    projects: Signal<Vec<PatternProject>>,
+    rows: KeyedSubViews<u64, PatternProjectRow>,
+    selection: Selector<u64>,
+    next_id: u64,
+    revision: u64,
+}
+
+impl PatternProjectPicker {
+    pub(super) fn new(cx: &mut Context<Self>) -> Self {
+        Self {
+            projects: cx.signal(vec![
+                PatternProject::new(1, "relay-ui-kit", "workspace / main", Tone::Accent, "ACTIVE"),
+                PatternProject::new(2, "relay", "crates / runtime", Tone::Info, "READY"),
+                PatternProject::new(3, "gallery", "bin / relay_gallery", Tone::Warning, "REVIEW"),
+            ]),
+            rows: KeyedSubViews::new(),
+            selection: cx.selector(Some(1)),
+            next_id: 4,
+            revision: 0,
+        }
+    }
+
+    fn cycle_selection(&self, cx: &mut App) {
+        let projects = self.projects.get_untracked();
+        if projects.is_empty() {
+            self.selection.clear(cx);
+            return;
+        }
+
+        let current = self.selection.get_untracked();
+        let next_index = current
+            .and_then(|id| projects.iter().position(|project| project.id == id))
+            .map_or(0, |index| (index + 1) % projects.len());
+        self.selection.select(cx, projects[next_index].id);
+    }
+
+    fn rotate_projects(&self, cx: &mut App) {
+        self.projects.update(cx, |projects| {
+            if projects.len() < 2 {
+                return false;
+            }
+            projects.rotate_left(1);
+            true
+        });
+    }
+
+    fn rename_selected(&mut self, cx: &mut App) {
+        let Some(selected) = self.selection.get_untracked() else {
+            return;
+        };
+        self.revision = self.revision.wrapping_add(1);
+        let revision = self.revision;
+
+        self.projects.update(cx, |projects| {
+            let Some(project) = projects.iter_mut().find(|project| project.id == selected) else {
+                return false;
+            };
+            project.label = format!("{} r{revision}", project.label);
+            project.detail = format!("workspace / refresh {revision:02}");
+            true
+        });
+    }
+
+    fn add_project(&mut self, cx: &mut App) {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.projects.update(cx, |projects| {
+            projects.push(PatternProject::new(
+                id,
+                format!("generated-{id:02}"),
+                "workspace / generated",
+                Tone::Secondary,
+                "NEW",
+            ));
+            true
+        });
+        self.selection.select(cx, id);
+    }
+}
+
+impl ReactiveView for PatternProjectPicker {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let projects = self.projects.get(cx);
+        self.selection
+            .retain_keys(projects.iter().map(|project| project.id));
+
+        let selection = self.selection.clone();
+        self.rows.sync(
+            cx,
+            projects,
+            |project| project.id,
+            move |project, _cx| PatternProjectRow::new(project, selection.clone()),
+            |project, row, _cx| row.update_project(project),
+        );
+
+        div()
+            .w(px(560.0))
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(
+                        Button::new("pattern-project-cycle", "Cycle")
+                            .ghost()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.cycle_selection(cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("pattern-project-rotate", "Rotate")
+                            .ghost()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.rotate_projects(cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("pattern-project-rename", "Rename Active")
+                            .ghost()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.rename_selected(cx);
+                            })),
+                    )
+                    .child(
+                        Button::new("pattern-project-add", "Add")
+                            .ghost()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.add_project(cx);
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .children(self.rows.cached(gpui::StyleRefinement::default().w_full())),
+            )
+            .into_any_element()
+    }
+}
+
+impl Render for PatternProjectPicker {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
+    }
+}
+
+struct PatternProjectRow {
+    project: PatternProject,
+    selection: Selector<u64>,
+}
+
+impl PatternProjectRow {
+    fn new(project: &PatternProject, selection: Selector<u64>) -> Self {
+        Self {
+            project: project.clone(),
+            selection,
+        }
+    }
+
+    fn update_project(&mut self, project: &PatternProject) -> bool {
+        if self.project == *project {
+            false
+        } else {
+            self.project = project.clone();
+            true
+        }
+    }
+}
+
+impl ReactiveView for PatternProjectRow {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let theme = *cx.theme();
+        let project = &self.project;
+        let selected = self.selection.is_selected(cx, project.id);
+        let selection = self.selection.clone();
+        let id = project.id;
+
+        ListItem::new(format!("pattern-project-{}", project.id))
+            .spacing(ListItemSpacing::Relaxed)
+            .selected(selected)
+            .start_slot(StatusDot::new(project.tone))
+            .child(
+                div()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(1.0))
+                    .child(
+                        div()
+                            .truncate()
+                            .text_sm()
+                            .text_color(theme.text)
+                            .child(project.label.clone()),
+                    )
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(11.0))
+                            .text_color(theme.text_muted)
+                            .child(project.detail.clone()),
+                    ),
+            )
+            .end_slot(
+                div()
+                    .text_size(px(11.0))
+                    .text_color(project.tone.fg(&theme))
+                    .child(project.status),
+            )
+            .on_click(move |_event, _window, cx| {
+                selection.select(cx, id);
+            })
+            .into_any_element()
+    }
+}
+
+impl Render for PatternProjectRow {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
+    }
 }
 
 fn viewer_patterns(theme: Theme) -> impl IntoElement {
@@ -447,7 +712,7 @@ fn menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> Men
 fn pattern_event(
     state: &GalleryState,
     message: &'static str,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
     let overlay_event = state.overlay_event.clone();
     move |_event, _window, cx| {
         overlay_event.set(cx, message.to_string());
@@ -457,11 +722,69 @@ fn pattern_event(
 fn close_dialog(
     state: &GalleryState,
     message: &'static str,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
+) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
     let dialog_open = state.pattern_dialog_open.clone();
     let overlay_event = state.overlay_event.clone();
     move |_event, _window, cx| {
         dialog_open.set(cx, false);
         overlay_event.set(cx, message.to_string());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{EntityId, TestApp};
+
+    use super::*;
+
+    fn row_ids(rows: &KeyedSubViews<u64, PatternProjectRow>) -> Vec<(u64, EntityId)> {
+        rows.keyed_iter()
+            .map(|(key, view)| (*key, view.entity().entity_id()))
+            .collect()
+    }
+
+    #[test]
+    fn project_picker_reuses_rows_when_projects_rotate() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            PatternProjectPicker::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        let initial = app.update_entity(&root, |picker, _cx| row_ids(&picker.rows));
+
+        app.update_entity(&root, |picker, cx| {
+            picker.rotate_projects(cx);
+        });
+        window.draw();
+
+        let rotated = app.update_entity(&root, |picker, _cx| row_ids(&picker.rows));
+        assert_eq!(
+            rotated,
+            vec![(2, initial[1].1), (3, initial[2].1), (1, initial[0].1)]
+        );
+    }
+
+    #[test]
+    fn project_picker_reuses_rows_when_selected_project_updates() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            PatternProjectPicker::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        let initial = app.update_entity(&root, |picker, _cx| row_ids(&picker.rows));
+
+        app.update_entity(&root, |picker, cx| {
+            picker.rename_selected(cx);
+        });
+        window.draw();
+
+        let updated = app.update_entity(&root, |picker, _cx| row_ids(&picker.rows));
+        assert_eq!(updated, initial);
     }
 }

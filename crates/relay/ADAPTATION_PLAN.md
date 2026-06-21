@@ -20,6 +20,9 @@ window lifecycles as the source of truth.
 - The gallery Patterns output surface consumes `Resource::reload` / `latest`
   semantics by keeping the previous output visible while an async refresh is
   in flight.
+- The gallery Patterns item picker now has an app-like keyed host that combines
+  `KeyedSubViews` row retention with `Selector<u64>` mutual selection, with
+  tests covering row entity reuse across reorder and selected-row updates.
 
 ## List Boundary
 
@@ -53,13 +56,12 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Add one real keyed-row host in an app-like surface beyond the gallery stress
-   sample, then verify row entity reuse under update and reorder.
-2. Replace boolean row-selection wiring in larger picker/command/list surfaces
-   with `Selector<K>` when selection is mutually exclusive.
-3. Evaluate the gallery Patterns resource usage after one or two more async
+1. Find the next non-gallery command/list surface where selection or row
+   retention is repeated enough to justify moving from `Binding<bool>` or
+   direct element mapping to `Selector<K>` / `KeyedSubViews`.
+2. Evaluate the gallery Patterns resource usage after one or two more async
    surfaces; add a shared async boundary only if it removes repeated app code.
-4. Revisit show/switch style helpers only after there is repeated app code that
+3. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 
 ## Verification Gates
