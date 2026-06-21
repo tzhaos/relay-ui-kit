@@ -241,16 +241,8 @@ impl PatternProjectPicker {
 
     fn cycle_selection(&self, cx: &mut App) {
         let projects = self.projects.get_untracked();
-        if projects.is_empty() {
-            self.selection.clear(cx);
-            return;
-        }
-
-        let current = self.selection.get_untracked();
-        let next_index = current
-            .and_then(|id| projects.iter().position(|project| project.id == id))
-            .map_or(0, |index| (index + 1) % projects.len());
-        self.selection.select(cx, projects[next_index].id);
+        self.selection
+            .select_next(cx, projects.iter().map(|project| project.id));
     }
 
     fn rotate_projects(&self, cx: &mut App) {

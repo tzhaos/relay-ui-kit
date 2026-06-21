@@ -88,6 +88,24 @@ where
         });
     }
 
+    /// Select the next key from the current ordered key set.
+    ///
+    /// When the current selection is missing from `keys`, this selects the
+    /// first key. When `keys` is empty, this clears the selection. Returns
+    /// whether the selected key changed.
+    pub fn select_next(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
+        self.select_relative(cx, keys, SelectionStep::Next)
+    }
+
+    /// Select the previous key from the current ordered key set.
+    ///
+    /// When the current selection is missing from `keys`, this selects the
+    /// last key. When `keys` is empty, this clears the selection. Returns
+    /// whether the selected key changed.
+    pub fn select_previous(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
+        self.select_relative(cx, keys, SelectionStep::Previous)
+    }
+
     /// Drop per-key signals for keys that are no longer relevant.
     pub fn retain_keys(&self, keys: impl IntoIterator<Item = K>) {
         let keys = keys.into_iter().collect::<HashSet<_>>();
@@ -127,6 +145,36 @@ where
         self.keyed.borrow_mut().insert(key, signal.clone());
         signal
     }
+
+    fn select_relative(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        step: SelectionStep,
+    ) -> bool {
+        let keys = keys.into_iter().collect::<Vec<_>>();
+        if keys.is_empty() {
+            let changed = self.selected.peek(Option::is_some);
+            self.clear(cx);
+            return changed;
+        }
+
+        let current = self.selected.get_untracked();
+        let selected_index = current
+            .as_ref()
+            .and_then(|current| keys.iter().position(|key| key == current));
+        let next_index = match (selected_index, step) {
+            (Some(index), SelectionStep::Next) => (index + 1) % keys.len(),
+            (Some(0), SelectionStep::Previous) => keys.len() - 1,
+            (Some(index), SelectionStep::Previous) => index - 1,
+            (None, SelectionStep::Next) => 0,
+            (None, SelectionStep::Previous) => keys.len() - 1,
+        };
+        let selected = keys[next_index].clone();
+        let changed = current.as_ref() != Some(&selected);
+        self.select(cx, selected);
+        changed
+    }
 }
 
 impl<K> Clone for Selector<K> {
@@ -136,6 +184,12 @@ impl<K> Clone for Selector<K> {
             keyed: self.keyed.clone(),
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum SelectionStep {
+    Next,
+    Previous,
 }
 
 #[cfg(test)]
@@ -301,5 +355,89 @@ mod tests {
         });
 
         assert_eq!(runs.get(), 2);
+    }
+
+    #[test]
+    fn selector_select_next_wraps_ordered_keys() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(3_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_next(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(1));
+    }
+
+    #[test]
+    fn selector_select_next_uses_first_when_current_is_missing() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_next(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(1));
+    }
+
+    #[test]
+    fn selector_select_previous_wraps_ordered_keys() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_previous(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_previous_uses_last_when_current_is_missing() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_previous(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_next_clears_empty_key_set() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_next(cx, []));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn selector_select_next_keeps_single_selected_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_next(cx, [1_u64]));
+
+        assert!(!changed);
+        assert_eq!(selector.get_untracked(), Some(1));
     }
 }

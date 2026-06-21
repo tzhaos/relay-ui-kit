@@ -209,16 +209,8 @@ impl StressSessionList {
 
     fn activate_next(&self, cx: &mut App) {
         let sessions = self.sessions.get_untracked();
-        if sessions.is_empty() {
-            self.selection.clear(cx);
-            return;
-        }
-
-        let current = self.selection.get_untracked();
-        let next_index = current
-            .and_then(|id| sessions.iter().position(|session| session.id == id))
-            .map_or(0, |index| (index + 1) % sessions.len());
-        self.selection.select(cx, sessions[next_index].id);
+        self.selection
+            .select_next(cx, sessions.iter().map(|session| session.id));
     }
 
     fn rotate(&self, cx: &mut App) {

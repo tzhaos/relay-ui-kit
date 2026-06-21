@@ -13,8 +13,9 @@ window lifecycles as the source of truth.
   async pending, reloading, ready, and error states without baking in a UI
   boundary.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
-- `Selector<K>` gives selection-heavy lists per-key tracking and can reconcile
-  selection against the current item keys.
+- `Selector<K>` gives selection-heavy lists per-key tracking, can reconcile
+  selection against the current item keys, and owns ordered next/previous
+  navigation for list and command surfaces.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
@@ -31,6 +32,9 @@ window lifecycles as the source of truth.
 - The gallery Stress session list uses the same `KeyedSubViews` + `Selector`
   shape for dynamic session rows, with tests covering row reuse during
   selection changes and selection reconciliation after removing the active row.
+- Existing keyed hosts use `Selector::select_next` for cycling active rows, so
+  ordered selection behavior lives in Relay instead of being reimplemented by
+  each app host.
 
 ## List Boundary
 
@@ -68,10 +72,14 @@ runtime adapters only where they simplify real app state:
    outside gallery that owns dynamic item collections. Keep presentation
    components value-first; use keyed entity retention only when rows have state
    or enough render cost.
-2. Add a shared async UI boundary only after at least two app surfaces repeat
+2. Wire keyboard/command-list navigation to `Selector::select_next` /
+   `select_previous` when a real focusable command or picker surface needs it.
+   Do this at the app host level first; only add UIKit adapters if repeated
+   call sites prove the component API needs them.
+3. Add a shared async UI boundary only after at least two app surfaces repeat
    the same `fold_latest` render shape. Until then, `Resource` should remain a
    UI-agnostic state primitive.
-3. Revisit show/switch style helpers only after there is repeated app code that
+4. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 
 ## Verification Gates
