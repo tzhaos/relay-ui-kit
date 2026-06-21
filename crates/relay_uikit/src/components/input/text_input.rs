@@ -1,6 +1,7 @@
 use gpui::{
-    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
-    RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use relay::Binding;
 
@@ -105,13 +106,23 @@ impl RenderOnce for TextInput {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let (before, after) = match binding.as_ref() {
+        let (before_str, selection_str, after_str, cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
-                let (before, after) = state.split();
-                (before.to_string(), after.to_string())
+                let sel_range = state.selection_range();
+                let value = state.value().to_string();
+                let cursor = state.cursor();
+                if let Some((start, end)) = sel_range {
+                    let before = value[..start].to_string();
+                    let selected = value[start..end].to_string();
+                    let after = value[end..].to_string();
+                    (before, selected, after, false)
+                } else {
+                    let (before, after) = state.split();
+                    (before.to_string(), String::new(), after.to_string(), true)
+                }
             }
-            None => (self.before, self.after),
+            None => (self.before, String::new(), self.after, false),
         };
         let border = if self.focused {
             theme.accent
@@ -119,10 +130,12 @@ impl RenderOnce for TextInput {
             theme.border_strong
         };
         let focus_for_click = self.focus.clone();
+        let focus_for_mousedown = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
+        let show_placeholder = before_str.is_empty() && after_str.is_empty() && selection_str.is_empty() && !self.focused;
         let disabled = self.disabled;
+        let is_focused = self.focused;
 
         div()
             .id(self.id)
@@ -143,7 +156,7 @@ impl RenderOnce for TextInput {
             .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
-                    .when(!self.focused, |this| {
+                    .when(!is_focused, |this| {
                         this.hover(move |s| s.border_color(theme.border_strong))
                     })
             })
@@ -166,14 +179,25 @@ impl RenderOnce for TextInput {
                     })
                     .when(!show_placeholder, |this| {
                         this.text_color(theme.text)
-                            .child(before)
-                            .when(self.focused, |this| this.child(caret(theme.accent)))
-                            .child(after)
+                            .child(div().child(before_str))
+                            .when(!selection_str.is_empty(), |this| {
+                                this.child(
+                                    div()
+                                        .bg(theme.selection)
+                                        .text_color(theme.text)
+                                        .child(selection_str),
+                                )
+                            })
+                            .when(is_focused && cursor_visible, |this| {
+                                this.child(caret(theme.accent))
+                            })
+                            .child(div().child(after_str))
                     }),
             )
             .when(handle_key, |this| {
+                let binding_clone = binding.clone();
                 this.on_key_down(move |event, window, cx| {
-                    if let Some(binding) = &binding {
+                    if let Some(binding) = &binding_clone {
                         binding.update(cx, |state| state.handle_key(event).should_notify());
                     }
                     if let Some(on_key) = &on_key {
@@ -183,7 +207,10 @@ impl RenderOnce for TextInput {
                 })
             })
             .when(!disabled, |this| {
-                this.on_click(move |_, window, cx| {
+                this.on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    window.focus(&focus_for_mousedown, cx);
+                })
+                .on_click(move |_, window, cx| {
                     window.focus(&focus_for_click, cx);
                 })
             })

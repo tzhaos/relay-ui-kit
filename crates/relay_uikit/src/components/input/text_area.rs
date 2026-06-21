@@ -113,14 +113,21 @@ impl RenderOnce for TextArea {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let (before, after) = match binding.as_ref() {
+        let (before, selection, after, _cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
-                let (before, after) = state.split();
-                (before.to_string(), after.to_string())
+                let sel_range = state.selection_range();
+                let value = state.value().to_string();
+                if let Some((start, end)) = sel_range {
+                    (value[..start].to_string(), value[start..end].to_string(), value[end..].to_string(), false)
+                } else {
+                    let (before, after) = state.split();
+                    (before.to_string(), String::new(), after.to_string(), true)
+                }
             }
-            None => (self.before, self.after),
+            None => (self.before, String::new(), self.after, false),
         };
+        let has_selection = !selection.is_empty();
         let border = if self.focused {
             theme.accent
         } else {
@@ -130,7 +137,7 @@ impl RenderOnce for TextArea {
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
+        let show_placeholder = before.is_empty() && after.is_empty() && !has_selection && !self.focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
         let disabled = self.disabled;
 
