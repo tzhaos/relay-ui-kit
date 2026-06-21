@@ -256,7 +256,8 @@ impl TextInputState {
     }
 
     pub(crate) fn split(&self) -> (&str, &str) {
-        self.value.split_at(self.cursor)
+        let cursor = self.safe_cursor();
+        self.value.split_at(cursor)
     }
 
     fn insert(&mut self, text: &str) {
@@ -300,6 +301,7 @@ impl TextInputState {
     }
 
     fn prev_boundary(&self, byte: usize) -> usize {
+        let byte = self.clamp_to_boundary(byte);
         self.value[..byte]
             .grapheme_indices(true)
             .next_back()
@@ -308,11 +310,32 @@ impl TextInputState {
     }
 
     fn next_boundary(&self, byte: usize) -> usize {
+        let byte = self.clamp_to_boundary(byte);
         self.value[byte..]
             .grapheme_indices(true)
             .nth(1)
             .map(|(i, _)| byte + i)
             .unwrap_or(self.value.len())
+    }
+
+    /// Clamp `cursor` to a valid UTF-8 character boundary within `[0, len]`.
+    ///
+    /// This is a defensive guard: if `cursor` was set to an invalid position
+    /// (e.g. via `update_silent` or external mutation), `split_at` / string
+    /// slicing would panic. This method walks back to the nearest boundary.
+    fn safe_cursor(&self) -> usize {
+        self.clamp_to_boundary(self.cursor)
+    }
+
+    fn clamp_to_boundary(&self, mut byte: usize) -> usize {
+        let len = self.value.len();
+        if byte > len {
+            byte = len;
+        }
+        while byte > 0 && !self.value.is_char_boundary(byte) {
+            byte -= 1;
+        }
+        byte
     }
 }
 
@@ -482,5 +505,26 @@ mod tests {
             TextInputAction::Ignored
         );
         assert_eq!(s.value(), "-");
+    }
+
+    #[test]
+    fn split_does_not_panic_on_invalid_cursor() {
+        let mut s = TextInputState::with_text("héllo"); // é is 2 bytes
+        // Set cursor to a non-char-boundary position (byte 2, inside é).
+        s.cursor = 2;
+        // split() should clamp to the nearest boundary, not panic.
+        let (before, after) = s.split();
+        assert_eq!(before, "h");
+        assert_eq!(after, "éllo");
+    }
+
+    #[test]
+    fn split_clamps_cursor_beyond_length() {
+        let s = TextInputState::with_text("abc");
+        let mut s = s;
+        s.cursor = 100;
+        let (before, after) = s.split();
+        assert_eq!(before, "abc");
+        assert_eq!(after, "");
     }
 }

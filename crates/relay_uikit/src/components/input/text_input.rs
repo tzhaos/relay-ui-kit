@@ -7,7 +7,7 @@ use relay::Binding;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::KeyHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 use super::TextInputState;
@@ -22,6 +22,7 @@ pub struct TextInput {
     placeholder: String,
     leading_icon: Option<IconName>,
     focused: bool,
+    disabled: bool,
     key_context: &'static str,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
@@ -38,6 +39,7 @@ impl TextInput {
             placeholder: String::new(),
             leading_icon: None,
             focused: false,
+            disabled: false,
             key_context: "TextInput",
             binding: None,
             on_key: None,
@@ -57,6 +59,7 @@ impl TextInput {
             placeholder: String::new(),
             leading_icon: None,
             focused: false,
+            disabled: false,
             key_context: "TextInput",
             binding: Some(binding),
             on_key: None,
@@ -75,6 +78,12 @@ impl TextInput {
 
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+
+    /// Disable the input — blocks keyboard input and click-to-focus.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -111,8 +120,9 @@ impl RenderOnce for TextInput {
         };
         let focus_for_click = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = binding.is_some() || on_key.is_some();
+        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
         let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
+        let disabled = self.disabled;
 
         div()
             .id(self.id)
@@ -130,9 +140,12 @@ impl RenderOnce for TextInput {
             .tab_index(0)
             .role(Role::TextInput)
             .key_context(self.key_context)
-            .cursor(gpui::CursorStyle::IBeam)
-            .when(!self.focused, |this| {
-                this.hover(move |s| s.border_color(theme.border_strong))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor(gpui::CursorStyle::IBeam)
+                    .when(!self.focused, |this| {
+                        this.hover(move |s| s.border_color(theme.border_strong))
+                    })
             })
             .when_some(self.leading_icon, |this, icon| {
                 this.child(
@@ -169,8 +182,10 @@ impl RenderOnce for TextInput {
                     cx.stop_propagation();
                 })
             })
-            .on_click(move |_, window, cx| {
-                window.focus(&focus_for_click, cx);
+            .when(!disabled, |this| {
+                this.on_click(move |_, window, cx| {
+                    window.focus(&focus_for_click, cx);
+                })
             })
     }
 }

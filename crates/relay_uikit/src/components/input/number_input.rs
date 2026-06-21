@@ -8,7 +8,7 @@ use relay::Binding;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, KeyHandler, SharedChangeHandler},
-    theme::{ActiveTheme, BORDER_WIDTH, radius},
+    theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius},
 };
 
 use super::{InputActionKind, InputValueKind, TextInputState};
@@ -44,6 +44,7 @@ pub struct NumberInput {
     suffix: Option<String>,
     layout: NumberInputLayout,
     editable: Option<EditableNumberValue>,
+    disabled: bool,
     min: Option<i32>,
     max: Option<i32>,
     step: i32,
@@ -61,6 +62,7 @@ impl NumberInput {
             suffix: None,
             layout: NumberInputLayout::ControlsAroundValue,
             editable: None,
+            disabled: false,
             min: None,
             max: None,
             step: 1,
@@ -78,6 +80,7 @@ impl NumberInput {
             suffix: None,
             layout: NumberInputLayout::ControlsAroundValue,
             editable: None,
+            disabled: false,
             min: None,
             max: None,
             step: 1,
@@ -94,6 +97,12 @@ impl NumberInput {
 
     pub fn layout(mut self, layout: NumberInputLayout) -> Self {
         self.layout = layout;
+        self
+    }
+
+    /// Disable the number input — blocks stepper buttons and keyboard input.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -208,6 +217,7 @@ impl RenderOnce for NumberInput {
             suffix,
             layout,
             editable,
+            disabled,
             min,
             max,
             step,
@@ -290,6 +300,7 @@ impl RenderOnce for NumberInput {
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .map(|this| match layout {
                 NumberInputLayout::ControlsAroundValue => {
                     this.child(decrement).child(value).child(increment)

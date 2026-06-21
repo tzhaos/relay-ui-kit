@@ -7,7 +7,7 @@ use relay::Binding;
 
 use crate::{
     interaction::KeyHandler,
-    theme::{ActiveTheme, radius, space},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius, space},
 };
 
 use super::TextInputState;
@@ -21,6 +21,7 @@ pub struct TextArea {
     after: String,
     placeholder: String,
     focused: bool,
+    disabled: bool,
     min_rows: usize,
     bordered: bool,
     key_context: &'static str,
@@ -38,6 +39,7 @@ impl TextArea {
             after: after.to_string(),
             placeholder: String::new(),
             focused: false,
+            disabled: false,
             min_rows: 3,
             bordered: true,
             key_context: "TextArea",
@@ -58,6 +60,7 @@ impl TextArea {
             after: String::new(),
             placeholder: String::new(),
             focused: false,
+            disabled: false,
             min_rows: 3,
             bordered: true,
             key_context: "TextArea",
@@ -73,6 +76,12 @@ impl TextArea {
 
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+
+    /// Disable the text area — blocks keyboard input and click-to-focus.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -120,9 +129,10 @@ impl RenderOnce for TextArea {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = binding.is_some() || on_key.is_some();
+        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
         let show_placeholder = before.is_empty() && after.is_empty() && !self.focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
+        let disabled = self.disabled;
 
         div()
             .id(self.id)
@@ -137,9 +147,12 @@ impl RenderOnce for TextArea {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .cursor(gpui::CursorStyle::IBeam)
-            .when(!self.focused, |this| {
-                this.hover(move |s| s.border_color(theme.border_strong))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor(gpui::CursorStyle::IBeam)
+                    .when(!self.focused, |this| {
+                        this.hover(move |s| s.border_color(theme.border_strong))
+                    })
             })
             .child(
                 div()
@@ -175,11 +188,13 @@ impl RenderOnce for TextArea {
                     cx.stop_propagation();
                 })
             })
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                window.focus(&focus_for_mouse_down, cx);
-            })
-            .on_click(move |_, window, cx| {
-                window.focus(&focus_for_click, cx);
+            .when(!disabled, |this| {
+                this.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    window.focus(&focus_for_mouse_down, cx);
+                })
+                .on_click(move |_, window, cx| {
+                    window.focus(&focus_for_click, cx);
+                })
             })
     }
 }

@@ -8,7 +8,7 @@ use relay::Binding;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::KeyCaptureHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 use super::TextInputState;
@@ -20,6 +20,7 @@ pub struct SearchField {
     focus: FocusHandle,
     value: String,
     placeholder: String,
+    disabled: bool,
     key_context: &'static str,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyCaptureHandler>,
@@ -32,6 +33,7 @@ impl SearchField {
             focus,
             value: String::new(),
             placeholder: "Search".into(),
+            disabled: false,
             key_context: "SearchField",
             binding: None,
             on_key: None,
@@ -48,6 +50,7 @@ impl SearchField {
             focus,
             value: String::new(),
             placeholder: "Search".into(),
+            disabled: false,
             key_context: "SearchField",
             binding: Some(binding),
             on_key: None,
@@ -61,6 +64,12 @@ impl SearchField {
 
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
+        self
+    }
+
+    /// Disable the search field — blocks keyboard input and click-to-focus.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -100,7 +109,8 @@ impl RenderOnce for SearchField {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = binding.is_some() || on_key.is_some();
+        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
+        let disabled = self.disabled;
 
         div()
             .id(self.id)
@@ -117,8 +127,11 @@ impl RenderOnce for SearchField {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .cursor(gpui::CursorStyle::IBeam)
-            .hover(move |style| style.border_color(theme.border_strong))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(!disabled, |this| {
+                this.cursor(gpui::CursorStyle::IBeam)
+                    .hover(move |style| style.border_color(theme.border_strong))
+            })
             .child(
                 Icon::new(IconName::Search)
                     .size(IconSize::Small)
@@ -153,12 +166,14 @@ impl RenderOnce for SearchField {
                     }
                 })
             })
-            .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
-                window.focus(&focus_for_mouse_down, cx);
-                window.prevent_default();
-            })
-            .on_click(move |_: &ClickEvent, window, cx| {
-                window.focus(&focus_for_click, cx);
+            .when(!disabled, |this| {
+                this.on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    window.focus(&focus_for_mouse_down, cx);
+                    window.prevent_default();
+                })
+                .on_click(move |_: &ClickEvent, window, cx| {
+                    window.focus(&focus_for_click, cx);
+                })
             })
     }
 }
