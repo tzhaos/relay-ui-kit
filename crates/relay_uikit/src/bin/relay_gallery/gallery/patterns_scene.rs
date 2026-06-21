@@ -5,8 +5,10 @@ use relay_uikit::patterns::{
     layout::ListSection,
     navigation::{Tab, Tabs},
     overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
+    InputComposer, OutputLine, OutputLineStyle, OutputLog, OutputSurface, QuickAction, SessionRow,
+    SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
 };
-use relay_uikit::{Button, IconButton, IconName, Label, Theme};
+use relay_uikit::{Button, IconButton, IconName, Label, ListItem, TextInputState, Theme, Tone};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -40,8 +42,113 @@ pub(super) fn render(
         stack = stack.child(settings_dialog(state));
     }
 
+    // Composite pattern demos — extract bodies first to avoid borrow conflicts
+    let rows_body = row_patterns(state, cx);
+    let tabs_body = tab_patterns(state, cx);
+    let composer_body = composer_sample(cx);
+    let output_body = output_patterns(state, theme, cx);
+    let qa_body = quick_action_sample(state);
+    let picker_body = picker_sample(state);
+    let viewer_body = viewer_patterns(theme);
+
+    stack = stack
+        .child(section(cx, "Task Row & Session Row", rows_body))
+        .child(section(cx, "Tab Strip & Toolbar", tabs_body))
+        .child(section(cx, "Input Composer", composer_body))
+        .child(section(cx, "Output Surface & Log", output_body))
+        .child(section(cx, "Quick Actions", qa_body))
+        .child(section(cx, "Item Picker", picker_body))
+        .child(section(cx, "Source Viewer", viewer_body));
+
     stack
 }
+
+// ── Composite pattern samples ─────────────────────────────────────────────
+
+fn row_patterns(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
+    let active = state.seg_tab.get(cx) == "files";
+    div().flex().flex_col().gap_2()
+        .child(
+            TaskRow::new("pat-task", TaskRowData {
+                title: "Implement relay patterns".into(),
+                status_label: "ACTIVE".into(),
+                status_tone: Tone::Accent,
+                branch: Some("relay/patterns".into()),
+                changed: 5,
+                review: 2,
+            }).selected(true)
+        )
+        .child(
+            SessionRow::new("pat-session", "codex", "relay/patterns")
+                .status(Tone::Accent)
+                .active(active)
+        )
+}
+
+fn tab_patterns(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
+    let active = state.seg_tab.get(cx);
+    div().flex().flex_col().gap_2()
+        .child(
+            div().flex().gap_1()
+                .child(TabStrip::new("pat-tab1", "Terminal")
+                    .active(active == "files")
+                    .status(Tone::Accent))
+                .child(TabStrip::new("pat-tab2", "Preview")
+                    .active(active == "diff")
+                    .status(Tone::Muted))
+                .child(TabStrip::new("pat-tab3", "Review").active(false))
+        )
+}
+
+fn composer_sample(_cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
+    div().h(px(40.0)).border_1().rounded(px(8.0)).border_color(gpui::rgb(0x333333)).px_2().flex().items_center()
+        .child(div().text_sm().text_color(gpui::rgb(0x666666)).child("Type a message..."))
+}
+
+fn output_patterns(state: &GalleryState, theme: Theme, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
+    let connected = state.core_disclosure_open.get(cx);
+    div().flex().flex_col().gap_2()
+        .child(
+            OutputSurface::new("pat-output",
+                OutputLog::new(vec![
+                    OutputLine::new("$ cargo build --release").style(OutputLineStyle::Input),
+                    OutputLine::new("   Compiling relay-uikit v0.1.0").style(OutputLineStyle::Muted),
+                    OutputLine::new("   Finished release in 12.4s").style(OutputLineStyle::Success),
+                ]).prompt("> "),
+            ).connected(connected)
+        )
+        .child(div().text_xs().text_color(theme.text_muted).child(format!("Connected: {connected}")))
+}
+
+fn quick_action_sample(state: &GalleryState) -> impl IntoElement {
+    let log = state.overlay_event.clone();
+    div().flex().gap_2().flex_wrap()
+        .child(QuickAction::new("qa-codex", "Launch Codex", "codex").on_click({
+            let log = log.clone();
+            move |_, _, cx: &mut gpui::App| { log.set(cx, "QuickAction: Launch Codex".into()); }
+        }))
+        .child(QuickAction::new("qa-build", "Build", "cargo build").on_click({
+            move |_, _, cx: &mut gpui::App| { log.set(cx, "QuickAction: Build".into()); }
+        }))
+}
+
+fn picker_sample(state: &GalleryState) -> impl IntoElement {
+    div().flex().gap_2()
+        .child(Button::new("picker-btn", "Open Picker").on_click({
+            let picker = state.command_context_open.clone();
+            move |_, _, cx: &mut gpui::App| { picker.update(cx, |v| { *v = !*v; true }); }
+        }))
+}
+
+fn viewer_patterns(theme: Theme) -> impl IntoElement {
+    div().flex().flex_col().gap_2().child(
+        div().h(px(120.0)).border_1().border_color(theme.border).rounded(px(8.0)).overflow_hidden().child(
+            SourceView::new(VIEWER_SAMPLE).language("rust")
+        )
+    )
+}
+
+const VIEWER_SAMPLE: &str = "pub struct OutputLine {\n    text: String,\n    style: OutputLineStyle,\n}\n\nimpl OutputLine {\n    pub fn new(text: impl Into<String>) -> Self {\n        Self { text: text.into(), style: OutputLineStyle::Output }\n    }\n}";
 
 fn layout_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
     div()
