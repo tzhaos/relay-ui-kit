@@ -18,7 +18,9 @@ window lifecycles as the source of truth.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
 - `Selector<K>` gives selection-heavy lists per-key tracking, can reconcile
   selection against the current item keys, and owns ordered next/previous plus
-  first/last navigation for list and command surfaces.
+  first/last navigation for list and command surfaces. Its `_by` helpers let
+  hosts navigate or reconcile item collections by stable key without cloning
+  the collection just to build key iterators.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
@@ -38,6 +40,9 @@ window lifecycles as the source of truth.
 - Existing keyed hosts use `Selector::select_next` for cycling active rows, so
   ordered selection behavior lives in Relay instead of being reimplemented by
   each app host.
+- Keyed hosts now use `Selector` `_by` helpers where they own item structs,
+  keeping key extraction close to the host collection and avoiding untracked
+  whole-list clones for navigation.
 - The compiled `keyed_subviews` Relay example now pairs `KeyedSubViews` with
   `Selector<u64>` and host-level arrow-key handling. Its tests verify row
   entity reuse while selection moves, previous-selection wraparound, and Enter

@@ -174,19 +174,31 @@ impl SessionSurface {
     }
 
     fn select_next_session(&self, cx: &mut App) {
-        self.selection.select_next(cx, self.session_ids());
+        self.sessions.peek(|sessions| {
+            self.selection
+                .select_next_by(cx, sessions, |session| session.id);
+        });
     }
 
     fn select_previous_session(&self, cx: &mut App) {
-        self.selection.select_previous(cx, self.session_ids());
+        self.sessions.peek(|sessions| {
+            self.selection
+                .select_previous_by(cx, sessions, |session| session.id);
+        });
     }
 
     fn select_first_session(&self, cx: &mut App) {
-        self.selection.select_first(cx, self.session_ids());
+        self.sessions.peek(|sessions| {
+            self.selection
+                .select_first_by(cx, sessions, |session| session.id);
+        });
     }
 
     fn select_last_session(&self, cx: &mut App) {
-        self.selection.select_last(cx, self.session_ids());
+        self.sessions.peek(|sessions| {
+            self.selection
+                .select_last_by(cx, sessions, |session| session.id);
+        });
     }
 
     fn handle_key_down(&self, event: &KeyDownEvent, cx: &mut App) -> bool {
@@ -222,6 +234,7 @@ impl SessionSurface {
         })
     }
 
+    #[cfg(test)]
     fn session_ids(&self) -> Vec<u64> {
         self.sessions
             .peek(|sessions| sessions.iter().map(|session| session.id).collect())
@@ -236,7 +249,7 @@ impl ReactiveView for SessionSurface {
             .filter(|session| session.status == SessionStatus::Running)
             .count();
         self.selection
-            .reconcile_keys(cx, sessions.iter().map(|session| session.id));
+            .reconcile_keys_by(cx, &sessions, |session| session.id);
 
         self.rows.sync(
             cx,

@@ -208,9 +208,10 @@ impl StressSessionList {
     }
 
     fn activate_next(&self, cx: &mut App) {
-        let sessions = self.sessions.get_untracked();
-        self.selection
-            .select_next(cx, sessions.iter().map(|session| session.id));
+        self.sessions.peek(|sessions| {
+            self.selection
+                .select_next_by(cx, sessions, |session| session.id);
+        });
     }
 
     fn rotate(&self, cx: &mut App) {
@@ -236,13 +237,10 @@ impl StressSessionList {
             true
         });
 
-        let available_ids = self.sessions.peek(|sessions| {
-            sessions
-                .iter()
-                .map(|session| session.id)
-                .collect::<Vec<_>>()
+        self.sessions.peek(|sessions| {
+            self.selection
+                .reconcile_keys_by(cx, sessions, |session| session.id);
         });
-        self.selection.reconcile_keys(cx, available_ids);
     }
 }
 
@@ -250,7 +248,7 @@ impl ReactiveView for StressSessionList {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sessions = self.sessions.get(cx);
         self.selection
-            .reconcile_keys(cx, sessions.iter().map(|session| session.id));
+            .reconcile_keys_by(cx, &sessions, |session| session.id);
 
         let selection = self.selection.clone();
         self.rows.sync(

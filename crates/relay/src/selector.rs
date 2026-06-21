@@ -97,6 +97,19 @@ where
         self.select_relative(cx, keys, SelectionStep::Next)
     }
 
+    /// Select the next key from an ordered item collection.
+    ///
+    /// `key` maps each item to its stable selection key. This is equivalent to
+    /// calling [`Selector::select_next`] with `items.into_iter().map(key)`.
+    pub fn select_next_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.select_next(cx, items.into_iter().map(key))
+    }
+
     /// Select the previous key from the current ordered key set.
     ///
     /// When the current selection is missing from `keys`, this selects the
@@ -104,6 +117,19 @@ where
     /// whether the selected key changed.
     pub fn select_previous(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
         self.select_relative(cx, keys, SelectionStep::Previous)
+    }
+
+    /// Select the previous key from an ordered item collection.
+    ///
+    /// `key` maps each item to its stable selection key. This is equivalent to
+    /// calling [`Selector::select_previous`] with `items.into_iter().map(key)`.
+    pub fn select_previous_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.select_previous(cx, items.into_iter().map(key))
     }
 
     /// Select the first key from the current ordered key set.
@@ -114,6 +140,19 @@ where
         self.select_boundary(cx, keys, SelectionBoundary::First)
     }
 
+    /// Select the first key from an ordered item collection.
+    ///
+    /// `key` maps each item to its stable selection key. This is equivalent to
+    /// calling [`Selector::select_first`] with `items.into_iter().map(key)`.
+    pub fn select_first_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.select_first(cx, items.into_iter().map(key))
+    }
+
     /// Select the last key from the current ordered key set.
     ///
     /// When `keys` is empty, this clears the selection. Returns whether the
@@ -122,10 +161,31 @@ where
         self.select_boundary(cx, keys, SelectionBoundary::Last)
     }
 
+    /// Select the last key from an ordered item collection.
+    ///
+    /// `key` maps each item to its stable selection key. This is equivalent to
+    /// calling [`Selector::select_last`] with `items.into_iter().map(key)`.
+    pub fn select_last_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.select_last(cx, items.into_iter().map(key))
+    }
+
     /// Drop per-key signals for keys that are no longer relevant.
     pub fn retain_keys(&self, keys: impl IntoIterator<Item = K>) {
         let keys = keys.into_iter().collect::<HashSet<_>>();
         self.keyed.borrow_mut().retain(|key, _| keys.contains(key));
+    }
+
+    /// Drop per-key signals for item keys that are no longer relevant.
+    ///
+    /// `key` maps each item to its stable selection key. The selected key
+    /// itself is unchanged.
+    pub fn retain_keys_by<T>(&self, items: impl IntoIterator<Item = T>, key: impl FnMut(T) -> K) {
+        self.retain_keys(items.into_iter().map(key));
     }
 
     /// Reconcile this selector with the currently available keys.
@@ -144,6 +204,20 @@ where
 
         self.keyed.borrow_mut().retain(|key, _| keys.contains(key));
         should_clear
+    }
+
+    /// Reconcile this selector with the currently available item keys.
+    ///
+    /// `key` maps each item to its stable selection key. This drops per-key
+    /// signals for removed keys and clears the selected key if it is no longer
+    /// present. Returns whether the selection was cleared.
+    pub fn reconcile_keys_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.reconcile_keys(cx, items.into_iter().map(key))
     }
 
     /// Drop all per-key signals. The selected key itself is unchanged.
@@ -238,6 +312,11 @@ mod tests {
     use gpui::TestApp;
 
     use crate::{Selector, effect, init};
+
+    #[derive(Clone, Copy)]
+    struct Item {
+        id: u64,
+    }
 
     #[test]
     fn selector_notifies_only_previous_and_next_key_effects() {
@@ -517,6 +596,51 @@ mod tests {
         });
 
         let changed = app.update(|cx| selector.select_first(cx, []));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn selector_select_next_by_uses_item_keys() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+        let items = [Item { id: 1 }, Item { id: 2 }, Item { id: 3 }];
+
+        let changed = app.update(|cx| selector.select_next_by(cx, &items, |item| item.id));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_last_by_uses_item_keys() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+        let items = [Item { id: 1 }, Item { id: 2 }, Item { id: 3 }];
+
+        let changed = app.update(|cx| selector.select_last_by(cx, &items, |item| item.id));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_reconcile_keys_by_clears_missing_selection() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+        let items = [Item { id: 1 }, Item { id: 2 }];
+
+        let changed = app.update(|cx| selector.reconcile_keys_by(cx, &items, |item| item.id));
 
         assert!(changed);
         assert_eq!(selector.get_untracked(), None);

@@ -240,9 +240,10 @@ impl PatternProjectPicker {
     }
 
     fn cycle_selection(&self, cx: &mut App) {
-        let projects = self.projects.get_untracked();
-        self.selection
-            .select_next(cx, projects.iter().map(|project| project.id));
+        self.projects.peek(|projects| {
+            self.selection
+                .select_next_by(cx, projects, |project| project.id);
+        });
     }
 
     fn rotate_projects(&self, cx: &mut App) {
@@ -293,7 +294,7 @@ impl ReactiveView for PatternProjectPicker {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let projects = self.projects.get(cx);
         self.selection
-            .reconcile_keys(cx, projects.iter().map(|project| project.id));
+            .reconcile_keys_by(cx, &projects, |project| project.id);
 
         let selection = self.selection.clone();
         self.rows.sync(

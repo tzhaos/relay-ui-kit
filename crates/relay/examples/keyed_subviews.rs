@@ -77,15 +77,15 @@ impl TaskList {
     }
 
     fn select_next(&self, cx: &mut App) {
-        let tasks = self.tasks.get_untracked();
-        self.selection
-            .select_next(cx, tasks.iter().map(|task| task.id));
+        self.tasks.peek(|tasks| {
+            self.selection.select_next_by(cx, tasks, |task| task.id);
+        });
     }
 
     fn select_previous(&self, cx: &mut App) {
-        let tasks = self.tasks.get_untracked();
-        self.selection
-            .select_previous(cx, tasks.iter().map(|task| task.id));
+        self.tasks.peek(|tasks| {
+            self.selection.select_previous_by(cx, tasks, |task| task.id);
+        });
     }
 
     fn reverse(&self, cx: &mut App) {
@@ -117,8 +117,7 @@ impl TaskList {
 impl ReactiveView for TaskList {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let tasks = self.tasks.get(cx);
-        self.selection
-            .reconcile_keys(cx, tasks.iter().map(|task| task.id));
+        self.selection.reconcile_keys_by(cx, &tasks, |task| task.id);
 
         self.rows.sync(
             cx,
