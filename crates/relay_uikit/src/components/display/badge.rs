@@ -64,11 +64,13 @@ impl RenderOnce for Badge {
 
         div()
             .h(px(20.0))
+            .max_w(px(240.0))
             .px(px(space::SM))
             .rounded(px(radius::SM))
             .border_1()
             .border_color(border)
             .bg(bg)
+            .overflow_hidden()
             .flex()
             .items_center()
             .gap_1()
@@ -78,6 +80,6 @@ impl RenderOnce for Badge {
             .when_some(self.icon, |this, icon| {
                 this.child(Icon::new(icon).size(IconSize::XSmall).color(fg))
             })
-            .child(self.label)
+            .child(div().truncate().child(self.label))
     }
 }

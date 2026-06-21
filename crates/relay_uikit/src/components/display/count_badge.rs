@@ -43,6 +43,9 @@ impl CountBadge {
 
 impl RenderOnce for CountBadge {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        if self.count == 0 {
+            return div().into_any_element();
+        }
         let theme = *cx.theme();
         let fg = self.tone.fg(&theme);
         div()
@@ -60,6 +63,7 @@ impl RenderOnce for CountBadge {
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(fg)
             .child(self.label())
+            .into_any_element()
     }
 }
 

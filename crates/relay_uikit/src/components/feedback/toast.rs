@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use gpui::{
     App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
     Window, div, prelude::FluentBuilder, px,
@@ -22,7 +24,9 @@ pub struct Toast {
     detail: Option<String>,
     tone: Tone,
     animated: bool,
+    duration: Option<Duration>,
     on_close: Option<ClickHandler>,
+    on_dismiss: Option<ClickHandler>,
 }
 
 impl Toast {
@@ -33,7 +37,9 @@ impl Toast {
             detail: None,
             tone: Tone::Info,
             animated: true,
+            duration: None,
             on_close: None,
+            on_dismiss: None,
         }
     }
 
@@ -52,11 +58,24 @@ impl Toast {
         self
     }
 
+    pub fn duration(mut self, duration: Duration) -> Self {
+        self.duration = Some(duration);
+        self
+    }
+
     pub fn on_close(
         mut self,
         handler: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_close = Some(Box::new(handler));
+        self
+    }
+
+    pub fn on_dismiss(
+        mut self,
+        handler: impl Fn(&gpui::ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_dismiss = Some(Box::new(handler));
         self
     }
 }
@@ -66,7 +85,8 @@ impl RenderOnce for Toast {
         let theme = *cx.theme();
         let fg = self.tone.fg(&theme);
         let close_id: ElementId = (self.id.clone(), "close").into();
-        let on_close = self.on_close;
+        let on_close = self.on_close.map(std::rc::Rc::new);
+        let on_dismiss = self.on_dismiss.map(std::rc::Rc::new);
         let base = div()
             .id(self.id)
             .w(px(320.0))
@@ -108,12 +128,19 @@ impl RenderOnce for Toast {
                         )
                     }),
             )
-            .when_some(on_close, |this, handler| {
-                this.child(
-                    IconButton::new(close_id, IconName::X)
-                        .size(IconSize::XSmall)
-                        .on_click(handler),
-                )
+            .child({
+                let on_close_for_key = on_close.clone();
+                let on_dismiss_for_key = on_dismiss.clone();
+                IconButton::new(close_id, IconName::X)
+                    .size(IconSize::XSmall)
+                    .on_click(move |event, window, cx| {
+                        if let Some(handler) = &on_close_for_key {
+                            handler(event, window, cx);
+                        }
+                        if let Some(handler) = &on_dismiss_for_key {
+                            handler(event, window, cx);
+                        }
+                    })
             });
 
         if self.animated {

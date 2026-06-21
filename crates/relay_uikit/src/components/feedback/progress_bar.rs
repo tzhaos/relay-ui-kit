@@ -3,11 +3,15 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 
-use crate::{theme::ActiveTheme, tone::Tone};
+use crate::{
+    motion::MotionExt,
+    theme::ActiveTheme,
+    tone::Tone,
+};
 
 use super::shared::progress_ratio;
 
-/// A determinate horizontal progress bar.
+/// A determinate or indeterminate horizontal progress bar.
 #[derive(IntoElement)]
 pub struct ProgressBar {
     id: ElementId,
@@ -15,6 +19,7 @@ pub struct ProgressBar {
     max: f32,
     tone: Tone,
     label: Option<String>,
+    indeterminate: bool,
 }
 
 impl ProgressBar {
@@ -25,6 +30,7 @@ impl ProgressBar {
             max,
             tone: Tone::Accent,
             label: None,
+            indeterminate: false,
         }
     }
 
@@ -38,6 +44,11 @@ impl ProgressBar {
         self
     }
 
+    pub fn indeterminate(mut self) -> Self {
+        self.indeterminate = true;
+        self
+    }
+
     pub fn ratio(&self) -> f32 {
         progress_ratio(self.value, self.max)
     }
@@ -46,18 +57,39 @@ impl ProgressBar {
 impl RenderOnce for ProgressBar {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let ratio = self.ratio();
         let fg = self.tone.fg(&theme);
-        let bar = div()
-            .id(self.id)
-            .h(px(6.0))
-            .w_full()
-            .rounded_full()
-            .bg(theme.panel_alt)
-            .role(Role::ProgressIndicator)
-            .border_1()
-            .border_color(theme.border)
-            .child(div().h_full().rounded_full().bg(fg).w(relative(ratio)));
+
+        let bar = if self.indeterminate {
+            div()
+                .id(self.id)
+                .h(px(6.0))
+                .w_full()
+                .rounded_full()
+                .bg(theme.panel_alt)
+                .role(Role::ProgressIndicator)
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    div()
+                        .h_full()
+                        .rounded_full()
+                        .bg(fg)
+                        .w(relative(0.35))
+                        .motion_pulse(0.3, 0.8),
+                )
+        } else {
+            let ratio = self.ratio();
+            div()
+                .id(self.id)
+                .h(px(6.0))
+                .w_full()
+                .rounded_full()
+                .bg(theme.panel_alt)
+                .role(Role::ProgressIndicator)
+                .border_1()
+                .border_color(theme.border)
+                .child(div().h_full().rounded_full().bg(fg).w(relative(ratio)))
+        };
 
         div()
             .w_full()

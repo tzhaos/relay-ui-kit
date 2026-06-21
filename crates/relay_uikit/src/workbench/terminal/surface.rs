@@ -54,6 +54,7 @@ impl RenderOnce for TerminalSurface {
             .bg(theme.terminal_bg)
             .font_family(mono_family())
             .text_size(px(13.0))
+            .relative()
             .when_some(content, |this, content| {
                 this.child(
                     div()
@@ -69,6 +70,28 @@ impl RenderOnce for TerminalSurface {
                 this.items_center()
                     .justify_center()
                     .child(empty_terminal_state(theme, connected))
+            })
+            .when(!connected && !empty, |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .bg(gpui::red().opacity(0.08))
+                        .occlude()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1()
+                                .rounded(px(4.0))
+                                .bg(gpui::red().opacity(0.5))
+                                .text_xs()
+                                .text_color(gpui::white())
+                                .child("Session disconnected"),
+                        ),
+                )
             })
             .occlude()
     }

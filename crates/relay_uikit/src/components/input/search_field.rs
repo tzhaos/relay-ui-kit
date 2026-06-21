@@ -7,7 +7,7 @@ use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::KeyCaptureHandler,
+    interaction::{ClickHandler, KeyCaptureHandler},
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
@@ -24,6 +24,7 @@ pub struct SearchField {
     key_context: &'static str,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyCaptureHandler>,
+    on_clear: Option<ClickHandler>,
 }
 
 impl SearchField {
@@ -37,6 +38,7 @@ impl SearchField {
             key_context: "SearchField",
             binding: None,
             on_key: None,
+            on_clear: None,
         }
     }
 
@@ -54,6 +56,7 @@ impl SearchField {
             key_context: "SearchField",
             binding: Some(binding),
             on_key: None,
+            on_clear: None,
         }
     }
 
@@ -85,6 +88,14 @@ impl SearchField {
         self.on_key = Some(Box::new(handler));
         self
     }
+
+    pub fn on_clear(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_clear = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for SearchField {
@@ -111,6 +122,7 @@ impl RenderOnce for SearchField {
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
         let disabled = self.disabled;
+        let on_clear = self.on_clear;
 
         div()
             .id(self.id)
@@ -146,6 +158,34 @@ impl RenderOnce for SearchField {
                     .text_color(text_color)
                     .child(display),
             )
+            .when(!is_empty && !disabled, |this| {
+                let on_clear_for_click = on_clear.map(std::rc::Rc::new);
+                this.child(
+                    div()
+                        .id("search-clear")
+                        .size(px(18.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(radius::SM))
+                        .cursor_pointer()
+                        .hover(move |style| style.bg(theme.hover))
+                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
+                        .on_click(move |event, window, cx| {
+                            if let Some(handler) = &on_clear_for_click {
+                                handler(event, window, cx);
+                            }
+                            cx.stop_propagation();
+                        })
+                        .child(
+                            Icon::new(IconName::X)
+                                .size(IconSize::XSmall)
+                                .color(theme.text_muted),
+                        ),
+                )
+            })
             .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
                     let mut consumed = false;
