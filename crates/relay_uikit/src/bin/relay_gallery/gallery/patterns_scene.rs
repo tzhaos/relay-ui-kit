@@ -4,7 +4,7 @@ use relay_uikit::patterns::{
     display::KeyValue,
     layout::ListSection,
     navigation::{Tab, Tabs},
-    overlay::{ContextMenu, Dialog, MenuItem, Select, SelectOption, TooltipBody},
+    overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
 };
 use relay_uikit::{Button, IconButton, IconName, Label, Theme};
 
@@ -32,12 +32,9 @@ pub(super) fn render(
             cx,
             "Navigation patterns",
             navigation_patterns(state),
-        ))
-        .child(section(
-            cx,
-            "Overlay patterns",
-            overlay_patterns(state, theme, overlay_event_text),
         ));
+    let overlay_body = overlay_patterns(state, theme, &overlay_event_text, cx);
+    stack = stack.child(section(cx, "Overlay patterns", overlay_body));
 
     if state.pattern_dialog_open.get(cx) {
         stack = stack.child(settings_dialog(state));
@@ -161,8 +158,9 @@ fn navigation_patterns(state: &GalleryState) -> impl IntoElement {
 fn overlay_patterns(
     state: &GalleryState,
     theme: Theme,
-    overlay_event_text: String,
-) -> impl IntoElement {
+    overlay_event_text: &str,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     div()
         .relative()
         .min_h(px(188.0))
@@ -181,6 +179,35 @@ fn overlay_patterns(
                         SelectOption::new("dark", "Dark"),
                     ],
                 ),
+            ),
+        )
+        .child(
+            div().w(px(220.0)).child(
+                DropdownMenu::new(
+                    "patterns-dropdown",
+                    Button::new("patterns-dropdown-btn", "Dropdown Menu")
+                        .variant(relay_uikit::ButtonVariant::Secondary)
+                        .icon(IconName::ChevronDown)
+                        .on_click({
+                            let open = state.command_context_open.clone();
+                            move |_event, _window, cx| {
+                                open.update(cx, |v| { *v = !*v; true });
+                            }
+                        }),
+                    vec![
+                        MenuItem::header("Actions"),
+                        MenuItem::new("New file").icon(IconName::Plus),
+                        MenuItem::new("Duplicate").icon(IconName::FileText),
+                        MenuItem::separator(),
+                        MenuItem::new("Delete").icon(IconName::Archive).danger(),
+                    ],
+                )
+                .open(state.command_context_open.get(cx))
+                .min_width(200.0)
+                .on_dismiss({
+                    let open = state.command_context_open.clone();
+                    move |_window, cx| { open.set(cx, false); }
+                }),
             ),
         )
         .child(
