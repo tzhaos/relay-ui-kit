@@ -1,10 +1,10 @@
 //! GPUI-friendly helpers for creating relay state.
 
-use std::borrow::BorrowMut;
+use std::{borrow::BorrowMut, hash::Hash};
 
 use gpui::{App, Context};
 
-use crate::{Binding, Effect, Memo, Resource, Signal, effect_in, init, track, untrack};
+use crate::{Binding, Effect, Memo, Resource, Selector, Signal, effect_in, init, track, untrack};
 
 /// Convenience constructors for relay primitives on GPUI app contexts.
 pub trait ReactiveAppExt {
@@ -27,6 +27,11 @@ pub trait ReactiveAppExt {
 
     /// Create an errored async resource.
     fn error_resource<T, E>(&mut self, error: E) -> Resource<T, E>;
+
+    /// Create keyed selection state.
+    fn selector<K>(&mut self, selected: Option<K>) -> Selector<K>
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static;
 
     /// Run a closure without recording signal reads as dependencies.
     ///
@@ -81,6 +86,13 @@ where
 
     fn error_resource<T, E>(&mut self, error: E) -> Resource<T, E> {
         Resource::error(self.borrow_mut(), error)
+    }
+
+    fn selector<K>(&mut self, selected: Option<K>) -> Selector<K>
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        Selector::new(self.borrow_mut(), selected)
     }
 
     fn untrack<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
@@ -186,6 +198,17 @@ mod tests {
 
         app.read(|cx| {
             assert_eq!(resource.get(cx), ResourceState::Ready(7));
+        });
+    }
+
+    #[test]
+    fn app_ext_creates_selector() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| cx.selector(Some(1_u64)));
+
+        app.update(|cx| {
+            assert!(selector.is_selected(cx, 1));
+            assert!(!selector.is_selected(cx, 2));
         });
     }
 
