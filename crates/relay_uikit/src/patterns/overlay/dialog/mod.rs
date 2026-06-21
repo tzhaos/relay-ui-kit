@@ -1,10 +1,12 @@
 mod confirm;
 mod panel;
 
+use std::rc::Rc;
+
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, deferred, div,
-    prelude::FluentBuilder, px,
+    AnyElement, App, ClickEvent, ElementId, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, deferred,
+    div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -109,13 +111,22 @@ impl RenderOnce for Dialog {
                 .bg(gpui::black().opacity(0.22))
                 .occlude()
                 .when_some(on_dismiss, |this, handler| {
+                    let handler_rc: Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)> = Rc::new(handler);
+                    let handler_for_click = handler_rc.clone();
+                    let handler_for_key = handler_rc;
                     this.cursor_pointer()
                         .on_click(move |event, window, cx| {
-                            handler(event, window, cx);
+                            handler_for_click(event, window, cx);
                             cx.stop_propagation();
                         })
                         .on_mouse_down(MouseButton::Left, |_, _, cx| {
                             cx.stop_propagation();
+                        })
+                        .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                            if event.keystroke.key.as_str() == "escape" {
+                                handler_for_key(&ClickEvent::default(), window, cx);
+                                cx.stop_propagation();
+                            }
                         })
                 })
                 .child(panel)

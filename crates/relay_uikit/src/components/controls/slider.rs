@@ -219,13 +219,15 @@ fn slider_ratio(value: f32, min: f32, max: f32) -> f32 {
 }
 
 fn value_from_drag(event: &DragMoveEvent<DraggedSlider>, min: f32, max: f32) -> f32 {
-    if max <= min {
+    if max <= min || !min.is_finite() || !max.is_finite() {
         return min;
     }
 
     let width = f32::from(event.bounds.size.width).max(1.0);
     let x = f32::from(event.event.position.x - event.bounds.left());
-    min + (x / width).clamp(0.0, 1.0) * (max - min)
+    let ratio = (x / width).clamp(0.0, 1.0);
+    let value = min + ratio * (max - min);
+    if value.is_finite() { value } else { min }
 }
 
 #[cfg(test)]

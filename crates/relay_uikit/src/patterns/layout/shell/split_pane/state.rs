@@ -10,7 +10,7 @@ pub struct SplitPaneState {
 
 impl SplitPaneState {
     pub fn new(first_size: f32) -> Self {
-        let first_size = snap_split_size(first_size);
+        let first_size = sanitize_size(first_size);
         Self {
             committed_first_size: first_size,
             visible_first_size: first_size,
@@ -31,7 +31,7 @@ impl SplitPaneState {
     }
 
     pub fn set_first_size(&mut self, first_size: f32) {
-        let first_size = snap_split_size(first_size);
+        let first_size = sanitize_size(first_size);
         self.committed_first_size = first_size;
         self.visible_first_size = first_size;
         self.resizing = false;
@@ -42,7 +42,7 @@ impl SplitPaneState {
     }
 
     pub fn preview_resize_to(&mut self, first_size: f32) -> bool {
-        let next = snap_split_size(first_size);
+        let next = sanitize_size(first_size);
         if should_emit_resize(self.visible_first_size, next) {
             self.visible_first_size = next;
             self.resizing = true;
@@ -58,6 +58,14 @@ impl SplitPaneState {
         self.resizing = false;
         changed
     }
+}
+
+/// Sanitize a split size: reject NaN/negative, snap to whole pixels.
+fn sanitize_size(size: f32) -> f32 {
+    if !size.is_finite() || size < 0.0 {
+        return 0.0;
+    }
+    snap_split_size(size)
 }
 
 #[cfg(test)]

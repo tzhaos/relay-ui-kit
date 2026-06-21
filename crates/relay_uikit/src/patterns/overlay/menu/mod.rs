@@ -114,6 +114,22 @@ impl RenderOnce for Menu {
         let id = self.id.clone();
         let state =
             window.use_keyed_state((id.clone(), "menu-state"), cx, |_, _| MenuState::default());
+
+        // Reset stale open_submenu if it points beyond the current items.
+        // This can happen when the menu is re-rendered with fewer items
+        // than before (e.g. dropdown reopened with different content).
+        let item_count = self.items.len();
+        {
+            let needs_reset = state.read(cx).open_submenu.is_some_and(|idx| idx >= item_count);
+            if needs_reset {
+                state.update(cx, |state, cx| {
+                    if state.close_submenu() {
+                        cx.notify();
+                    }
+                });
+            }
+        }
+
         let snapshot = state.read(cx).snapshot();
 
         let menu_bounds_state = state.clone();
