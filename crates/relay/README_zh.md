@@ -69,7 +69,8 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`derived`** — `memo` 的语义别名，强调"派生值"。在 view 的 `new()` 里用 `cx.derived(|cx| ...)` 注册派生计算，渲染时 `derived.get(cx)` 读取，依赖变化才重算。
 - **`watch(cx, sources, react)`** — 声明式副作用。`sources` 闭包读取依赖，`react` 闭包执行副作用，分离声明与执行。对标 Vue `watch`。
 - **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。
-- **`ForEach`** (relay_uikit) — 响应式列表组件，接收 `Signal<Vec<T>>` + key fn + render fn，自动订阅信号刷新。
+- **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
+- **`KeyedSubViews`** — 面向列表形态 view 的 keyed row/entity 保持器。按稳定 key 对齐 item 顺序，复用已有 row entity，丢弃移除的 row，并让未变化的兄弟 row 继续复用 GPUI view cache。
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
 - **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
 - **`WindowSignalExt::use_signal` / `use_binding`** — 组件内 hooks，供 `RenderOnce` 组件使用。通过 `window.use_keyed_state` 按 `ElementId` 持久化跨渲染状态。对标 React `useState` / Solid `createSignal`。
@@ -126,6 +127,48 @@ fn child_render(cx: &App) {
 }
 ```
 
+## 异步资源
+
+`Resource::load` 会重置为 `Pending` 并开始加载。`Resource::reload` 会把上一份 ready 值保留为 `Reloading(value)`，让 view 可以继续展示最新可用数据，同时表达刷新进度。UI 需要“最后一份可用值”语义时，用 `state.latest()` 或 `resource.latest(cx)`。
+
+```rust
+resource.reload(cx, |cx| async move {
+    let value = fetch(cx).await?;
+    Ok(value)
+});
+
+let state = resource.get(cx);
+let latest = state.latest();
+```
+
+## Entity 粒度 UI
+
+Relay 的 UI 粒度跟随 GPUI 的 `Entity` 缓存边界。把昂贵区域拆成 `SubView<T>` 字段，用 `cached(...)` 渲染；当列表行本身有状态或重绘成本较高时，用 `KeyedSubViews` 保持 row entity 稳定。
+
+```rust
+struct TaskList {
+    rows: KeyedSubViews<u64, TaskRow>,
+    tasks: Signal<Vec<Task>>,
+}
+
+impl ReactiveView for TaskList {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let tasks = self.tasks.get(cx);
+        self.rows.sync(
+            cx,
+            tasks,
+            |task| task.id,
+            |task, _cx| TaskRow::new(task),
+            |task, row, _cx| row.update_task(task),
+        );
+
+        div()
+            .children(self.rows.cached(gpui::StyleRefinement::default().w_full()))
+            .into_any_element()
+    }
+}
+```
+
 ## 示例
 
 每个示例演示一个特定的 API 或范式。用 `cargo run -p relay --example <名称>` 运行：
@@ -139,11 +182,13 @@ fn child_render(cx: &App) {
 | `derived` | `derived` / `memo` 派生值 |
 | `watch` | `watch` 声明式副作用 |
 | `signal_vec` | `SignalVecExt` 响应式列表操作 |
-| `resource` | `Resource` 异步 pending/ready/error |
+| `resource` | `Resource` 异步 pending/reloading/ready/error 和 latest 值 |
 | `context` | `provide_context` / `use_context` 跨层共享 |
 | `form` | `Form` 聚合、`is_dirty`、`reset`、`commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |
 | `reactive_struct` | `#[derive(Reactive)]` — 字段级响应 |
+| `subview` | `SubView` cached 子 Entity 拆分 |
+| `keyed_subviews` | `KeyedSubViews` 稳定 row entity |
 
 ```sh
 cargo run -p relay --example counter

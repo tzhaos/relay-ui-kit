@@ -67,7 +67,8 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`derived`** — semantic alias for `memo`, emphasizing "derived value". Register derived computation in `new()` with `cx.derived(|cx| ...)`, read via `derived.get(cx)` in render; recomputes only when dependencies change.
 - **`watch(cx, sources, react)`** — declarative side effects. `sources` closure reads dependencies; `react` closure executes the side effect. Separates declaration from execution. Vue `watch` equivalent.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path.
-- **`ForEach`** (relay_uikit) — reactive list component. Takes `Signal<Vec<T>>` + key fn + render fn; subscribes to the signal and refreshes automatically.
+- **`SubView`** — stable GPUI child entity wrapper. Use it to split stateful or heavy regions into their own `Entity` and render them with GPUI's `AnyView::cached` path.
+- **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache.
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
 - **`Form`** — form aggregation model. Register multiple `Binding<T>` fields; provides `is_dirty()` (returns `Memo<bool>`), `reset(cx)`, and `commit(cx)`. Suited for settings panels, edit forms, and other dirty-check/reset/submit scenarios.
 - **`WindowSignalExt::use_signal` / `use_binding`** — component-internal hooks for `RenderOnce` components. Calls `window.use_keyed_state` to persist state across renders keyed by `ElementId`. The React `useState` / Solid `createSignal` equivalent for GPUI.
@@ -124,6 +125,48 @@ fn child_render(cx: &App) {
 }
 ```
 
+## Async resources
+
+`Resource::load` starts a reset load and enters `Pending`. `Resource::reload` keeps a previous ready value available as `Reloading(value)`, so views can keep rendering the latest data while showing refresh progress. Use `state.latest()` or `resource.latest(cx)` when the UI wants "last usable value" semantics.
+
+```rust
+resource.reload(cx, |cx| async move {
+    let value = fetch(cx).await?;
+    Ok(value)
+});
+
+let state = resource.get(cx);
+let latest = state.latest();
+```
+
+## Entity-grained UI
+
+Relay's UI-level granularity follows GPUI's `Entity` cache boundary. Split expensive regions into `SubView<T>` fields, render them with `cached(...)`, and keep list rows stable with `KeyedSubViews` when the row has state or is expensive to redraw.
+
+```rust
+struct TaskList {
+    rows: KeyedSubViews<u64, TaskRow>,
+    tasks: Signal<Vec<Task>>,
+}
+
+impl ReactiveView for TaskList {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let tasks = self.tasks.get(cx);
+        self.rows.sync(
+            cx,
+            tasks,
+            |task| task.id,
+            |task, _cx| TaskRow::new(task),
+            |task, row, _cx| row.update_task(task),
+        );
+
+        div()
+            .children(self.rows.cached(gpui::StyleRefinement::default().w_full()))
+            .into_any_element()
+    }
+}
+```
+
 ## Examples
 
 Each example demonstrates a specific API or pattern. Run with `cargo run -p relay --example <name>`:
@@ -137,11 +180,13 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `derived` | `derived` / `memo` derived values |
 | `watch` | `watch` declarative side effects |
 | `signal_vec` | `SignalVecExt` reactive list operations |
-| `resource` | `Resource` async pending/ready/error |
+| `resource` | `Resource` async pending/reloading/ready/error and latest value |
 | `context` | `provide_context` / `use_context` cross-layer sharing |
 | `form` | `Form` aggregation, `is_dirty`, `reset`, `commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — component-internal state |
 | `reactive_struct` | `#[derive(Reactive)]` — field-level reactivity |
+| `subview` | `SubView` cached child entity splitting |
+| `keyed_subviews` | `KeyedSubViews` retained row entities |
 
 ```sh
 cargo run -p relay --example counter

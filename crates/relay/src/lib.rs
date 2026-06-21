@@ -32,6 +32,7 @@ mod context;
 mod effect;
 mod form;
 mod hooks;
+mod keyed;
 mod memo;
 mod resource;
 mod runtime;
@@ -44,9 +45,10 @@ pub use binding::Binding;
 pub use context::{ContextHandle, provide_context, use_context};
 pub use effect::{Effect, effect, effect_in};
 pub use form::Form;
-pub use relay_macros::Reactive;
 pub use hooks::{ReactiveAppExt, ReactiveContextExt, install};
+pub use keyed::{KeyedSubView, KeyedSubViews};
 pub use memo::Memo;
+pub use relay_macros::Reactive;
 pub use resource::{Resource, ResourceState};
 pub use runtime::{EffectId, ReactiveRuntime, SignalId, batch, init, is_installed, track, untrack};
 pub use signal::{ReadSignal, Signal, WriteSignal};
@@ -56,11 +58,11 @@ pub use window_ext::WindowSignalExt;
 
 /// Common relay imports for GPUI views.
 pub mod prelude {
-    pub use crate::{
-        Binding, ContextHandle, Effect, Form, FormBuilder, Memo, Reactive, ReactiveAppExt,
-        ReactiveContextExt, ReactiveView, Resource, ResourceState, Signal, SignalVecExt,
-        StateScope, SubView, WindowSignalExt, batch, effect, effect_in, init, install,
-        provide_context, track, untrack, use_context,
-    };
     pub use crate::view;
+    pub use crate::{
+        Binding, ContextHandle, Effect, Form, FormBuilder, KeyedSubView, KeyedSubViews, Memo,
+        Reactive, ReactiveAppExt, ReactiveContextExt, ReactiveView, Resource, ResourceState,
+        Signal, SignalVecExt, StateScope, SubView, WindowSignalExt, batch, effect, effect_in, init,
+        install, provide_context, track, untrack, use_context,
+    };
 }

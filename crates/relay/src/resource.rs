@@ -9,16 +9,61 @@ use crate::Signal;
 pub enum ResourceState<T, E> {
     /// The value is loading.
     Pending,
+    /// A new value is loading while the previous ready value remains usable.
+    Reloading(T),
     /// The value is available.
     Ready(T),
     /// Loading failed.
     Error(E),
 }
 
+impl<T, E> ResourceState<T, E> {
+    /// Return whether the resource has no current value and is loading.
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Self::Pending)
+    }
+
+    /// Return whether the resource is loading while retaining a previous value.
+    pub fn is_reloading(&self) -> bool {
+        matches!(self, Self::Reloading(_))
+    }
+
+    /// Return whether the resource is currently loading.
+    pub fn is_loading(&self) -> bool {
+        matches!(self, Self::Pending | Self::Reloading(_))
+    }
+
+    /// Return whether the resource has a ready value.
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready(_))
+    }
+
+    /// Return whether the resource has an error.
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
+    }
+
+    /// Borrow the latest available value, including retained values while reloading.
+    pub fn latest(&self) -> Option<&T> {
+        match self {
+            Self::Reloading(value) | Self::Ready(value) => Some(value),
+            Self::Pending | Self::Error(_) => None,
+        }
+    }
+
+    /// Borrow the current error, if any.
+    pub fn error(&self) -> Option<&E> {
+        match self {
+            Self::Error(error) => Some(error),
+            Self::Pending | Self::Reloading(_) | Self::Ready(_) => None,
+        }
+    }
+}
+
 /// Signal-backed resource state.
 ///
 /// This type is intentionally UI-agnostic. Higher layers decide how to render
-/// pending, ready, and error states.
+/// pending, reloading, ready, and error states.
 pub struct Resource<T, E> {
     state: Signal<ResourceState<T, E>>,
     control: Rc<RefCell<ResourceControl>>,
@@ -64,6 +109,11 @@ impl<T, E> Resource<T, E> {
         self.state.read(cx, f)
     }
 
+    /// Read the latest available value with dependency tracking.
+    pub fn read_latest<R>(&self, cx: &App, f: impl FnOnce(Option<&T>) -> R) -> R {
+        self.read(cx, |state| f(state.latest()))
+    }
+
     /// Mark the resource as pending.
     pub fn set_pending(&self, cx: &mut App) {
         self.state.update(cx, |state| {
@@ -100,6 +150,27 @@ impl<T, E> Resource<T, E> {
         let mut control = self.control.borrow_mut();
         control.generation = control.generation.wrapping_add(1);
     }
+
+    /// Cancel the current load and restore a retained value to ready state.
+    ///
+    /// If the resource is not reloading, this behaves like [`Resource::cancel`]
+    /// and leaves the visible state unchanged.
+    pub fn cancel_to_latest(&self, cx: &mut App) {
+        self.cancel();
+        self.state.update(cx, |state| {
+            let current = std::mem::replace(state, ResourceState::Pending);
+            match current {
+                ResourceState::Reloading(value) => {
+                    *state = ResourceState::Ready(value);
+                    true
+                }
+                current => {
+                    *state = current;
+                    false
+                }
+            }
+        });
+    }
 }
 
 impl<T, E> Resource<T, E>
@@ -109,28 +180,38 @@ where
 {
     /// Start loading the resource on GPUI's foreground executor.
     ///
-    /// The resource is set to [`ResourceState::Pending`] immediately. When the
-    /// future resolves, the latest load commits [`ResourceState::Ready`] or
+    /// The resource is reset to [`ResourceState::Pending`] immediately. When
+    /// the future resolves, the latest load commits [`ResourceState::Ready`] or
     /// [`ResourceState::Error`] on the GPUI app thread. Starting another load
-    /// prevents stale completions from committing.
+    /// prevents stale completions from committing. Use [`Resource::reload`] to
+    /// retain an existing value while loading.
     pub fn load<F, Fut>(&self, cx: &mut App, load: F)
     where
         F: FnOnce(AsyncApp) -> Fut + 'static,
         Fut: Future<Output = Result<T, E>> + 'static,
     {
-        self.reload(cx, load);
+        self.start_load(cx, LoadMode::Reset, load);
     }
 
     /// Restart loading the resource.
     ///
-    /// This is an alias for [`Resource::load`] that reads better at call sites
-    /// where the resource may already contain a value.
+    /// If the resource currently has a ready or retained value, it enters
+    /// [`ResourceState::Reloading`] so render code can keep showing the latest
+    /// value while indicating refresh progress.
     pub fn reload<F, Fut>(&self, cx: &mut App, load: F)
     where
         F: FnOnce(AsyncApp) -> Fut + 'static,
         Fut: Future<Output = Result<T, E>> + 'static,
     {
-        let generation = self.begin_load(cx);
+        self.start_load(cx, LoadMode::RetainLatest, load);
+    }
+
+    fn start_load<F, Fut>(&self, cx: &mut App, mode: LoadMode, load: F)
+    where
+        F: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<T, E>> + 'static,
+    {
+        let generation = self.begin_load(cx, mode);
         let state = self.state.clone();
         let control = Rc::downgrade(&self.control);
 
@@ -162,12 +243,46 @@ where
         .detach();
     }
 
-    fn begin_load(&self, cx: &mut App) -> u64 {
-        self.set_pending(cx);
+    fn begin_load(&self, cx: &mut App, mode: LoadMode) -> u64 {
         let mut control = self.control.borrow_mut();
         control.generation = control.generation.wrapping_add(1);
-        control.generation
+        let generation = control.generation;
+        drop(control);
+
+        self.state.update(cx, |state| match mode {
+            LoadMode::Reset => {
+                if matches!(state, ResourceState::Pending) {
+                    false
+                } else {
+                    *state = ResourceState::Pending;
+                    true
+                }
+            }
+            LoadMode::RetainLatest => {
+                let current = std::mem::replace(state, ResourceState::Pending);
+                match current {
+                    ResourceState::Ready(value) => {
+                        *state = ResourceState::Reloading(value);
+                        true
+                    }
+                    ResourceState::Reloading(value) => {
+                        *state = ResourceState::Reloading(value);
+                        false
+                    }
+                    ResourceState::Pending => false,
+                    ResourceState::Error(_) => true,
+                }
+            }
+        });
+
+        generation
     }
+}
+
+#[derive(Clone, Copy)]
+enum LoadMode {
+    Reset,
+    RetainLatest,
 }
 
 impl<T, E> Resource<T, E>
@@ -178,6 +293,16 @@ where
     /// Clone the current resource state with dependency tracking.
     pub fn get(&self, cx: &App) -> ResourceState<T, E> {
         self.state.get(cx)
+    }
+}
+
+impl<T, E> Resource<T, E>
+where
+    T: Clone,
+{
+    /// Clone the latest available value with dependency tracking.
+    pub fn latest(&self, cx: &App) -> Option<T> {
+        self.read_latest(cx, |latest| latest.cloned())
     }
 }
 
@@ -234,6 +359,15 @@ mod tests {
         });
     }
 
+    #[test]
+    fn resource_state_latest_borrows_ready_and_reloading_values() {
+        let ready = ResourceState::<_, &'static str>::Ready(7);
+        assert_eq!(ready.latest(), Some(&7));
+
+        let reloading = ResourceState::<_, &'static str>::Reloading(8);
+        assert_eq!(reloading.latest(), Some(&8));
+    }
+
     #[gpui::test]
     fn resource_load_resolves_to_ready(cx: &mut TestAppContext) {
         let resource = cx.update(|cx| {
@@ -249,6 +383,98 @@ mod tests {
 
         cx.read(|cx| {
             assert_eq!(resource.get(cx), ResourceState::Ready(7));
+        });
+    }
+
+    #[gpui::test]
+    fn resource_load_resets_previous_value_while_pending(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 1)
+        });
+
+        cx.update(|cx| {
+            resource.load(cx, |_| async move { Ok(2) });
+        });
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Pending);
+            assert_eq!(resource.latest(cx), None);
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Ready(2));
+        });
+    }
+
+    #[gpui::test]
+    fn resource_reload_retains_latest_value_while_loading(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 1)
+        });
+
+        cx.update(|cx| {
+            resource.reload(cx, |_| async move { Ok(2) });
+        });
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Reloading(1));
+            assert_eq!(resource.latest(cx), Some(1));
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Ready(2));
+        });
+    }
+
+    #[gpui::test]
+    fn resource_reload_from_error_enters_pending_without_latest(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::error(cx, "failed")
+        });
+
+        cx.update(|cx| {
+            resource.reload(cx, |cx| async move {
+                cx.background_executor()
+                    .timer(Duration::from_millis(20))
+                    .await;
+                Ok(2)
+            });
+        });
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Pending);
+            assert_eq!(resource.latest(cx), None);
+        });
+    }
+
+    #[gpui::test]
+    fn resource_cancel_to_latest_restores_retained_value(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 1)
+        });
+
+        cx.update(|cx| {
+            resource.reload(cx, |cx| async move {
+                cx.background_executor()
+                    .timer(Duration::from_millis(20))
+                    .await;
+                Ok(2)
+            });
+            resource.cancel_to_latest(cx);
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Ready(1));
         });
     }
 

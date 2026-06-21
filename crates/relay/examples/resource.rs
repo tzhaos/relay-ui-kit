@@ -1,8 +1,9 @@
-//! Resource — async state with pending/ready/error tracking.
+//! Resource — async state with pending/reloading/ready/error tracking.
 //!
 //! `Resource<T, E>` wraps a `Signal<ResourceState<T, E>>` and provides `load`
-//! to start an async operation on GPUI's foreground executor. Stale loads are
-//! automatically ignored when a newer load is started.
+//! to start a reset load on GPUI's foreground executor. `reload` retains the
+//! latest value while refreshing. Stale loads are automatically ignored when a
+//! newer load is started.
 //!
 //! Run with `cargo run -p relay --example resource`.
 
@@ -12,8 +13,8 @@ use std::time::Duration;
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{ReactiveContextExt, Resource, ResourceState, init};
@@ -32,18 +33,21 @@ impl ResourceDemo {
 
     fn load_success(&self, cx: &mut App) {
         self.data.load(cx, |cx| async move {
-            cx.background_executor()
-                .timer(Duration::from_secs(2))
-                .await;
+            cx.background_executor().timer(Duration::from_secs(2)).await;
             Ok("Data loaded successfully!".into())
+        });
+    }
+
+    fn reload_success(&self, cx: &mut App) {
+        self.data.reload(cx, |cx| async move {
+            cx.background_executor().timer(Duration::from_secs(2)).await;
+            Ok("Data refreshed successfully!".into())
         });
     }
 
     fn load_failure(&self, cx: &mut App) {
         self.data.load(cx, |cx| async move {
-            cx.background_executor()
-                .timer(Duration::from_secs(1))
-                .await;
+            cx.background_executor().timer(Duration::from_secs(1)).await;
             Err("Simulated load failure".into())
         });
     }
@@ -55,14 +59,16 @@ impl Render for ResourceDemo {
             // Clone the state out so we own the strings (avoids lifetime issues
             // with borrowing into 'static closures below).
             let state = self.data.get(cx);
+            let latest = self.data.latest(cx);
             let (status_text, status_color) = match &state {
-                ResourceState::Pending => (
-                    "Loading...".to_string(),
-                    rgb(0xfbbf24),
-                ),
+                ResourceState::Pending => ("Loading...".to_string(), rgb(0xfbbf24)),
+                ResourceState::Reloading(value) => {
+                    (format!("{value} (refreshing...)"), rgb(0x60a5fa))
+                }
                 ResourceState::Ready(v) => (v.clone(), rgb(0x4ade80)),
                 ResourceState::Error(e) => (e.clone(), rgb(0xef4444)),
             };
+            let latest_text = latest.unwrap_or_else(|| "No latest value".to_string());
 
             div()
                 .flex()
@@ -75,11 +81,22 @@ impl Render for ResourceDemo {
                 .child(div().text_lg().child("Resource demo"))
                 .child(div().text_sm().text_color(status_color).child(status_text))
                 .child(
-                    div().flex().gap_2()
+                    div()
+                        .text_xs()
+                        .text_color(rgb(0xa1a1aa))
+                        .child(format!("latest: {latest_text}")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
                         .child(
                             div()
                                 .id("load")
-                                .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x3b82f6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
                                 .child("Load (2s delay)")
@@ -89,8 +106,25 @@ impl Render for ResourceDemo {
                         )
                         .child(
                             div()
+                                .id("reload")
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x14b8a6))
+                                .rounded(px(6.0))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0x0f766e)))
+                                .child("Reload (keeps latest)")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.reload_success(cx);
+                                })),
+                        )
+                        .child(
+                            div()
                                 .id("load-error")
-                                .px_3().py_2().bg(rgb(0xef4444)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0xef4444))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0xdc2626)))
                                 .child("Load error (1s delay)")
@@ -100,7 +134,7 @@ impl Render for ResourceDemo {
                         ),
                 )
                 .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(
-                    "Starting a new load while one is pending cancels the stale result."
+                    "load resets to pending; reload keeps the previous ready value visible.",
                 ))
         })
     }
@@ -109,7 +143,7 @@ impl Render for ResourceDemo {
 fn run_example() {
     application().run(|cx: &mut App| {
         init(cx);
-        let bounds = Bounds::centered(None, size(px(360.0), px(220.0)), cx);
+        let bounds = Bounds::centered(None, size(px(520.0), px(240.0)), cx);
         let _ = cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
