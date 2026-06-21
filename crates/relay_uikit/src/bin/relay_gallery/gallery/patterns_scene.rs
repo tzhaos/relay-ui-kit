@@ -3,8 +3,7 @@ use gpui::{
     Styled, Window, div, px,
 };
 use relay::{
-    KeyedSubViews, ReactiveAppExt, ReactiveView, ResourceState, Selector, Signal,
-    view::reactive_render,
+    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, view::reactive_render,
 };
 use relay_uikit::patterns::{
     PaneToolbar, TopToolbar, WorkspaceBreadcrumb,
@@ -121,16 +120,23 @@ fn output_patterns(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     let connected = state.core_disclosure_open.get(cx);
-    let (lines, loading, status_text) = state.pattern_output.read(cx, |resource_state| match resource_state {
-        ResourceState::Pending => (Vec::new(), true, "Loading output".to_string()),
-        ResourceState::Reloading(lines) => (lines.clone(), true, "Refreshing output".to_string()),
-        ResourceState::Ready(lines) => (lines.clone(), false, format!("{} lines ready", lines.len())),
-        ResourceState::Error(error) => (
+    let (lines, loading, status_text) = state.pattern_output.fold_latest(
+        cx,
+        || (Vec::new(), true, "Loading output".to_string()),
+        |lines, reloading| {
+            let status_text = if reloading {
+                "Refreshing output".to_string()
+            } else {
+                format!("{} lines ready", lines.len())
+            };
+            (lines.clone(), reloading, status_text)
+        },
+        |error| (
             vec![OutputLine::new(format!("refresh failed: {error}")).style(OutputLineStyle::Error)],
             false,
             "Refresh failed".to_string(),
         ),
-    });
+    );
     let refresh_host = host.clone();
 
     div().flex().flex_col().gap_2()
@@ -295,7 +301,7 @@ impl ReactiveView for PatternProjectPicker {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let projects = self.projects.get(cx);
         self.selection
-            .retain_keys(projects.iter().map(|project| project.id));
+            .reconcile_keys(cx, projects.iter().map(|project| project.id));
 
         let selection = self.selection.clone();
         self.rows.sync(

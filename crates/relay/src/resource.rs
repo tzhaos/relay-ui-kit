@@ -58,6 +58,24 @@ impl<T, E> ResourceState<T, E> {
             Self::Pending | Self::Reloading(_) | Self::Ready(_) => None,
         }
     }
+
+    /// Fold the state into pending, latest-value, and error branches.
+    ///
+    /// `Reloading` and `Ready` both call `latest`; the boolean passed to
+    /// `latest` is `true` when a refresh is in progress.
+    pub fn fold_latest<R>(
+        &self,
+        pending: impl FnOnce() -> R,
+        latest: impl FnOnce(&T, bool) -> R,
+        error: impl FnOnce(&E) -> R,
+    ) -> R {
+        match self {
+            Self::Pending => pending(),
+            Self::Reloading(value) => latest(value, true),
+            Self::Ready(value) => latest(value, false),
+            Self::Error(err) => error(err),
+        }
+    }
 }
 
 /// Signal-backed resource state.
@@ -112,6 +130,20 @@ impl<T, E> Resource<T, E> {
     /// Read the latest available value with dependency tracking.
     pub fn read_latest<R>(&self, cx: &App, f: impl FnOnce(Option<&T>) -> R) -> R {
         self.read(cx, |state| f(state.latest()))
+    }
+
+    /// Read the state and fold it into pending, latest-value, and error branches.
+    ///
+    /// This tracks the resource once and is useful for views that keep rendering
+    /// the previous value while a reload is in progress.
+    pub fn fold_latest<R>(
+        &self,
+        cx: &App,
+        pending: impl FnOnce() -> R,
+        latest: impl FnOnce(&T, bool) -> R,
+        error: impl FnOnce(&E) -> R,
+    ) -> R {
+        self.read(cx, |state| state.fold_latest(pending, latest, error))
     }
 
     /// Mark the resource as pending.
@@ -366,6 +398,46 @@ mod tests {
 
         let reloading = ResourceState::<_, &'static str>::Reloading(8);
         assert_eq!(reloading.latest(), Some(&8));
+    }
+
+    #[test]
+    fn resource_state_fold_latest_collapses_ready_and_reloading() {
+        let ready = ResourceState::<_, &'static str>::Ready(7);
+        let reloading = ResourceState::<_, &'static str>::Reloading(8);
+
+        let ready_result = ready.fold_latest(
+            || "pending".to_string(),
+            |value, loading| format!("{value}:{loading}"),
+            |error| error.to_string(),
+        );
+        let reloading_result = reloading.fold_latest(
+            || "pending".to_string(),
+            |value, loading| format!("{value}:{loading}"),
+            |error| error.to_string(),
+        );
+
+        assert_eq!(ready_result, "7:false");
+        assert_eq!(reloading_result, "8:true");
+    }
+
+    #[test]
+    fn resource_fold_latest_reads_ready_value() {
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 7)
+        });
+
+        let result = app.read(|cx| {
+            resource.fold_latest(
+                cx,
+                || 0,
+                |value, loading| value + if loading { 1 } else { 0 },
+                |_| -1,
+            )
+        });
+
+        assert_eq!(result, 7);
     }
 
     #[gpui::test]

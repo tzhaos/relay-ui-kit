@@ -9,20 +9,24 @@ window lifecycles as the source of truth.
 - `Signal`, `Binding`, `Memo` / `derived`, `Effect`, `watch`, `untrack`, and
   reactive context cover app state, derivation, side effects, and cross-layer
   state sharing.
-- `Resource::load`, `Resource::reload`, and `latest` cover async pending,
-  reloading, ready, and error states.
+- `Resource::load`, `Resource::reload`, `latest`, and `fold_latest` cover
+  async pending, reloading, ready, and error states without baking in a UI
+  boundary.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
-- `Selector<K>` gives selection-heavy lists per-key tracking.
+- `Selector<K>` gives selection-heavy lists per-key tracking and can reconcile
+  selection against the current item keys.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
   selection and `KeyedSubViews` in the gallery stress scene.
 - The gallery Patterns output surface consumes `Resource::reload` / `latest`
-  semantics by keeping the previous output visible while an async refresh is
-  in flight.
+  semantics through `fold_latest`, keeping the previous output visible while an
+  async refresh is in flight.
 - The gallery Patterns item picker now has an app-like keyed host that combines
   `KeyedSubViews` row retention with `Selector<u64>` mutual selection, with
-  tests covering row entity reuse across reorder and selected-row updates.
+  tests covering row entity reuse across reorder and selected-row updates. The
+  picker uses selector reconciliation so removed keys cannot leave stale
+  selection behind.
 
 ## List Boundary
 
@@ -56,11 +60,12 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Find the next non-gallery command/list surface where selection or row
-   retention is repeated enough to justify moving from `Binding<bool>` or
-   direct element mapping to `Selector<K>` / `KeyedSubViews`.
-2. Evaluate the gallery Patterns resource usage after one or two more async
-   surfaces; add a shared async boundary only if it removes repeated app code.
+1. Apply `Selector::reconcile_keys` at the next real command/list host that
+   owns dynamic item collections. Keep presentation components value-first; use
+   keyed entity retention only when rows have state or enough render cost.
+2. Add a shared async UI boundary only after at least two app surfaces repeat
+   the same `fold_latest` render shape. Until then, `Resource` should remain a
+   UI-agnostic state primitive.
 3. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 

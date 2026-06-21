@@ -94,6 +94,24 @@ where
         self.keyed.borrow_mut().retain(|key, _| keys.contains(key));
     }
 
+    /// Reconcile this selector with the currently available keys.
+    ///
+    /// This drops per-key signals for removed keys and clears the selected key
+    /// if it is no longer present. Returns whether the selection was cleared.
+    pub fn reconcile_keys(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
+        let keys = keys.into_iter().collect::<HashSet<_>>();
+        let should_clear = self
+            .selected
+            .peek(|selected| selected.as_ref().is_some_and(|key| !keys.contains(key)));
+
+        if should_clear {
+            self.clear(cx);
+        }
+
+        self.keyed.borrow_mut().retain(|key, _| keys.contains(key));
+        should_clear
+    }
+
     /// Drop all per-key signals. The selected key itself is unchanged.
     pub fn clear_keyed_signals(&self) {
         self.keyed.borrow_mut().clear();
@@ -205,6 +223,82 @@ mod tests {
         assert_eq!(runs.get(), 1);
 
         app.update(|cx| selector.select(cx, "second"));
+
+        assert_eq!(runs.get(), 2);
+    }
+
+    #[test]
+    fn selector_reconcile_keys_clears_missing_selection() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+
+        let changed = app.update(|cx| selector.reconcile_keys(cx, [1_u64, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn selector_reconcile_keys_keeps_available_selection() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+
+        let changed = app.update(|cx| selector.reconcile_keys(cx, [1_u64, 2, 3]));
+
+        assert!(!changed);
+        assert_eq!(selector.get_untracked(), Some(2));
+    }
+
+    #[test]
+    fn selector_reconcile_keys_prunes_keyed_signals() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+
+        app.update(|cx| {
+            selector.is_selected(cx, 1);
+            selector.is_selected(cx, 2);
+            selector.is_selected(cx, 3);
+            selector.reconcile_keys(cx, [2_u64]);
+        });
+
+        assert_eq!(selector.keyed.borrow().len(), 1);
+        assert!(selector.keyed.borrow().contains_key(&2));
+    }
+
+    #[test]
+    fn selector_reconcile_keys_notifies_removed_selected_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let selector = selector.clone();
+            let runs = runs.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = selector.is_selected(cx, 2);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+
+        assert_eq!(runs.get(), 1);
+
+        app.update(|cx| {
+            selector.reconcile_keys(cx, [1_u64]);
+        });
 
         assert_eq!(runs.get(), 2);
     }
