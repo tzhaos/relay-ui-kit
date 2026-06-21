@@ -116,11 +116,17 @@ impl BranchSelector {
         self
     }
 
-    pub fn selected_label(&self) -> &str {
+    /// Returns the display label for the currently selected branch.
+    /// Reads from selected_binding first, falls back to selected_key.
+    pub fn selected_label(&self, cx: &App) -> String {
+        let key = self
+            .selected_binding
+            .as_ref()
+            .map_or(self.selected_key, |b| b.get(cx));
         self.branches
             .iter()
-            .find(|branch| branch.key == self.selected_key)
-            .map_or(self.selected_key, |branch| branch.label.as_str())
+            .find(|branch| branch.key == key)
+            .map_or(key.to_string(), |branch| branch.label.to_string())
     }
 }
 
@@ -235,6 +241,8 @@ impl RenderOnce for BranchSelector {
 
 #[cfg(test)]
 mod tests {
+    use gpui::TestApp;
+
     use super::*;
 
     #[test]
@@ -244,14 +252,18 @@ mod tests {
             "feat-ui",
             vec![BranchOption::new("feat-ui", "feature/ui-kit")],
         );
+        let app = TestApp::new();
+        let label = app.read(|cx| selector.selected_label(cx));
 
-        assert_eq!(selector.selected_label(), "feature/ui-kit");
+        assert_eq!(label, "feature/ui-kit");
     }
 
     #[test]
     fn branch_selector_falls_back_to_selected_key() {
         let selector = BranchSelector::new("branch-selector", "main", vec![]);
+        let app = TestApp::new();
+        let label = app.read(|cx| selector.selected_label(cx));
 
-        assert_eq!(selector.selected_label(), "main");
+        assert_eq!(label, "main");
     }
 }
