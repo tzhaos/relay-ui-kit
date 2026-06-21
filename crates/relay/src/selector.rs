@@ -106,6 +106,22 @@ where
         self.select_relative(cx, keys, SelectionStep::Previous)
     }
 
+    /// Select the first key from the current ordered key set.
+    ///
+    /// When `keys` is empty, this clears the selection. Returns whether the
+    /// selected key changed.
+    pub fn select_first(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
+        self.select_boundary(cx, keys, SelectionBoundary::First)
+    }
+
+    /// Select the last key from the current ordered key set.
+    ///
+    /// When `keys` is empty, this clears the selection. Returns whether the
+    /// selected key changed.
+    pub fn select_last(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
+        self.select_boundary(cx, keys, SelectionBoundary::Last)
+    }
+
     /// Drop per-key signals for keys that are no longer relevant.
     pub fn retain_keys(&self, keys: impl IntoIterator<Item = K>) {
         let keys = keys.into_iter().collect::<HashSet<_>>();
@@ -175,6 +191,23 @@ where
         self.select(cx, selected);
         changed
     }
+
+    fn select_boundary(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        boundary: SelectionBoundary,
+    ) -> bool {
+        let mut keys = keys.into_iter();
+        let selected = match boundary {
+            SelectionBoundary::First => keys.next(),
+            SelectionBoundary::Last => keys.last(),
+        };
+        let current = self.selected.get_untracked();
+        let changed = current != selected;
+        self.set(cx, selected);
+        changed
+    }
 }
 
 impl<K> Clone for Selector<K> {
@@ -190,6 +223,12 @@ impl<K> Clone for Selector<K> {
 enum SelectionStep {
     Next,
     Previous,
+}
+
+#[derive(Clone, Copy)]
+enum SelectionBoundary {
+    First,
+    Last,
 }
 
 #[cfg(test)]
@@ -439,5 +478,47 @@ mod tests {
 
         assert!(!changed);
         assert_eq!(selector.get_untracked(), Some(1));
+    }
+
+    #[test]
+    fn selector_select_first_uses_first_ordered_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(3_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_first(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(1));
+    }
+
+    #[test]
+    fn selector_select_last_uses_last_ordered_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_last(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_first_clears_empty_key_set() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| selector.select_first(cx, []));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), None);
     }
 }

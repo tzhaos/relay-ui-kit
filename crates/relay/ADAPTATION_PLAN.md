@@ -17,8 +17,8 @@ window lifecycles as the source of truth.
   boundary.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
 - `Selector<K>` gives selection-heavy lists per-key tracking, can reconcile
-  selection against the current item keys, and owns ordered next/previous
-  navigation for list and command surfaces.
+  selection against the current item keys, and owns ordered next/previous plus
+  first/last navigation for list and command surfaces.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
@@ -42,6 +42,12 @@ window lifecycles as the source of truth.
   `Selector<u64>` and host-level arrow-key handling. Its tests verify row
   entity reuse while selection moves, previous-selection wraparound, and Enter
   acting on the selected row.
+- The compiled `session_surface` Relay example promotes that shape outside
+  gallery into a GPUI session surface. It combines dynamic `Signal<Vec<T>>`
+  sessions, retained row entities, per-row local state, host-level
+  Home/End/arrow navigation, Enter activation, and Delete removal. Its tests
+  verify row entity reuse, row-local state survival across reorder, and command
+  keyboard behavior.
 
 ## List Boundary
 
@@ -79,16 +85,13 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Promote the verified `keyed_subviews` shape to the first real
-   workbench/session surface outside gallery that owns dynamic item
-   collections. Keep presentation components value-first; use keyed entity
-   retention only when rows have state or enough render cost. The existing
-   `workbench_demo.rs` draft is not a completion target until it is wired into
-   a compiled binary with its missing modules present.
-2. Wire keyboard/command-list navigation at host level with
-   `Selector::select_next` / `select_previous` when a real focusable command or
-   picker surface needs it. Only add UIKit adapters if repeated call sites prove
-   the component API needs them.
+1. Carry the verified `session_surface` shape into a compiled workbench binary
+   once the missing workbench modules exist. Keep presentation components
+   value-first; use keyed entity retention only when rows have state or enough
+   render cost.
+2. Add UIKit command or picker adapters only if repeated host-level call sites
+   prove the component API needs them. The Relay primitive should remain
+   `Selector<K>` plus host-owned key order.
 3. Add a shared async UI boundary only after at least two app surfaces repeat
    the same `fold_latest` render shape. Until then, `Resource` should remain a
    UI-agnostic state primitive.
