@@ -1,4 +1,5 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, px};
+use relay::ResourceState;
 use relay_uikit::patterns::{
     PaneToolbar, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
@@ -17,7 +18,7 @@ use super::{
 
 pub(super) fn render(
     state: &GalleryState,
-    _host: &Entity<GalleryScenesApp>,
+    host: &Entity<GalleryScenesApp>,
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
@@ -46,7 +47,7 @@ pub(super) fn render(
     let rows_body = row_patterns(state, cx);
     let tabs_body = tab_patterns(state, cx);
     let composer_body = composer_sample(cx);
-    let output_body = output_patterns(state, theme, cx);
+    let output_body = output_patterns(state, host, theme, cx);
     let qa_body = quick_action_sample(state);
     let picker_body = picker_sample(state);
     let viewer_body = viewer_patterns(theme);
@@ -104,19 +105,51 @@ fn composer_sample(_cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + us
         .child(div().text_sm().text_color(gpui::rgb(0x666666)).child("Type a message..."))
 }
 
-fn output_patterns(state: &GalleryState, theme: Theme, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
+fn output_patterns(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    theme: Theme,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
     let connected = state.core_disclosure_open.get(cx);
+    let (lines, loading, status_text) = state.pattern_output.read(cx, |resource_state| match resource_state {
+        ResourceState::Pending => (Vec::new(), true, "Loading output".to_string()),
+        ResourceState::Reloading(lines) => (lines.clone(), true, "Refreshing output".to_string()),
+        ResourceState::Ready(lines) => (lines.clone(), false, format!("{} lines ready", lines.len())),
+        ResourceState::Error(error) => (
+            vec![OutputLine::new(format!("refresh failed: {error}")).style(OutputLineStyle::Error)],
+            false,
+            "Refresh failed".to_string(),
+        ),
+    });
+    let refresh_host = host.clone();
+
     div().flex().flex_col().gap_2()
         .child(
             OutputSurface::new("pat-output",
-                OutputLog::new(vec![
-                    OutputLine::new("$ cargo build --release").style(OutputLineStyle::Input),
-                    OutputLine::new("   Compiling relay-uikit v0.1.0").style(OutputLineStyle::Muted),
-                    OutputLine::new("   Finished release in 12.4s").style(OutputLineStyle::Success),
-                ]).prompt("> "),
+                OutputLog::new(lines).prompt("> "),
             ).connected(connected)
         )
-        .child(div().text_xs().text_color(theme.text_muted).child(format!("Connected: {connected}")))
+        .child(
+            div().flex().items_center().gap_2()
+                .child(
+                    Button::new(
+                        "pat-output-refresh",
+                        if loading { "Refreshing" } else { "Refresh output" },
+                    )
+                    .icon(IconName::RefreshCw)
+                    .ghost()
+                    .disabled(loading)
+                    .on_click(move |_event, _window, cx| {
+                        refresh_host.update(cx, |this, cx| {
+                            this.reload_pattern_output(cx);
+                        });
+                    }),
+                )
+                .child(div().text_xs().text_color(theme.text_muted).child(
+                    format!("{status_text} - connected: {connected}"),
+                )),
+        )
 }
 
 fn quick_action_sample(state: &GalleryState) -> impl IntoElement {

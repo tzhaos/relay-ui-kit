@@ -10,10 +10,10 @@ use gpui::{
     Render, Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Selector, Signal, SignalVecExt,
+    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Resource, Selector, Signal, SignalVecExt,
     view::StateScope,
 };
-use relay_uikit::patterns::ScrollSurface;
+use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
 use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
 
 mod core_scene;
@@ -78,6 +78,8 @@ pub struct GalleryState {
     pub pattern_dialog_open: Binding<bool>,
     pub pattern_row_selection: Selector<&'static str>,
     pub pattern_tab_selection: Selector<&'static str>,
+    pub pattern_output: Resource<Vec<OutputLine>, String>,
+    pattern_output_refresh_serial: u64,
     stress_session_list: Entity<stress_scene::StressSessionList>,
     pub feedback_toasts: Signal<Vec<FeedbackToast>>,
     pub feedback_toast_serial: u64,
@@ -157,6 +159,8 @@ impl GalleryState {
             pattern_dialog_open: cx.binding(false),
             pattern_row_selection: cx.selector(Some("task")),
             pattern_tab_selection: cx.selector(Some("terminal")),
+            pattern_output: cx.ready_resource(initial_pattern_output_lines()),
+            pattern_output_refresh_serial: 0,
             stress_session_list: cx.new(stress_scene::StressSessionList::new),
             feedback_toasts: cx.signal(Vec::new()),
             feedback_toast_serial: 0,
@@ -170,6 +174,26 @@ impl GalleryState {
             settings_dirty,
         }
     }
+}
+
+fn initial_pattern_output_lines() -> Vec<OutputLine> {
+    vec![
+        OutputLine::new("$ cargo build --release").style(OutputLineStyle::Input),
+        OutputLine::new("   Compiling relay-uikit v0.1.0").style(OutputLineStyle::Muted),
+        OutputLine::new("   Finished release in 12.4s").style(OutputLineStyle::Success),
+    ]
+}
+
+fn refreshed_pattern_output_lines(revision: u64) -> Vec<OutputLine> {
+    vec![
+        OutputLine::new(format!(
+            "$ cargo check -p relay_uikit --bin relay_gallery #{revision:02}"
+        ))
+        .style(OutputLineStyle::Input),
+        OutputLine::new("   Checking relay v0.1.0").style(OutputLineStyle::Muted),
+        OutputLine::new("   Checking relay-uikit v0.1.0").style(OutputLineStyle::Muted),
+        OutputLine::new("   Finished dev in 0.8s").style(OutputLineStyle::Success),
+    ]
 }
 
 fn build_core_tree_nodes(src_open: bool, components_open: bool, list_open: bool) -> Vec<TreeNode> {
@@ -205,6 +229,19 @@ fn build_core_tree_nodes(src_open: bool, components_open: bool, list_open: bool)
 }
 
 impl GalleryScenesApp {
+    pub fn reload_pattern_output(&mut self, cx: &mut App) {
+        self.state.pattern_output_refresh_serial =
+            self.state.pattern_output_refresh_serial.wrapping_add(1);
+        let revision = self.state.pattern_output_refresh_serial;
+        let output = self.state.pattern_output.clone();
+        output.reload(cx, move |cx| async move {
+            cx.background_executor()
+                .timer(Duration::from_millis(850))
+                .await;
+            Ok(refreshed_pattern_output_lines(revision))
+        });
+    }
+
     pub fn add_feedback_toast(&mut self, cx: &mut Context<Self>, message: impl Into<String>) {
         self.state.feedback_toast_serial = self.state.feedback_toast_serial.wrapping_add(1);
         let id = self.state.feedback_toast_serial;

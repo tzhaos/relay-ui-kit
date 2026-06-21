@@ -17,6 +17,9 @@ window lifecycles as the source of truth.
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
   selection and `KeyedSubViews` in the gallery stress scene.
+- The gallery Patterns output surface consumes `Resource::reload` / `latest`
+  semantics by keeping the previous output visible while an async refresh is
+  in flight.
 
 ## List Boundary
 
@@ -44,8 +47,9 @@ runtime adapters only where they simplify real app state:
 - Use `KeyedSubViews` in host entities for stateful or heavy repeated rows.
 - Keep `ForEach` focused on lightweight element lists; row entity caching lives
   in host entities through `KeyedSubViews`.
-- Use `Resource::reload` / `latest` for future async data surfaces that should
-  keep stale-ready content visible while refreshing.
+- Use `Resource::reload` / `latest` for async data surfaces that should keep
+  stale-ready content visible while refreshing. Prefer local render branches
+  until repeated call sites justify a shared boundary helper.
 
 ## Next Landing Steps
 
@@ -53,8 +57,8 @@ runtime adapters only where they simplify real app state:
    sample, then verify row entity reuse under update and reorder.
 2. Replace boolean row-selection wiring in larger picker/command/list surfaces
    with `Selector<K>` when selection is mutually exclusive.
-3. Introduce `Resource` in a real async surface before designing any
-   Suspense-like abstraction.
+3. Evaluate the gallery Patterns resource usage after one or two more async
+   surfaces; add a shared async boundary only if it removes repeated app code.
 4. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 
