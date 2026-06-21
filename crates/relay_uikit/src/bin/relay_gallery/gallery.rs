@@ -22,7 +22,7 @@ mod settings_scene;
 mod shared;
 mod stress_scene;
 
-const FEEDBACK_TOAST_DURATION: Duration = Duration::from_secs(4);
+pub(super) const FEEDBACK_TOAST_DURATION: Duration = Duration::from_secs(4);
 const FEEDBACK_TOAST_LIMIT: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,14 +88,15 @@ pub struct GalleryState {
     pub settings_dirty: Memo<bool>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct FeedbackToast {
     pub id: u64,
+    pub message: String,
 }
 
 impl FeedbackToast {
-    fn new(id: u64) -> Self {
-        Self { id }
+    fn new(id: u64, message: impl Into<String>) -> Self {
+        Self { id, message: message.into() }
     }
 }
 
@@ -198,10 +199,10 @@ fn build_core_tree_nodes(src_open: bool, components_open: bool, list_open: bool)
 }
 
 impl GalleryScenesApp {
-    pub fn add_feedback_toast(&mut self, cx: &mut Context<Self>) {
+    pub fn add_feedback_toast(&mut self, cx: &mut Context<Self>, message: impl Into<String>) {
         self.state.feedback_toast_serial = self.state.feedback_toast_serial.wrapping_add(1);
         let id = self.state.feedback_toast_serial;
-        self.state.feedback_toasts.push(cx, FeedbackToast::new(id));
+        self.state.feedback_toasts.push(cx, FeedbackToast::new(id, message));
         let len = self.state.feedback_toasts.read(cx, |toasts| toasts.len());
         if len > FEEDBACK_TOAST_LIMIT {
             self.state.feedback_toasts.remove(cx, 0);

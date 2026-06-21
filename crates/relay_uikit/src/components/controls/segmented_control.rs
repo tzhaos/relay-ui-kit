@@ -106,7 +106,7 @@ impl RenderOnce for SegmentedControl {
             .border_color(theme.border)
             .role(Role::RadioGroup)
             .tab_index(0)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY));
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed));
 
         for (index, segment) in segments.into_iter().enumerate() {
             let is_active = segment.key == active;

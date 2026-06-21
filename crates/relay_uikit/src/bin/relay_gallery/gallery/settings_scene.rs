@@ -11,7 +11,7 @@ use relay_uikit::{
 };
 
 use super::{
-    GalleryScenesApp, GalleryState,
+    FEEDBACK_TOAST_DURATION, GalleryScenesApp, GalleryState,
     shared::{scene_stack, section, strip, text_input_field},
 };
 
@@ -186,7 +186,7 @@ pub(super) fn render(
                                 let host = host.clone();
                                 move |_event, _window, cx| {
                                     host.update(cx, |this, cx| {
-                                        this.add_feedback_toast(cx);
+                                        this.add_feedback_toast(cx, "Notification sample");
                                     });
                                 }
                             }),
@@ -216,11 +216,12 @@ pub(super) fn render(
                                 .gap_2()
                                 .children(toasts.iter().map(|toast| {
                                     let id = toast.id;
+                                    let msg = toast.message.clone();
                                     Toast::new(
                                         format!("feedback-floating-toast-{id}"),
-                                        format!("Terminal session restored #{id}"),
+                                        msg,
                                     )
-                                    .detail("codex on ui-kit/branch-controls")
+                                    .detail(format!("Dismisses in {:.0}s", FEEDBACK_TOAST_DURATION.as_secs()))
                                     .tone(Tone::Accent)
                                     .on_close({
                                         let host = host.clone();

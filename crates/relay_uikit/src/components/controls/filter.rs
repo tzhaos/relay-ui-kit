@@ -175,7 +175,7 @@ impl RenderOnce for FilterChip {
             })
             .bg(if active { theme.panel_alt } else { theme.panel })
             .text_color(fg)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))

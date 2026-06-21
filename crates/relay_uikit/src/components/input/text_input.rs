@@ -140,7 +140,7 @@ impl RenderOnce for TextInput {
             .tab_index(0)
             .role(Role::TextInput)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
                     .when(!self.focused, |this| {

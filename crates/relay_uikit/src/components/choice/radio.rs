@@ -92,7 +92,7 @@ impl RenderOnce for Radio {
             .role(Role::RadioButton)
             .tab_index(0)
             .aria_selected(selected)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {

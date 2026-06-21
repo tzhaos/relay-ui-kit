@@ -155,7 +155,7 @@ impl RenderOnce for ButtonLike {
             .when_some(self.padding_x, |this, padding| this.px(px(padding)))
             .when_some(self.text_size, |this, size| this.text_size(px(size)))
             .when_some(self.font_weight, |this, weight| this.font_weight(weight))
-            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| {

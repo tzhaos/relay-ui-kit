@@ -135,7 +135,7 @@ impl RenderOnce for Disclosure {
             .rounded(px(radius::MD))
             .text_color(theme.text_secondary)
             .tab_index(0)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover))

@@ -139,7 +139,7 @@ impl RenderOnce for SearchField {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
                     .hover(move |style| style.border_color(theme.border_strong))

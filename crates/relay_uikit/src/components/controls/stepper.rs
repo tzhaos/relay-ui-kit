@@ -114,7 +114,7 @@ impl RenderOnce for Stepper {
             .flex()
             .items_center()
             .gap_1()
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .child(
                 div()
                     .h_full()

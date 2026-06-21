@@ -300,7 +300,7 @@ impl RenderOnce for NumberInput {
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .map(|this| match layout {
                 NumberInputLayout::ControlsAroundValue => {
                     this.child(decrement).child(value).child(increment)

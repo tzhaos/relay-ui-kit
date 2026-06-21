@@ -147,7 +147,7 @@ impl RenderOnce for TextArea {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
                     .when(!self.focused, |this| {

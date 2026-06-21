@@ -156,7 +156,7 @@ impl RenderOnce for Slider {
             .items_center()
             .gap_2()
             .role(Role::Slider)
-            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY))
+            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .child(step_button(
                 "slider-decrement",
                 IconName::Minus,
