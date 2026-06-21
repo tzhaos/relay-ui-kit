@@ -16,6 +16,10 @@ pub trait SignalVecExt<T: 'static> {
     /// Push a value onto the end of the list and notify dependents.
     fn push(&self, cx: &mut App, value: T);
 
+    /// Append multiple values to the end of the list and notify dependents
+    /// once when at least one value was appended.
+    fn extend(&self, cx: &mut App, values: impl IntoIterator<Item = T>);
+
     /// Insert a value at `index`, shifting later elements right.
     fn insert(&self, cx: &mut App, index: usize, value: T);
 
@@ -40,6 +44,18 @@ impl<T: 'static> SignalVecExt<T> for Signal<Vec<T>> {
     fn push(&self, cx: &mut App, value: T) {
         self.update(cx, |list| {
             list.push(value);
+            true
+        });
+    }
+
+    fn extend(&self, cx: &mut App, values: impl IntoIterator<Item = T>) {
+        let mut values = values.into_iter().peekable();
+        if values.peek().is_none() {
+            return;
+        }
+
+        self.update(cx, |list| {
+            list.extend(values);
             true
         });
     }
@@ -157,6 +173,62 @@ mod tests {
         assert_eq!(notifications.get(), 1);
         app.update_entity(&root, |view, _cx| {
             assert_eq!(view.items.get_untracked(), vec![1]);
+        });
+    }
+
+    #[test]
+    fn extend_notifies_rendering_entity_once() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ListView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        app.update_entity(&root, |view, cx| {
+            view.items.extend(cx, [1, 2, 3]);
+        });
+
+        assert_eq!(notifications.get(), 1);
+        app.update_entity(&root, |view, _cx| {
+            assert_eq!(view.items.get_untracked(), vec![1, 2, 3]);
+        });
+    }
+
+    #[test]
+    fn extend_empty_does_not_notify() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ListView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        app.update_entity(&root, |view, cx| {
+            view.items.extend(cx, []);
+        });
+
+        assert_eq!(notifications.get(), 0);
+        app.update_entity(&root, |view, _cx| {
+            assert_eq!(view.items.get_untracked(), Vec::<i32>::new());
         });
     }
 

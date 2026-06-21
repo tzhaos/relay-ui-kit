@@ -1,8 +1,9 @@
 //! SignalVec — reactive list operations on `Signal<Vec<T>>`.
 //!
-//! `SignalVecExt` provides `push`, `insert`, `remove`, `retain`, `clear`, and
-//! `set_all` for `Signal<Vec<T>>`. Each mutation notifies dependents through
-//! the normal signal path, so any view reading the list refreshes automatically.
+//! `SignalVecExt` provides `push`, `extend`, `insert`, `remove`, `retain`,
+//! `clear`, and `set_all` for `Signal<Vec<T>>`. Each mutation notifies
+//! dependents through the normal signal path, so any view reading the list
+//! refreshes automatically.
 //!
 //! Run with `cargo run -p relay --example signal_vec`.
 
@@ -10,8 +11,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt, init};
@@ -24,10 +25,7 @@ impl SignalVecDemo {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
         Self {
-            items: cx.signal(vec![
-                "First item".into(),
-                "Second item".into(),
-            ]),
+            items: cx.signal(vec!["First item".into(), "Second item".into()]),
         }
     }
 }
@@ -82,11 +80,16 @@ impl Render for SignalVecDemo {
                 .text_color(rgb(0xf4f4f5))
                 .child(div().text_lg().child(format!("Items ({})", items.len())))
                 .child(
-                    div().flex().gap_2()
+                    div()
+                        .flex()
+                        .gap_2()
                         .child(
                             div()
                                 .id("add")
-                                .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x3b82f6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
                                 .child("Push item")
@@ -97,8 +100,29 @@ impl Render for SignalVecDemo {
                         )
                         .child(
                             div()
+                                .id("add-many")
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x1d4ed8))
+                                .rounded(px(6.0))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb(0x1e40af)))
+                                .child("Push 3")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    let count = this.items.read(cx, |v| v.len());
+                                    this.items.extend(
+                                        cx,
+                                        (1..=3).map(|offset| format!("Item {}", count + offset)),
+                                    );
+                                })),
+                        )
+                        .child(
+                            div()
                                 .id("clear")
-                                .px_3().py_2().bg(rgb(0x27272a)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x27272a))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x3f3f46)))
                                 .child("Clear all")

@@ -9,6 +9,9 @@ window lifecycles as the source of truth.
 - `Signal`, `Binding`, `Memo` / `derived`, `Effect`, `watch`, `untrack`, and
   reactive context cover app state, derivation, side effects, and cross-layer
   state sharing.
+- `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
+  including `extend` for appending multiple items with a single reactive
+  notification.
 - `Resource::load`, `Resource::reload`, `latest`, and `fold_latest` cover
   async pending, reloading, ready, and error states without baking in a UI
   boundary.
@@ -69,6 +72,10 @@ runtime adapters only where they simplify real app state:
 - Use `Resource::reload` / `latest` for async data surfaces that should keep
   stale-ready content visible while refreshing. Prefer local render branches
   until repeated call sites justify a shared boundary helper.
+- Use `batch` or single-operation collection helpers such as
+  `SignalVecExt::extend` for write bursts that should notify once. Avoid
+  assuming a global frame-boundary batch when code does not have a `Window`
+  lifecycle hook.
 
 ## Next Landing Steps
 
