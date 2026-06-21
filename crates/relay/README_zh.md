@@ -11,6 +11,8 @@
 - **UI 线程优先**：默认使用单线程状态模型，适配 GPUI 渲染和前台任务。
 - **可被上层组件适配**：组件层可以把 `Binding` / `Resource` 接到具体控件，运行时本身只负责状态和调度。
 
+当前 UIKit 迁移路径与 Relay 的应用层落地顺序见 [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md)。
+
 ## 最小用法
 
 ```rust
@@ -145,6 +147,8 @@ let latest = state.latest();
 ## Entity 粒度 UI
 
 Relay 的 UI 粒度跟随 GPUI 的 `Entity` 缓存边界。把昂贵区域拆成 `SubView<T>` 字段，用 `cached(...)` 渲染；当列表行本身有状态或重绘成本较高时，用 `KeyedSubViews` 保持 row entity 稳定。
+
+便宜且无状态的 row 可以继续用普通元素映射。row 自己持有状态、focus/scroll 一类 element state、异步 resource、scoped effect，或者渲染成本高到希望干净兄弟 row 复用缓存时，再拆成 `SubView` / `KeyedSubViews`。这样 Relay 的抽象会贴合 GPUI 的真实生命周期：元素 helper 在父 render 中重建元素，而 `KeyedSubViews` 按稳定 key 保持子 entity。
 
 ```rust
 struct TaskList {

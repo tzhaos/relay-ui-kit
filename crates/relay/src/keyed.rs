@@ -1,4 +1,11 @@
 //! Keyed GPUI entity helpers for list-shaped views.
+//!
+//! `KeyedSubViews` is the Relay primitive for list rows that deserve their own
+//! GPUI entity boundary. It keeps row entities stable across insert, remove, and
+//! reorder operations, then lets those rows render through GPUI's view cache.
+//! Use ordinary element mapping for cheap stateless rows; use this module when
+//! rows hold state, focus/scroll-like element state, subscriptions, resources,
+//! or enough rendering work that clean siblings should stay cached.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -33,6 +40,10 @@ impl<K, V: 'static> KeyedSubView<K, V> {
 /// file-tree rows, session rows, or log rows with state. `sync` reconciles the
 /// collection against the latest item order, reusing existing row entities
 /// when their keys are still present and dropping rows whose keys disappeared.
+///
+/// For lightweight rows that are just cheap GPUI elements, map the collection
+/// directly in the component layer. `KeyedSubViews` pays for a child entity per
+/// key because the entity is the cache and lifecycle boundary.
 pub struct KeyedSubViews<K, V: 'static> {
     entries: Vec<KeyedSubView<K, V>>,
     indices: HashMap<K, usize>,

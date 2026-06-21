@@ -9,6 +9,8 @@
 - **UI-thread-first**: single-threaded state model by default, suited to GPUI rendering and foreground tasks.
 - **Adaptable by upper layers**: component crates can wire `Binding` / `Resource` to concrete controls; the runtime itself only handles state and scheduling.
 
+See [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md) for the current UIKit migration path and Relay's app-facing landing sequence.
+
 ## Minimal usage
 
 ```rust
@@ -143,6 +145,8 @@ let latest = state.latest();
 ## Entity-grained UI
 
 Relay's UI-level granularity follows GPUI's `Entity` cache boundary. Split expensive regions into `SubView<T>` fields, render them with `cached(...)`, and keep list rows stable with `KeyedSubViews` when the row has state or is expensive to redraw.
+
+Use lightweight element mapping for cheap stateless rows. Move a row to `SubView` / `KeyedSubViews` when it owns state, focus or scroll-like element state, async resources, scoped effects, or enough rendering work that clean siblings should stay cached. This keeps Relay aligned with GPUI's real lifecycle: element helpers rebuild elements during parent render, while `KeyedSubViews` retains child entities by stable key.
 
 ```rust
 struct TaskList {

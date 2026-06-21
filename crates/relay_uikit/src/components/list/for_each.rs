@@ -6,16 +6,21 @@ use gpui::{
 };
 use relay::Signal;
 
-/// A reactive list renderer backed by a `Signal<Vec<T>>`.
+/// A lightweight reactive element-list renderer backed by a `Signal<Vec<T>>`.
 ///
 /// `ForEach` reads the signal during render (subscribing the surrounding view)
 /// and maps each item to an element via the provided `render` closure. The
-/// `key` closure produces a stable numeric key per item so GPUI can reuse
-/// element state across renders when the list changes.
+/// `key` closure produces a stable numeric key per item, which is combined
+/// with this component's id to create stable per-item element ids.
 ///
 /// Use this instead of `div().children(...)` when the list comes from a
 /// [`Signal`] and you want the view to refresh automatically when items are
-/// added, removed, or reordered.
+/// added, removed, or reordered. The surrounding view still rebuilds these
+/// child elements during render, so this is best for cheap, stateless rows.
+///
+/// When each row has its own state, subscriptions, async resources, or enough
+/// rendering work that clean sibling rows should reuse GPUI's view cache, store
+/// `relay::KeyedSubViews` in the host entity instead.
 ///
 /// # Example
 ///
@@ -46,9 +51,8 @@ impl<T: Clone + 'static> ForEach<T> {
     /// Provide a stable numeric key for each item.
     ///
     /// The key is combined with the `ForEach` id to form a stable per-item
-    /// element id, so GPUI can diff efficiently. If omitted, items are keyed by
-    /// their index in the current list (fine for append-only lists, but causes
-    /// re-renders on reorder).
+    /// element id. If omitted, items are keyed by their index in the current
+    /// list, which is fine for append-only lists but unstable under reorder.
     pub fn key(mut self, key: impl Fn(&T) -> usize + 'static) -> Self {
         self.key = Some(Rc::new(key));
         self
