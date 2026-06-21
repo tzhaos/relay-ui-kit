@@ -99,7 +99,7 @@ impl RenderOnce for Button {
                 theme.accent,
                 theme.accent,
                 theme.on_accent,
-                theme.accent_bg,
+                theme.accent.opacity(0.85),
                 theme.accent,
                 theme.on_accent,
             ),

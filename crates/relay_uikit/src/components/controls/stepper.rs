@@ -213,7 +213,16 @@ fn stepper_button(
     hover_bg: gpui::Hsla,
     color: gpui::Hsla,
 ) -> impl IntoElement {
-    let interactive = !disabled && (binding.is_some() || handler.is_some());
+    let at_limit = binding.as_ref().map_or(false, |b| {
+        let value = b.signal().peek(|v| *v);
+        if delta < 0 {
+            min.is_some_and(|m| value <= m)
+        } else {
+            max.is_some_and(|m| value >= m)
+        }
+    });
+    let interactive = !disabled && !at_limit && (binding.is_some() || handler.is_some());
+    let opacity = if at_limit && !disabled { DISABLED_OPACITY } else { 1.0 };
     div()
         .id(id)
         .w(px(30.0))
@@ -221,6 +230,7 @@ fn stepper_button(
         .flex()
         .items_center()
         .justify_center()
+        .opacity(opacity)
         .when(interactive, |this| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
