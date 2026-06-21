@@ -52,6 +52,7 @@ pub struct Select {
     options: Vec<SelectOption>,
     open: bool,
     placeholder: String,
+    auto_dismiss: bool,
     binding: Option<Binding<&'static str>>,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SelectHandler>,
@@ -70,6 +71,7 @@ impl Select {
             options,
             open: false,
             placeholder: "Select".into(),
+            auto_dismiss: true,
             binding: None,
             on_toggle: None,
             on_select: None,
@@ -88,6 +90,7 @@ impl Select {
             options,
             open: false,
             placeholder: "Select".into(),
+            auto_dismiss: true,
             binding: Some(binding),
             on_toggle: None,
             on_select: None,
@@ -102,6 +105,11 @@ impl Select {
 
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
+        self
+    }
+
+    pub fn auto_dismiss(mut self, auto_dismiss: bool) -> Self {
+        self.auto_dismiss = auto_dismiss;
         self
     }
 
@@ -149,6 +157,7 @@ impl RenderOnce for Select {
         let label = selected_label(&self.options, selected_key, &self.placeholder).to_string();
         let select_handler = self.on_select.map(Rc::new);
         let dismiss_handler = self.on_dismiss;
+        let auto_dismiss = self.auto_dismiss;
         let id = self.id.clone();
         let toggle_handler = self.on_toggle;
         let trigger_clickable = toggle_handler.is_some();
@@ -233,10 +242,28 @@ impl RenderOnce for Select {
         let mut overlay = AnchoredOverlay::new(
             id.clone(),
             trigger,
-            Menu::new((id, "menu"), items).min_width(220.0),
+            Menu::new((id.clone(), "menu"), items).min_width(220.0),
         )
         .open(self.open);
-        if let Some(dismiss_handler) = dismiss_handler {
+
+        if auto_dismiss {
+            if let Some(dismiss_handler) = dismiss_handler {
+                overlay = overlay.on_dismiss(dismiss_handler);
+            } else if let Some(binding) = binding {
+                let binding_clone = binding.clone();
+                overlay = overlay.on_dismiss(move |_window, cx| {
+                    binding_clone.set(cx, selected_key);
+                });
+            } else {
+                // Auto-dismiss without explicit handler is a no-op visually
+                // but ensures the overlay has dismiss wiring
+                let id_for_dismiss = id.clone();
+                overlay = overlay.on_dismiss(move |_window, _cx| {
+                    // no-op: overlay dismissed but no state to update
+                    let _ = &id_for_dismiss;
+                });
+            }
+        } else if let Some(dismiss_handler) = dismiss_handler {
             overlay = overlay.on_dismiss(dismiss_handler);
         }
 
@@ -280,5 +307,12 @@ mod tests {
         });
 
         assert!(select.binding.is_some());
+    }
+
+    #[test]
+    fn select_auto_dismiss_defaults_to_true() {
+        let select = Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")]);
+
+        assert!(select.auto_dismiss);
     }
 }

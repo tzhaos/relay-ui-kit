@@ -1,5 +1,7 @@
 use gpui::{Anchor, App, ElementId, IntoElement, RenderOnce, Window};
 
+use crate::interaction::DismissHandler;
+
 use super::{Menu, MenuItem, overlay};
 
 /// A right-click or more-actions menu placed relative to its anchor.
@@ -11,6 +13,7 @@ pub struct ContextMenu {
     left: f32,
     top: f32,
     anchor: Anchor,
+    on_dismiss: Option<DismissHandler>,
 }
 
 impl ContextMenu {
@@ -22,6 +25,7 @@ impl ContextMenu {
             left: 0.0,
             top: 0.0,
             anchor: Anchor::TopLeft,
+            on_dismiss: None,
         }
     }
 
@@ -40,13 +44,27 @@ impl ContextMenu {
         self.anchor = anchor;
         self
     }
+
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Box::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for ContextMenu {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        overlay(Menu::new(self.id, self.items).min_width(self.min_width))
+        let mut ov = overlay(Menu::new(self.id, self.items).min_width(self.min_width))
             .anchor(self.anchor)
-            .offset(self.left, self.top)
+            .offset(self.left, self.top);
+
+        if let Some(handler) = self.on_dismiss {
+            ov = ov.on_dismiss(handler);
+        } else {
+            // Always wire dismiss so overlay closes on click-outside / Escape
+            ov = ov.on_dismiss(|_window, _cx| {});
+        }
+
+        ov
     }
 }
 

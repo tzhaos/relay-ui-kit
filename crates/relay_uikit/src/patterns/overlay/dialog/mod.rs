@@ -29,6 +29,7 @@ pub struct Dialog {
     width: f32,
     children: Vec<AnyElement>,
     footer: Option<AnyElement>,
+    closable: bool,
     on_dismiss: Option<ClickHandler>,
 }
 
@@ -42,6 +43,7 @@ impl Dialog {
             width: 440.0,
             children: Vec::new(),
             footer: None,
+            closable: true,
             on_dismiss: None,
         }
     }
@@ -66,6 +68,11 @@ impl Dialog {
         self
     }
 
+    pub fn closable(mut self, closable: bool) -> Self {
+        self.closable = closable;
+        self
+    }
+
     pub fn on_dismiss(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -85,6 +92,7 @@ impl RenderOnce for Dialog {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let on_dismiss = self.on_dismiss;
+        let closable = self.closable;
         let id = self.id.clone();
         let panel = DialogPanel {
             theme,
@@ -110,8 +118,13 @@ impl RenderOnce for Dialog {
                 .p(px(space::XL))
                 .bg(gpui::black().opacity(0.22))
                 .occlude()
-                .when_some(on_dismiss, |this, handler| {
-                    let handler_rc: Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)> = Rc::new(handler);
+                .when(closable, |this| {
+                    let handler_rc: Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)> =
+                        if let Some(handler) = on_dismiss {
+                            Rc::new(handler)
+                        } else {
+                            Rc::new(|_: &ClickEvent, _: &mut Window, _: &mut App| {})
+                        };
                     let handler_for_click = handler_rc.clone();
                     let handler_for_key = handler_rc;
                     this.cursor_pointer()
@@ -146,5 +159,12 @@ mod tests {
         let dialog = Dialog::new("dialog", "Settings").width(520.0);
 
         assert_eq!(dialog.width, 520.0);
+    }
+
+    #[test]
+    fn dialog_closable_defaults_to_true() {
+        let dialog = Dialog::new("dialog", "Settings");
+
+        assert!(dialog.closable);
     }
 }
