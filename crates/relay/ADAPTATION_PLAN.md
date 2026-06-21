@@ -18,7 +18,8 @@ window lifecycles as the source of truth.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
-  selection and `KeyedSubViews` in the gallery stress scene.
+  selection, including keyed gallery hosts where selection is host-owned rather
+  than embedded in row data.
 - The gallery Patterns output surface consumes `Resource::reload` / `latest`
   semantics through `fold_latest`, keeping the previous output visible while an
   async refresh is in flight.
@@ -27,6 +28,9 @@ window lifecycles as the source of truth.
   tests covering row entity reuse across reorder and selected-row updates. The
   picker uses selector reconciliation so removed keys cannot leave stale
   selection behind.
+- The gallery Stress session list uses the same `KeyedSubViews` + `Selector`
+  shape for dynamic session rows, with tests covering row reuse during
+  selection changes and selection reconciliation after removing the active row.
 
 ## List Boundary
 
@@ -60,9 +64,10 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Apply `Selector::reconcile_keys` at the next real command/list host that
-   owns dynamic item collections. Keep presentation components value-first; use
-   keyed entity retention only when rows have state or enough render cost.
+1. Apply the keyed host pattern to the first real workbench/session surface
+   outside gallery that owns dynamic item collections. Keep presentation
+   components value-first; use keyed entity retention only when rows have state
+   or enough render cost.
 2. Add a shared async UI boundary only after at least two app surfaces repeat
    the same `fold_latest` render shape. Until then, `Resource` should remain a
    UI-agnostic state primitive.

@@ -2,7 +2,7 @@ use gpui::{
     AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
     div, px,
 };
-use relay::{KeyedSubViews, ReactiveAppExt, ReactiveView, Signal, view::reactive_render};
+use relay::{KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, view::reactive_render};
 use relay_uikit::patterns::ScrollSurface;
 use relay_uikit::{
     ActiveTheme, Button, ButtonVariant, IconButton, IconName, IconSize, Label, LabelSize, ListItem,
@@ -137,7 +137,6 @@ struct StressSession {
     title: String,
     detail: String,
     tone: Tone,
-    active: bool,
 }
 
 impl StressSession {
@@ -147,19 +146,14 @@ impl StressSession {
             title: title.into(),
             detail: detail.into(),
             tone,
-            active: false,
         }
-    }
-
-    fn active(mut self, active: bool) -> Self {
-        self.active = active;
-        self
     }
 }
 
 pub(super) struct StressSessionList {
     sessions: Signal<Vec<StressSession>>,
     rows: KeyedSubViews<u64, StressSessionRow>,
+    selection: Selector<u64>,
     next_id: u64,
 }
 
@@ -172,8 +166,7 @@ impl StressSessionList {
                     "Terminal focus repair",
                     "relay-ui-kit / session-a",
                     Tone::Accent,
-                )
-                .active(true),
+                ),
                 StressSession::new(
                     2,
                     "Review note sync",
@@ -194,6 +187,7 @@ impl StressSessionList {
                 ),
             ]),
             rows: KeyedSubViews::new(),
+            selection: cx.selector(Some(1)),
             next_id: 5,
         }
     }
@@ -210,22 +204,21 @@ impl StressSessionList {
             ));
             true
         });
+        self.selection.select(cx, id);
     }
 
     fn activate_next(&self, cx: &mut App) {
-        self.sessions.update(cx, |sessions| {
-            let Some(current) = sessions.iter().position(|session| session.active) else {
-                if let Some(first) = sessions.first_mut() {
-                    first.active = true;
-                    return true;
-                }
-                return false;
-            };
-            let next = (current + 1) % sessions.len();
-            sessions[current].active = false;
-            sessions[next].active = true;
-            true
-        });
+        let sessions = self.sessions.get_untracked();
+        if sessions.is_empty() {
+            self.selection.clear(cx);
+            return;
+        }
+
+        let current = self.selection.get_untracked();
+        let next_index = current
+            .and_then(|id| sessions.iter().position(|session| session.id == id))
+            .map_or(0, |index| (index + 1) % sessions.len());
+        self.selection.select(cx, sessions[next_index].id);
     }
 
     fn rotate(&self, cx: &mut App) {
@@ -237,17 +230,42 @@ impl StressSessionList {
             true
         });
     }
+
+    fn remove_active(&self, cx: &mut App) {
+        let Some(selected) = self.selection.get_untracked() else {
+            return;
+        };
+
+        self.sessions.update(cx, |sessions| {
+            let Some(index) = sessions.iter().position(|session| session.id == selected) else {
+                return false;
+            };
+            sessions.remove(index);
+            true
+        });
+
+        let available_ids = self.sessions.peek(|sessions| {
+            sessions
+                .iter()
+                .map(|session| session.id)
+                .collect::<Vec<_>>()
+        });
+        self.selection.reconcile_keys(cx, available_ids);
+    }
 }
 
 impl ReactiveView for StressSessionList {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sessions = self.sessions.get(cx);
+        self.selection
+            .reconcile_keys(cx, sessions.iter().map(|session| session.id));
 
+        let selection = self.selection.clone();
         self.rows.sync(
             cx,
             sessions,
             |session| session.id,
-            |session, _cx| StressSessionRow::new(session),
+            move |session, _cx| StressSessionRow::new(session, selection.clone()),
             |session, row, _cx| row.update_session(session),
         );
 
@@ -281,6 +299,13 @@ impl ReactiveView for StressSessionList {
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.add_session(cx);
                             })),
+                    )
+                    .child(
+                        Button::new("stress-keyed-remove-active", "Remove Active")
+                            .ghost()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.remove_active(cx);
+                            })),
                     ),
             )
             .child(
@@ -302,12 +327,14 @@ impl Render for StressSessionList {
 
 struct StressSessionRow {
     session: StressSession,
+    selection: Selector<u64>,
 }
 
 impl StressSessionRow {
-    fn new(session: &StressSession) -> Self {
+    fn new(session: &StressSession, selection: Selector<u64>) -> Self {
         Self {
             session: session.clone(),
+            selection,
         }
     }
 
@@ -325,10 +352,13 @@ impl ReactiveView for StressSessionRow {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = *cx.theme();
         let session = &self.session;
+        let selected = self.selection.is_selected(cx, session.id);
+        let selection = self.selection.clone();
+        let id = session.id;
 
         ListItem::new(format!("stress-keyed-session-{}", session.id))
             .spacing(ListItemSpacing::Dense)
-            .selected(session.active)
+            .selected(selected)
             .start_slot(StatusDot::new(session.tone))
             .child(
                 div()
@@ -355,8 +385,11 @@ impl ReactiveView for StressSessionRow {
                 div()
                     .text_size(px(11.0))
                     .text_color(session.tone.fg(&theme))
-                    .child(if session.active { "ACTIVE" } else { "READY" }),
+                    .child(if selected { "ACTIVE" } else { "READY" }),
             )
+            .on_click(move |_event, _window, cx| {
+                selection.select(cx, id);
+            })
             .into_any_element()
     }
 }
@@ -364,6 +397,76 @@ impl ReactiveView for StressSessionRow {
 impl Render for StressSessionRow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         reactive_render(self, window, cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{EntityId, TestApp};
+
+    use super::*;
+
+    fn row_ids(rows: &KeyedSubViews<u64, StressSessionRow>) -> Vec<(u64, EntityId)> {
+        rows.keyed_iter()
+            .map(|(key, view)| (*key, view.entity().entity_id()))
+            .collect()
+    }
+
+    fn session_ids(list: &StressSessionList) -> Vec<u64> {
+        list.sessions
+            .get_untracked()
+            .into_iter()
+            .map(|session| session.id)
+            .collect()
+    }
+
+    #[test]
+    fn session_list_reuses_rows_when_selection_changes() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            StressSessionList::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        let initial_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+
+        app.update_entity(&root, |list, cx| {
+            list.activate_next(cx);
+        });
+        window.draw();
+
+        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
+        let updated_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+        assert_eq!(selected, Some(2));
+        assert_eq!(updated_rows, initial_rows);
+    }
+
+    #[test]
+    fn session_list_reconcile_clears_selection_when_active_removed() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            StressSessionList::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        app.update_entity(&root, |list, cx| {
+            list.remove_active(cx);
+        });
+        window.draw();
+
+        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
+        let sessions = app.update_entity(&root, |list, _cx| session_ids(list));
+        let rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+        assert_eq!(selected, None);
+        assert_eq!(sessions, vec![2, 3, 4]);
+        assert_eq!(
+            rows.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            sessions
+        );
     }
 }
 
