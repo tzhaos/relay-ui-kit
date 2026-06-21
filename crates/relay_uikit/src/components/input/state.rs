@@ -59,6 +59,7 @@ impl ValidationState {
 pub struct TextInputState {
     value: String,
     cursor: usize,
+    selection_anchor: Option<usize>,
 }
 
 /// What a keystroke did to the model.
@@ -111,7 +112,11 @@ impl TextInputState {
     pub fn with_text(text: impl Into<String>) -> Self {
         let value = text.into();
         let cursor = value.len();
-        Self { value, cursor }
+        Self {
+            value,
+            cursor,
+            selection_anchor: None,
+        }
     }
 
     pub fn value(&self) -> &str {
@@ -126,15 +131,93 @@ impl TextInputState {
         self.value.is_empty()
     }
 
+    // ------------------------------------------------------------------
+    // Selection
+    // ------------------------------------------------------------------
+
+    /// Returns `Some((start_byte, end_byte))` when a non-empty selection exists.
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        let anchor = self.selection_anchor?;
+        let start = anchor.min(self.cursor);
+        let end = anchor.max(self.cursor);
+        if start == end {
+            None
+        } else {
+            Some((start, end))
+        }
+    }
+
+    /// Returns the selected text slice, if any.
+    pub fn selected_text(&self) -> Option<&str> {
+        let (start, end) = self.selection_range()?;
+        Some(&self.value[start..end])
+    }
+
+    /// Selects the entire value. Anchor goes to 0, cursor to the end.
+    pub fn select_all(&mut self) {
+        self.selection_anchor = Some(0);
+        self.cursor = self.value.len();
+    }
+
+    /// Drops the selection without changing the text or cursor.
+    pub fn clear_selection(&mut self) {
+        self.selection_anchor = None;
+    }
+
+    /// Removes the selected text. Returns `true` if a non-empty selection
+    /// was removed.
+    pub fn delete_selection(&mut self) -> bool {
+        if let Some((start, end)) = self.selection_range() {
+            self.value.replace_range(start..end, "");
+            self.cursor = start;
+            self.selection_anchor = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Clipboard helpers (to be called by the component / platform layer)
+    // ------------------------------------------------------------------
+
+    /// Returns a copy of the selected text, suitable for the system clipboard.
+    pub fn copy_selection(&self) -> Option<String> {
+        self.selected_text().map(|s| s.to_string())
+    }
+
+    /// Returns and removes the selected text, suitable for "cut".
+    pub fn cut_selection(&mut self) -> Option<String> {
+        let text = self.copy_selection();
+        self.delete_selection();
+        text
+    }
+
+    /// Inserts `text` at the cursor, replacing any active selection first.
+    pub fn paste(&mut self, text: &str) {
+        self.delete_selection();
+        self.insert(text);
+    }
+
+    // ------------------------------------------------------------------
+    // Mutators
+    // ------------------------------------------------------------------
+
     pub fn set_text(&mut self, text: impl Into<String>) {
         self.value = text.into();
         self.cursor = self.value.len();
+        self.selection_anchor = None;
     }
 
     pub fn clear(&mut self) {
         self.value.clear();
         self.cursor = 0;
+        self.selection_anchor = None;
     }
+
+    // ------------------------------------------------------------------
+    // Key dispatch
+    // ------------------------------------------------------------------
 
     pub fn handle_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
@@ -143,50 +226,160 @@ impl TextInputState {
         match keystroke.key.as_str() {
             "enter" => TextInputAction::Submit,
             "escape" => TextInputAction::Cancel,
+
             "backspace" => {
-                if self.delete_grapheme_before() {
+                if mods.control {
+                    if self.delete_word_before() {
+                        TextInputAction::Changed
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if self.delete_selection() {
+                    TextInputAction::Changed
+                } else if self.delete_grapheme_before() {
                     TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored
                 }
             }
+
             "delete" => {
-                if self.delete_grapheme_after() {
+                if mods.control {
+                    if self.delete_word_after() {
+                        TextInputAction::Changed
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if self.delete_selection() {
+                    TextInputAction::Changed
+                } else if self.delete_grapheme_after() {
                     TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored
                 }
             }
+
             "left" => {
-                if self.move_left() {
-                    TextInputAction::CursorMoved
+                if mods.control && mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.move_to_prev_word() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if mods.control {
+                    self.clear_selection();
+                    if self.move_to_prev_word() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.move_left() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 } else {
-                    TextInputAction::Ignored
+                    self.clear_selection();
+                    if self.move_left() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 }
             }
+
             "right" => {
-                if self.move_right() {
-                    TextInputAction::CursorMoved
+                if mods.control && mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.move_to_next_word() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if mods.control {
+                    self.clear_selection();
+                    if self.move_to_next_word() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
+                } else if mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.move_right() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 } else {
-                    TextInputAction::Ignored
+                    self.clear_selection();
+                    if self.move_right() {
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 }
             }
+
             "home" => {
-                if self.cursor != 0 {
-                    self.cursor = 0;
-                    TextInputAction::CursorMoved
+                if mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.cursor != 0 {
+                        self.cursor = 0;
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 } else {
-                    TextInputAction::Ignored
+                    self.clear_selection();
+                    if self.cursor != 0 {
+                        self.cursor = 0;
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 }
             }
+
             "end" => {
-                if self.cursor != self.value.len() {
-                    self.cursor = self.value.len();
-                    TextInputAction::CursorMoved
+                if mods.shift {
+                    if self.selection_anchor.is_none() {
+                        self.selection_anchor = Some(self.cursor);
+                    }
+                    if self.cursor != self.value.len() {
+                        self.cursor = self.value.len();
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 } else {
-                    TextInputAction::Ignored
+                    self.clear_selection();
+                    if self.cursor != self.value.len() {
+                        self.cursor = self.value.len();
+                        TextInputAction::CursorMoved
+                    } else {
+                        TextInputAction::Ignored
+                    }
                 }
             }
+
+            "a" if mods.control => {
+                self.select_all();
+                TextInputAction::CursorMoved
+            }
+
             _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
                 match keystroke
                     .key_char
@@ -194,6 +387,7 @@ impl TextInputState {
                     .filter(|text| text.chars().all(|c| !c.is_control()))
                 {
                     Some(text) => {
+                        self.delete_selection();
                         self.insert(text);
                         TextInputAction::Changed
                     }
@@ -216,6 +410,7 @@ impl TextInputState {
             "enter" | "escape" | "backspace" | "delete" | "left" | "right" | "home" | "end" => {
                 self.handle_key(event)
             }
+            "a" if mods.control => self.handle_key(event),
             _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
                 match keystroke
                     .key_char
@@ -223,6 +418,7 @@ impl TextInputState {
                     .filter(|text| text.chars().all(|c| !c.is_control()))
                 {
                     Some(text) if text.chars().all(|c| c.is_ascii_digit()) => {
+                        self.delete_selection();
                         self.insert(text);
                         TextInputAction::Changed
                     }
@@ -230,6 +426,7 @@ impl TextInputState {
                         if self.value.starts_with('-') {
                             TextInputAction::Ignored
                         } else {
+                            self.delete_selection();
                             self.insert(text);
                             TextInputAction::Changed
                         }
@@ -248,6 +445,7 @@ impl TextInputState {
         match keystroke.key.as_str() {
             "enter" if mods.control || mods.platform => TextInputAction::Submit,
             "enter" => {
+                self.delete_selection();
                 self.insert("\n");
                 TextInputAction::Changed
             }
@@ -255,12 +453,20 @@ impl TextInputState {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Internal helpers
+    // ------------------------------------------------------------------
+
     pub(crate) fn split(&self) -> (&str, &str) {
         let cursor = self.safe_cursor();
         self.value.split_at(cursor)
     }
 
+    /// Insert text at cursor. Clears any selection anchor (the caller, i.e.
+    /// `handle_key`, is expected to have already called `delete_selection()`
+    /// if replacing active selection is desired).
     fn insert(&mut self, text: &str) {
+        self.clear_selection();
         self.value.insert_str(self.cursor, text);
         self.cursor += text.len();
     }
@@ -269,6 +475,7 @@ impl TextInputState {
         if self.cursor == 0 {
             return false;
         }
+        self.clear_selection();
         let prev = self.prev_boundary(self.cursor);
         self.value.replace_range(prev..self.cursor, "");
         self.cursor = prev;
@@ -279,11 +486,14 @@ impl TextInputState {
         if self.cursor >= self.value.len() {
             return false;
         }
+        self.clear_selection();
         let next = self.next_boundary(self.cursor);
         self.value.replace_range(self.cursor..next, "");
         true
     }
 
+    /// Move cursor one grapheme left (does *not* manage selection — the
+    /// caller is responsible so that Shift variants keep the anchor).
     fn move_left(&mut self) -> bool {
         if self.cursor == 0 {
             return false;
@@ -292,6 +502,8 @@ impl TextInputState {
         true
     }
 
+    /// Move cursor one grapheme right (does *not* manage selection — the
+    /// caller is responsible so that Shift variants keep the anchor).
     fn move_right(&mut self) -> bool {
         if self.cursor >= self.value.len() {
             return false;
@@ -299,6 +511,130 @@ impl TextInputState {
         self.cursor = self.next_boundary(self.cursor);
         true
     }
+
+    // ------------------------------------------------------------------
+    // Word-level navigation
+    // ------------------------------------------------------------------
+
+    /// Move cursor to the start of the nearest non-whitespace word to the
+    /// left, skipping any whitespace-only segments.
+    fn move_to_prev_word(&mut self) -> bool {
+        if self.cursor == 0 {
+            return false;
+        }
+        let target = self
+            .value
+            .split_word_bound_indices()
+            .map(|(i, _)| i)
+            .filter(|&i| i < self.cursor)
+            .rev()
+            .find(|&i| {
+                !self.value[i..]
+                    .chars()
+                    .next()
+                    .unwrap_or('\0')
+                    .is_whitespace()
+            })
+            .unwrap_or(0);
+        if target != self.cursor {
+            self.cursor = target;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move cursor to the end of the nearest non-whitespace word to the
+    /// right, skipping any whitespace-only segments.
+    fn move_to_next_word(&mut self) -> bool {
+        if self.cursor >= self.value.len() {
+            return false;
+        }
+        let boundaries: Vec<usize> = self
+            .value
+            .split_word_bound_indices()
+            .map(|(i, _)| i)
+            .collect();
+        // Walk forward to find the next boundary that ends a non-whitespace
+        // segment (i.e. the segment between the previous boundary and this
+        // one contains something other than just whitespace).
+        let target = boundaries
+            .iter()
+            .filter(|&&b| b > self.cursor)
+            .find(|&&b| {
+                let prev = boundaries
+                    .iter()
+                    .rev()
+                    .find(|&&pb| pb < b)
+                    .copied()
+                    .unwrap_or(0);
+                !self.value[prev..b].chars().all(|c| c.is_whitespace())
+            })
+            .copied()
+            .unwrap_or(self.value.len());
+        if target != self.cursor {
+            self.cursor = target;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn delete_word_before(&mut self) -> bool {
+        if self.cursor == 0 {
+            return false;
+        }
+        self.clear_selection();
+        let start = self
+            .value
+            .split_word_bound_indices()
+            .map(|(i, _)| i)
+            .filter(|&i| i < self.cursor)
+            .rev()
+            .find(|&i| {
+                !self.value[i..]
+                    .chars()
+                    .next()
+                    .unwrap_or('\0')
+                    .is_whitespace()
+            })
+            .unwrap_or(0);
+        self.value.replace_range(start..self.cursor, "");
+        self.cursor = start;
+        true
+    }
+
+    fn delete_word_after(&mut self) -> bool {
+        if self.cursor >= self.value.len() {
+            return false;
+        }
+        self.clear_selection();
+        let boundaries: Vec<usize> = self
+            .value
+            .split_word_bound_indices()
+            .map(|(i, _)| i)
+            .collect();
+        let end = boundaries
+            .iter()
+            .filter(|&&b| b > self.cursor)
+            .find(|&&b| {
+                let prev = boundaries
+                    .iter()
+                    .rev()
+                    .find(|&&pb| pb < b)
+                    .copied()
+                    .unwrap_or(0);
+                !self.value[prev..b].chars().all(|c| c.is_whitespace())
+            })
+            .copied()
+            .unwrap_or(self.value.len());
+        self.value.replace_range(self.cursor..end, "");
+        true
+    }
+
+    // ------------------------------------------------------------------
+    // Grapheme boundary helpers
+    // ------------------------------------------------------------------
 
     fn prev_boundary(&self, byte: usize) -> usize {
         let byte = self.clamp_to_boundary(byte);
@@ -354,6 +690,26 @@ mod tests {
             prefer_character_input: false,
         }
     }
+
+    fn key_with_mods(name: &str, ch: Option<&str>, control: bool, shift: bool) -> KeyDownEvent {
+        KeyDownEvent {
+            keystroke: gpui::Keystroke {
+                key: name.to_string(),
+                key_char: ch.map(|c| c.to_string()),
+                modifiers: gpui::Modifiers {
+                    control,
+                    shift,
+                    ..Default::default()
+                },
+            },
+            is_held: false,
+            prefer_character_input: false,
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Existing tests (preserved)
+    // ------------------------------------------------------------------
 
     #[test]
     fn typing_inserts_at_cursor() {
@@ -463,8 +819,9 @@ mod tests {
 
     #[test]
     fn ctrl_combo_is_ignored() {
+        // Ctrl+A is special-cased (select-all); other ctrl combos are ignored.
         let mut s = TextInputState::new();
-        let mut k = key("a", Some("a"));
+        let mut k = key("b", Some("b"));
         k.keystroke.modifiers.control = true;
         assert_eq!(s.handle_key(&k), TextInputAction::Ignored);
         assert!(s.is_empty());
@@ -510,7 +867,7 @@ mod tests {
     #[test]
     fn split_does_not_panic_on_invalid_cursor() {
         let mut s = TextInputState::with_text("héllo"); // é is 2 bytes
-        // Set cursor to a non-char-boundary position (byte 2, inside é).
+                                                        // Set cursor to a non-char-boundary position (byte 2, inside é).
         s.cursor = 2;
         // split() should clamp to the nearest boundary, not panic.
         let (before, after) = s.split();
@@ -526,5 +883,444 @@ mod tests {
         let (before, after) = s.split();
         assert_eq!(before, "abc");
         assert_eq!(after, "");
+    }
+
+    // ------------------------------------------------------------------
+    // New tests: selection
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn basic_selection_with_shift_right() {
+        let mut s = TextInputState::with_text("hello");
+        // Move cursor left twice to position 3 ("hel|lo")
+        s.handle_key(&key("left", None));
+        s.handle_key(&key("left", None));
+        assert_eq!(s.cursor(), 3);
+
+        // Shift+Right: begin selection, cursor moves right
+        let ev = key_with_mods("right", None, false, true);
+        assert_eq!(s.handle_key(&ev), TextInputAction::CursorMoved);
+        assert_eq!(s.cursor(), 4);
+        assert_eq!(s.selection_range(), Some((3, 4)));
+        assert_eq!(s.selected_text(), Some("l"));
+    }
+
+    #[test]
+    fn selection_anchor_persists_across_multiple_shift_moves() {
+        let mut s = TextInputState::with_text("hello");
+        // Set cursor to 1 ("h|ello")
+        s.handle_key(&key("home", None));
+        s.handle_key(&key("right", None));
+        assert_eq!(s.cursor(), 1);
+
+        // Shift+Right three times: anchor stays at 1
+        for _ in 0..3 {
+            s.handle_key(&key_with_mods("right", None, false, true));
+        }
+        assert_eq!(s.cursor(), 4);
+        assert_eq!(s.selection_range(), Some((1, 4)));
+        assert_eq!(s.selected_text(), Some("ell"));
+    }
+
+    #[test]
+    fn select_all_via_ctrl_a() {
+        let mut s = TextInputState::with_text("hello world");
+        let mut k = key("a", Some("a"));
+        k.keystroke.modifiers.control = true;
+
+        assert_eq!(s.handle_key(&k), TextInputAction::CursorMoved);
+        assert_eq!(s.selection_range(), Some((0, 11)));
+        assert_eq!(s.selected_text(), Some("hello world"));
+    }
+
+    #[test]
+    fn shift_home_selects_to_beginning() {
+        let mut s = TextInputState::with_text("hello");
+        s.handle_key(&key("end", None)); // cursor at 5
+        s.handle_key(&key("left", None)); // cursor at 4
+        s.handle_key(&key("left", None)); // cursor at 3
+
+        let ev = key_with_mods("home", None, false, true);
+        assert_eq!(s.handle_key(&ev), TextInputAction::CursorMoved);
+        assert_eq!(s.cursor(), 0);
+        assert_eq!(s.selection_range(), Some((0, 3)));
+    }
+
+    #[test]
+    fn shift_end_selects_to_end() {
+        let mut s = TextInputState::with_text("hello");
+        s.handle_key(&key("home", None)); // cursor at 0
+        s.handle_key(&key("right", None)); // cursor at 1
+
+        let ev = key_with_mods("end", None, false, true);
+        assert_eq!(s.handle_key(&ev), TextInputAction::CursorMoved);
+        assert_eq!(s.cursor(), 5);
+        assert_eq!(s.selection_range(), Some((1, 5)));
+    }
+
+    #[test]
+    fn selection_cleared_on_typing() {
+        let mut s = TextInputState::with_text("hello");
+        s.select_all();
+        assert!(s.selection_range().is_some());
+
+        // Typing a character replaces the selection and clears the anchor
+        s.handle_key(&key("x", Some("x")));
+        assert_eq!(s.value(), "x");
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn selection_cleared_on_cursor_movement_without_shift() {
+        let mut s = TextInputState::with_text("hello");
+        s.select_all();
+        assert!(s.selection_range().is_some());
+
+        // Plain left arrow should clear selection
+        s.handle_key(&key("left", None));
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn delete_selection_removes_text() {
+        let mut s = TextInputState::with_text("hello world");
+        // Select "ello "
+        s.selection_anchor = Some(1);
+        s.cursor = 6;
+
+        assert!(s.delete_selection());
+        assert_eq!(s.value(), "hworld");
+        assert_eq!(s.cursor(), 1);
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn delete_selection_returns_false_when_nothing_selected() {
+        let mut s = TextInputState::with_text("hello");
+        assert!(!s.delete_selection());
+        assert_eq!(s.value(), "hello");
+    }
+
+    #[test]
+    fn clear_selection_drops_anchor_but_keeps_text_and_cursor() {
+        let mut s = TextInputState::with_text("hello");
+        s.selection_anchor = Some(2);
+        s.cursor = 4;
+        s.clear_selection();
+        assert_eq!(s.selection_range(), None);
+        assert_eq!(s.value(), "hello");
+        assert_eq!(s.cursor(), 4);
+    }
+
+    // ------------------------------------------------------------------
+    // New tests: word navigation
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn ctrl_left_moves_to_prev_word() {
+        let mut s = TextInputState::with_text("hello world");
+        // cursor at end (11)
+        let ev = key_with_mods("left", None, true, false);
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 6); // start of "world"
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 0); // start of "hello" (skipping the space)
+        s.handle_key(&ev); // already at 0, should be ignored
+    }
+
+    #[test]
+    fn ctrl_right_moves_to_next_word() {
+        let mut s = TextInputState::with_text("hello world");
+        s.handle_key(&key("home", None)); // cursor at 0
+        let ev = key_with_mods("right", None, true, false);
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 5); // after "hello"
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 11); // end of "world" (skipping the space)
+    }
+
+    #[test]
+    fn ctrl_shift_left_selects_by_word() {
+        let mut s = TextInputState::with_text("hello world");
+        // cursor at end (11)
+        let ev = key_with_mods("left", None, true, true);
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 6);
+        assert_eq!(s.selection_range(), Some((6, 11)));
+        assert_eq!(s.selected_text(), Some("world"));
+    }
+
+    #[test]
+    fn ctrl_shift_right_selects_by_word() {
+        let mut s = TextInputState::with_text("hello world");
+        s.handle_key(&key("home", None)); // cursor at 0
+        let ev = key_with_mods("right", None, true, true);
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 5);
+        assert_eq!(s.selection_range(), Some((0, 5)));
+        assert_eq!(s.selected_text(), Some("hello"));
+    }
+
+    // ------------------------------------------------------------------
+    // New tests: word deletion
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn ctrl_backspace_deletes_prev_word() {
+        let mut s = TextInputState::with_text("hello world");
+        let mut ev = key("backspace", None);
+        ev.keystroke.modifiers.control = true;
+        assert_eq!(s.handle_key(&ev), TextInputAction::Changed);
+        assert_eq!(s.value(), "hello ");
+        assert_eq!(s.cursor(), 6);
+    }
+
+    #[test]
+    fn ctrl_delete_deletes_next_word() {
+        let mut s = TextInputState::with_text("hello world");
+        s.handle_key(&key("home", None)); // cursor at 0
+        let mut ev = key("delete", None);
+        ev.keystroke.modifiers.control = true;
+        assert_eq!(s.handle_key(&ev), TextInputAction::Changed);
+        assert_eq!(s.value(), " world");
+        assert_eq!(s.cursor(), 0);
+    }
+
+    // ------------------------------------------------------------------
+    // New tests: clipboard
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn copy_selection_returns_selected_text() {
+        let mut s = TextInputState::with_text("hello world");
+        s.selection_anchor = Some(0);
+        s.cursor = 5;
+        assert_eq!(s.copy_selection(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn copy_selection_returns_none_when_nothing_selected() {
+        let s = TextInputState::with_text("hello");
+        assert_eq!(s.copy_selection(), None);
+    }
+
+    #[test]
+    fn cut_selection_returns_and_removes_text() {
+        let mut s = TextInputState::with_text("hello world");
+        s.selection_anchor = Some(0);
+        s.cursor = 5;
+        let cut = s.cut_selection();
+        assert_eq!(cut, Some("hello".to_string()));
+        assert_eq!(s.value(), " world");
+        assert_eq!(s.cursor(), 0);
+    }
+
+    #[test]
+    fn paste_inserts_at_cursor() {
+        let mut s = TextInputState::with_text("hello");
+        s.paste(" world");
+        assert_eq!(s.value(), "hello world");
+        assert_eq!(s.cursor(), 11);
+    }
+
+    #[test]
+    fn paste_replaces_selection() {
+        let mut s = TextInputState::with_text("hello world");
+        s.selection_anchor = Some(0);
+        s.cursor = 5; // "hello" selected
+        s.paste("hi");
+        assert_eq!(s.value(), "hi world");
+        assert_eq!(s.cursor(), 2);
+        assert!(s.selection_range().is_none());
+    }
+
+    // ------------------------------------------------------------------
+    // New tests: edge cases
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn selection_range_returns_none_for_empty_selection() {
+        let mut s = TextInputState::with_text("hello");
+        s.selection_anchor = Some(3);
+        s.cursor = 3; // anchor == cursor: empty selection
+        assert_eq!(s.selection_range(), None);
+        assert_eq!(s.selected_text(), None);
+    }
+
+    #[test]
+    fn selection_range_works_regardless_of_anchor_cursor_order() {
+        let mut s = TextInputState::with_text("hello");
+        // anchor after cursor
+        s.selection_anchor = Some(4);
+        s.cursor = 1;
+        assert_eq!(s.selection_range(), Some((1, 4)));
+
+        // cursor after anchor
+        s.selection_anchor = Some(1);
+        s.cursor = 4;
+        assert_eq!(s.selection_range(), Some((1, 4)));
+    }
+
+    #[test]
+    fn select_all_on_empty_input() {
+        let mut s = TextInputState::new();
+        s.select_all();
+        assert_eq!(s.cursor(), 0);
+        assert_eq!(s.selection_range(), None); // empty selection
+    }
+
+    #[test]
+    fn set_text_clears_selection() {
+        let mut s = TextInputState::with_text("hello");
+        s.select_all();
+        assert!(s.selection_range().is_some());
+        s.set_text("world");
+        assert_eq!(s.value(), "world");
+        assert_eq!(s.cursor(), 5);
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn clear_clears_selection() {
+        let mut s = TextInputState::with_text("hello");
+        s.select_all();
+        assert!(s.selection_range().is_some());
+        s.clear();
+        assert!(s.is_empty());
+        assert_eq!(s.cursor(), 0);
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn backspace_deletes_selection_when_present() {
+        let mut s = TextInputState::with_text("hello world");
+        s.selection_anchor = Some(6);
+        s.cursor = 11; // "world" selected
+        assert_eq!(
+            s.handle_key(&key("backspace", None)),
+            TextInputAction::Changed
+        );
+        assert_eq!(s.value(), "hello ");
+        assert_eq!(s.cursor(), 6);
+    }
+
+    #[test]
+    fn delete_deletes_selection_when_present() {
+        let mut s = TextInputState::with_text("hello world");
+        s.selection_anchor = Some(0);
+        s.cursor = 6; // "hello " selected
+        assert_eq!(s.handle_key(&key("delete", None)), TextInputAction::Changed);
+        assert_eq!(s.value(), "world");
+        assert_eq!(s.cursor(), 0);
+    }
+
+    #[test]
+    fn shift_left_starts_selection() {
+        let mut s = TextInputState::with_text("hello");
+        // cursor at end
+        let ev = key_with_mods("left", None, false, true);
+        s.handle_key(&ev);
+        assert_eq!(s.cursor(), 4);
+        assert_eq!(s.selection_range(), Some((4, 5)));
+    }
+
+    #[test]
+    fn shift_right_then_shift_left_narrows_selection() {
+        let mut s = TextInputState::with_text("hello");
+        s.handle_key(&key("home", None)); // cursor at 0
+        let right_shift = key_with_mods("right", None, false, true);
+        let left_shift = key_with_mods("left", None, false, true);
+
+        s.handle_key(&right_shift);
+        s.handle_key(&right_shift);
+        s.handle_key(&right_shift);
+        assert_eq!(s.cursor(), 3);
+        assert_eq!(s.selection_range(), Some((0, 3)));
+
+        // Shift+Left shrinks selection
+        s.handle_key(&left_shift);
+        assert_eq!(s.cursor(), 2);
+        assert_eq!(s.selection_range(), Some((0, 2)));
+    }
+
+    #[test]
+    fn move_to_prev_word_at_start_returns_false() {
+        let mut s = TextInputState::new();
+        // empty, cursor at 0
+        assert!(!s.move_to_prev_word());
+    }
+
+    #[test]
+    fn move_to_next_word_at_end_returns_false() {
+        let mut s = TextInputState::with_text("hi");
+        // cursor at end
+        assert!(!s.move_to_next_word());
+    }
+
+    #[test]
+    fn word_navigation_handles_punctuation() {
+        let mut s = TextInputState::with_text("hello, world!");
+        s.handle_key(&key("home", None)); // cursor at 0
+        let ctrl_right = key_with_mods("right", None, true, false);
+
+        s.handle_key(&ctrl_right);
+        assert_eq!(s.cursor(), 5); // after "hello"
+        s.handle_key(&ctrl_right);
+        assert_eq!(s.cursor(), 6); // after ","
+                                   // Whitespace segment is skipped, so we jump to the end of "world"
+        s.handle_key(&ctrl_right);
+        assert_eq!(s.cursor(), 12); // after "world" (skipped space)
+        s.handle_key(&ctrl_right);
+        assert_eq!(s.cursor(), 13); // after "!" (end of string)
+    }
+
+    #[test]
+    fn word_deletion_clears_selection() {
+        let mut s = TextInputState::with_text("hello world");
+        s.select_all();
+        assert!(s.selection_range().is_some());
+
+        // Ctrl+Backspace: word deletion should clear selection
+        let mut ev = key("backspace", None);
+        ev.keystroke.modifiers.control = true;
+        s.handle_key(&ev);
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn copy_selection_returns_none_for_empty_value() {
+        let s = TextInputState::new();
+        assert_eq!(s.copy_selection(), None);
+    }
+
+    #[test]
+    fn cut_selection_returns_none_when_nothing_selected() {
+        let mut s = TextInputState::with_text("hello");
+        assert_eq!(s.cut_selection(), None);
+        assert_eq!(s.value(), "hello");
+    }
+
+    #[test]
+    fn integer_ctrl_a_selects_all() {
+        let mut s = TextInputState::with_text("42");
+        let mut k = key("a", Some("a"));
+        k.keystroke.modifiers.control = true;
+        assert_eq!(
+            s.handle_integer_key(&k, false),
+            TextInputAction::CursorMoved
+        );
+        assert_eq!(s.selection_range(), Some((0, 2)));
+    }
+
+    #[test]
+    fn multiline_enter_replaces_selection() {
+        let mut s = TextInputState::with_text("hello world");
+        s.select_all();
+        assert_eq!(
+            s.handle_multiline_key(&key("enter", None)),
+            TextInputAction::Changed
+        );
+        assert_eq!(s.value(), "\n");
+        assert!(s.selection_range().is_none());
     }
 }
