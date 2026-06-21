@@ -130,11 +130,11 @@ fn branch_selector(
     .on_select({
         let choice = branch_choice.clone();
         let open = open.clone();
-        let event = branch_event.clone();
         move |key, _window, cx| {
+            // Only set the choice — the `branch_event` is derived
+            // declaratively via `watch` in `GalleryState::new`.
             choice.set(cx, key);
             open.set(cx, false);
-            event.set(cx, format!("Switched to {key}"));
         }
     })
     .on_action({

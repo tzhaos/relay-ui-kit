@@ -189,13 +189,14 @@ impl GalleryState {
         {
             let branch_choice = state.branch_choice.clone();
             let branch_event = state.branch_event.clone();
+            let choice_for_react = branch_choice.clone();
             let _ = cx.watch(
                 move |cx| {
                     let _ = branch_choice.get(cx);
                 },
                 move |cx| {
-                    let key = branch_choice.get(cx);
-                    branch_event.set_silent(cx, format!("Switched to {key}"));
+                    let key = choice_for_react.get(cx);
+                    branch_event.set(cx, format!("Switched to {key}"));
                 },
             );
         }

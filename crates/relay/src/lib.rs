@@ -28,6 +28,7 @@
 //! ```
 
 mod binding;
+mod context;
 mod effect;
 mod hooks;
 mod memo;
@@ -38,6 +39,7 @@ mod signal_vec;
 mod window_ext;
 
 pub use binding::Binding;
+pub use context::{ContextHandle, provide_context, use_context};
 pub use effect::{Effect, effect, effect_in};
 pub use hooks::{ReactiveAppExt, ReactiveContextExt, install};
 pub use memo::Memo;
@@ -50,7 +52,8 @@ pub use window_ext::WindowSignalExt;
 /// Common relay imports for GPUI views.
 pub mod prelude {
     pub use crate::{
-        Binding, Effect, Memo, ReactiveAppExt, ReactiveContextExt, Resource, ResourceState, Signal,
-        SignalVecExt, WindowSignalExt, batch, effect, effect_in, init, install, track, untrack,
+        Binding, ContextHandle, Effect, Memo, ReactiveAppExt, ReactiveContextExt, Resource,
+        ResourceState, Signal, SignalVecExt, WindowSignalExt, batch, effect, effect_in, init,
+        install, provide_context, track, untrack, use_context,
     };
 }
