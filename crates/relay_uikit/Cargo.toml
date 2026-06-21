@@ -18,7 +18,9 @@ path = "src/bin/relay_gallery/main.rs"
 [dependencies]
 gpui.workspace = true
 gpui_platform.workspace = true
+pulldown-cmark.workspace = true
 relay.workspace = true
+similar.workspace = true
 unicode-segmentation.workspace = true
 
 [dev-dependencies]
