@@ -136,6 +136,11 @@ impl Select {
 
 impl RenderOnce for Select {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        debug_assert!(
+            !self.options.is_empty(),
+            "Select `{}` must have at least one option",
+            self.id
+        );
         let theme = *cx.theme();
         let binding = self.binding;
         let selected_key = binding

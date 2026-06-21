@@ -90,6 +90,7 @@ impl RenderOnce for Radio {
             .items_center()
             .gap_2()
             .role(Role::RadioButton)
+            .aria_selected(selected)
             .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(interactive, |this| {
                 this.cursor_pointer()
