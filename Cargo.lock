@@ -4296,6 +4296,16 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui_platform",
+ "relay_macros",
+]
+
+[[package]]
+name = "relay_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

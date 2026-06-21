@@ -72,6 +72,8 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`ForEach`** (relay_uikit) — 响应式列表组件，接收 `Signal<Vec<T>>` + key fn + render fn，自动订阅信号刷新。
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
 - **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
+- **`WindowSignalExt::use_signal` / `use_binding`** — 组件内 hooks，供 `RenderOnce` 组件使用。通过 `window.use_keyed_state` 按 `ElementId` 持久化跨渲染状态。对标 React `useState` / Solid `createSignal`。
+- **`#[derive(Reactive)]`** (relay_macros) — 字段级响应。将普通结构体转换为每个字段包装在 `Signal<T>` 中的响应式结构体，自动生成 `get_field`/`set_field`/`update_field`/`signal_field` 访问器。免去多字段状态的手动 signal 创建。
 
 ## 应用层范式
 
@@ -140,6 +142,8 @@ fn child_render(cx: &App) {
 | `resource` | `Resource` 异步 pending/ready/error |
 | `context` | `provide_context` / `use_context` 跨层共享 |
 | `form` | `Form` 聚合、`is_dirty`、`reset`、`commit` |
+| `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |
+| `reactive_struct` | `#[derive(Reactive)]` — 字段级响应 |
 
 ```sh
 cargo run -p relay --example counter

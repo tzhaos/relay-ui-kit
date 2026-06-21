@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 gpui.workspace = true
+relay_macros.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

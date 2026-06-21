@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/relay",
+    "crates/relay_macros",
     "crates/relay_uikit",
 ]
 default-members = ["crates/relay_uikit"]
@@ -55,8 +56,12 @@ incremental = false          # CI runners are ephemeral — no incremental cache
 anyhow = "1"
 gpui = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "6febe1c45a6d4b5460678a69b4eea497aa1f89ad", package = "gpui_platform" }
+proc-macro2 = "1"
 pulldown-cmark = "0.13.4"
+quote = "1"
 relay = { path = "crates/relay" }
+relay_macros = { path = "crates/relay_macros" }
 relay_uikit = { path = "crates/relay_uikit" }
 similar = "2"
+syn = { version = "2", features = ["full"] }
 unicode-segmentation = "1.13"
