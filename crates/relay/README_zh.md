@@ -74,7 +74,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
 - **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
 - **`WindowSignalExt::use_signal` / `use_binding`** — 组件内 hooks，供 `RenderOnce` 组件使用。通过 `window.use_keyed_state` 按 `ElementId` 持久化跨渲染状态。对标 React `useState` / Solid `createSignal`。
-- **`#[derive(Reactive)]`** (relay_macros) — 字段级响应。将普通结构体转换为每个字段包装在 `Signal<T>` 中的响应式结构体，自动生成 `get_field`/`set_field`/`update_field`/`signal_field` 访问器。免去多字段状态的手动 signal 创建。
+- **`#[derive(Reactive)]`** (relay_macros) — 字段级响应。将普通结构体转换为生成的 `ReactiveFoo` 包装，字段默认包装为 `Signal<T>`，并提供 `from(cx, value)`、`snapshot(cx)`、`set(cx, value)` 和字段访问器。嵌套结构字段可用 `#[reactive(nested)]` 标记，保留嵌套字段级追踪。
 
 ## 应用层范式
 

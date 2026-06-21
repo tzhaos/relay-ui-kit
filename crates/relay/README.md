@@ -72,7 +72,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
 - **`Form`** — form aggregation model. Register multiple `Binding<T>` fields; provides `is_dirty()` (returns `Memo<bool>`), `reset(cx)`, and `commit(cx)`. Suited for settings panels, edit forms, and other dirty-check/reset/submit scenarios.
 - **`WindowSignalExt::use_signal` / `use_binding`** — component-internal hooks for `RenderOnce` components. Calls `window.use_keyed_state` to persist state across renders keyed by `ElementId`. The React `useState` / Solid `createSignal` equivalent for GPUI.
-- **`#[derive(Reactive)]`** (relay_macros) — field-level reactivity. Transforms a plain struct into one where each field is wrapped in `Signal<T>`, with generated `get_field`/`set_field`/`update_field`/`signal_field` accessors. Eliminates manual signal creation for multi-field state.
+- **`#[derive(Reactive)]`** (relay_macros) — field-level reactivity. Transforms a plain struct into a generated `ReactiveFoo` wrapper with `Signal<T>` fields, `from(cx, value)`, `snapshot(cx)`, `set(cx, value)`, and generated field accessors. Mark nested struct fields with `#[reactive(nested)]` to keep their own field-level tracking.
 
 ## Application-layer patterns
 
