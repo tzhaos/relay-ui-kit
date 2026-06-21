@@ -6,26 +6,16 @@
 //! launches several small app-shaped scenes so components appear in the kind of
 //! surface where Relay will use them:
 //!
-//! - **Product Workbench** — the Orca three-column shell (left rail / center terminal /
-//!   right context). Click tasks to activate them, switch Files/Diff/Review and
-//!   Terminal/Preview, filter the file tree, open the row context menu.
 //! - **Core Kit** — primitives, inputs, forms, choices, feedback, lists, and rows.
 //! - **Patterns Kit** — command, navigation, layout, overlay, and scroll patterns.
-//! - **Workbench Kit** — terminal, agent, branch, viewer, composer, and task components.
 //! - **Stress Lab** — long labels, dense rows, disabled states, and overflow.
-//!
-//! Interactivity pattern: components carry view-free callbacks
-//! (`Fn(&ClickEvent, &mut Window, &mut App)`). App-shaped scenes are GPUI child
-//! entities so high-frequency interactions redraw the active surface instead of
-//! the entire gallery shell.
 //!
 //! Run with `cargo run -p relay_uikit --bin relay_gallery`.
 
 mod gallery;
-mod workbench_demo;
 
 use gpui::{
-    AnyElement, AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
+    AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
     Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
@@ -33,13 +23,10 @@ use relay::{ReactiveAppExt, Signal, view::{ReactiveView, StateScope, reactive_re
 use relay_uikit::patterns::{TitleBar, WorkspaceBreadcrumb};
 use relay_uikit::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
 
-/// Which gallery page is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
-    Product,
     Core,
     Patterns,
-    Workbench,
     Stress,
 }
 
@@ -47,18 +34,15 @@ pub struct GalleryApp {
     page: Signal<Page>,
     dark_mode: Signal<bool>,
     gallery: gpui::Entity<gallery::GalleryScenesApp>,
-    workbench: gpui::Entity<workbench_demo::WorkbenchApp>,
-    #[allow(dead_code)]
     scope: StateScope,
 }
 
 impl GalleryApp {
     fn new(cx: &mut Context<Self>) -> Self {
         Self {
-            page: cx.signal(Page::Product),
+            page: cx.signal(Page::Core),
             dark_mode: cx.signal(false),
             gallery: cx.new(gallery::GalleryScenesApp::new),
-            workbench: cx.new(workbench_demo::WorkbenchApp::new),
             scope: StateScope::new(),
         }
     }
@@ -85,20 +69,16 @@ impl GalleryApp {
 
     fn label_for(&self, page: Page) -> &'static str {
         match page {
-            Page::Product => "Product Workbench",
             Page::Core => "Core Kit",
             Page::Patterns => "Patterns Kit",
-            Page::Workbench => "Workbench Kit",
             Page::Stress => "Stress Lab",
         }
     }
 
     fn page_icon(page: Page) -> IconName {
         match page {
-            Page::Product => IconName::PanelLeft,
             Page::Core => IconName::LayoutGrid,
             Page::Patterns => IconName::Zap,
-            Page::Workbench => IconName::Terminal,
             Page::Stress => IconName::ListChecks,
         }
     }
@@ -107,9 +87,7 @@ impl GalleryApp {
         match page {
             Page::Core => Some(6),
             Page::Patterns => Some(5),
-            Page::Workbench => Some(6),
             Page::Stress => Some(9),
-            _ => None,
         }
     }
 
@@ -128,10 +106,8 @@ impl GalleryApp {
             .border_r_1()
             .border_color(theme.border)
             .bg(theme.chrome)
-            .child(self.catalog_row(Page::Product, page, cx))
             .child(self.catalog_row(Page::Core, page, cx))
             .child(self.catalog_row(Page::Patterns, page, cx))
-            .child(self.catalog_row(Page::Workbench, page, cx))
             .child(self.catalog_row(Page::Stress, page, cx))
             .child(div().flex_1())
             .child(self.theme_toggle(cx))
@@ -140,7 +116,7 @@ impl GalleryApp {
     fn theme_toggle(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = *cx.theme();
         let is_dark = self.dark_mode.get(cx);
-        let label = if is_dark { "☀  Light" } else { "☾  Dark" };
+        let label = if is_dark { "\u{263E}  Dark" } else { "\u{2600}  Light" };
         let dark_mode = self.dark_mode.clone();
 
         div()
@@ -179,26 +155,18 @@ impl GalleryApp {
 
     fn page_key(page: Page) -> &'static str {
         match page {
-            Page::Product => "studio-product",
             Page::Core => "studio-core",
             Page::Patterns => "studio-patterns",
-            Page::Workbench => "studio-workbench-kit",
             Page::Stress => "studio-stress",
         }
     }
-
 }
 
 impl ReactiveView for GalleryApp {
-    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> gpui::AnyElement {
         let theme = *cx.theme();
         let page = self.page.get(cx);
-        let body = match page {
-            Page::Product => cached_scene(self.workbench.clone()),
-            Page::Core | Page::Patterns | Page::Workbench | Page::Stress => {
-                cached_scene(self.gallery.clone())
-            }
-        };
+        let body = cached_scene(self.gallery.clone());
 
         div()
             .size_full()
@@ -229,16 +197,14 @@ impl Render for GalleryApp {
 impl Page {
     fn gallery_surface(self) -> Option<gallery::GallerySurface> {
         match self {
-            Page::Product => None,
             Page::Core => Some(gallery::GallerySurface::Core),
             Page::Patterns => Some(gallery::GallerySurface::Patterns),
-            Page::Workbench => Some(gallery::GallerySurface::Workbench),
             Page::Stress => Some(gallery::GallerySurface::Stress),
         }
     }
 }
 
-fn cached_scene(scene: impl Into<AnyView>) -> AnyElement {
+fn cached_scene(scene: impl Into<AnyView>) -> gpui::AnyElement {
     scene
         .into()
         .cached(gpui::StyleRefinement::default().size_full())

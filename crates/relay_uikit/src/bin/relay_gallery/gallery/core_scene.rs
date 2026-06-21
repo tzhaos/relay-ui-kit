@@ -2,7 +2,6 @@ use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::Fl
 use relay::Binding;
 use relay_uikit::patterns::navigation::{Tab, Tabs};
 use relay_uikit::patterns::overlay::{DropdownMenu, MenuItem};
-use relay_uikit::workbench::{TaskRow, TaskRowData};
 use relay_uikit::{
     Badge, Button, ButtonVariant, ColorField, ColorSwatch, CountBadge, Disclosure, Divider,
     EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton, IconName,
@@ -71,7 +70,7 @@ pub(super) fn render(
                 .flex_wrap()
                 .child(nav_rows_sample())
                 .child(tree_rows_sample())
-                .child(task_rows_sample()),
+                .child(task_rows_sample(theme)),
         ))
         .child(section(cx, "Core list patterns", list_body))
         .child(section(cx, "Tabs and empty state", tab_samples(state)))
@@ -211,13 +210,13 @@ fn input_choice_samples(
 fn button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     strip()
         .child(
-            Button::new("btn-primary", "Launch Agent")
+            Button::new("btn-primary", "Primary Action")
                 .primary()
                 .icon(IconName::Play)
                 .on_click({
-                    let terminal_session = state.terminal_session.clone();
+                    let event = state.overlay_event.clone();
                     move |_event, _window, cx| {
-                        terminal_session.set(cx, "codex");
+                        event.set(cx, "Primary button clicked".into());
                     }
                 }),
         )
@@ -278,9 +277,9 @@ fn icon_button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                 )
                 .child(
                     IconButton::new("ib-settings", IconName::Settings).on_click({
-                        let launcher_choice = state.launcher_choice.clone();
+                        let event = state.overlay_event.clone();
                         move |_event, _window, cx| {
-                            launcher_choice.set(cx, "settings");
+                            event.set(cx, "Settings clicked".into());
                         }
                     }),
                 ),
@@ -529,37 +528,62 @@ fn tree_rows_sample() -> impl IntoElement {
         .child(TreeRow::new("tr-4", IconName::FileText, "icon.rs").depth(2))
 }
 
-fn task_rows_sample() -> impl IntoElement {
+fn task_rows_sample(theme: Theme) -> impl IntoElement {
     div()
         .w(gpui::px(320.0))
         .flex()
         .flex_col()
         .gap_1()
         .child(
-            TaskRow::new(
-                "task-1",
-                TaskRowData {
-                    title: "Wire diff pane".into(),
-                    status_label: "RUNNING".into(),
-                    status_tone: Tone::Accent,
-                    branch: Some("relay/diff-pane".into()),
-                    changed: 12,
-                    review: 0,
-                },
-            )
-            .selected(true),
+            gpui::div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .py_1()
+                .rounded(gpui::px(relay_uikit::radius::MD))
+                .bg(theme.panel)
+                .child(relay_uikit::StatusDot::new(Tone::Accent))
+                .child(
+                    div()
+                        .flex_1()
+                        .truncate()
+                        .text_sm()
+                        .text_color(theme.text)
+                        .child("Wire diff pane"),
+                )
+                .child(
+                    div()
+                        .text_size(gpui::px(11.0))
+                        .text_color(Tone::Accent.fg(&theme))
+                        .child("RUNNING"),
+                ),
         )
-        .child(TaskRow::new(
-            "task-2",
-            TaskRowData {
-                title: "Refactor terminal session".into(),
-                status_label: "WAITING".into(),
-                status_tone: Tone::Warning,
-                branch: Some("relay/term".into()),
-                changed: 3,
-                review: 2,
-            },
-        ))
+        .child(
+            gpui::div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .py_1()
+                .rounded(gpui::px(relay_uikit::radius::MD))
+                .bg(theme.panel)
+                .child(relay_uikit::StatusDot::new(Tone::Warning))
+                .child(
+                    div()
+                        .flex_1()
+                        .truncate()
+                        .text_sm()
+                        .text_color(theme.text)
+                        .child("Refactor terminal session"),
+                )
+                .child(
+                    div()
+                        .text_size(gpui::px(11.0))
+                        .text_color(Tone::Warning.fg(&theme))
+                        .child("WAITING"),
+                ),
+        )
 }
 
 fn list_core_samples(
@@ -567,10 +591,10 @@ fn list_core_samples(
     theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
-    let selected = state.viewer_tab.get(cx);
+    let selected = state.seg_tab.get(cx);
     let tree_nodes = state.core_tree_nodes.get(cx);
     let select_tree = {
-        let viewer_tab = state.viewer_tab.clone();
+        let viewer_tab = state.seg_tab.clone();
         move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
             viewer_tab.set(cx, key);
         }
@@ -621,7 +645,7 @@ fn list_core_samples(
                             .selected(selected == "recent:terminal")
                             .start_slot(Icon::new(IconName::Terminal))
                             .on_click(select_core_item(
-                                state.viewer_tab.clone(),
+                                state.seg_tab.clone(),
                                 "recent:terminal",
                             ))
                             .child(list_item_text(
@@ -635,7 +659,7 @@ fn list_core_samples(
                             .height(gpui::px(48.0))
                             .selected(selected == "recent:diff")
                             .start_slot(Icon::new(IconName::FileDiff))
-                            .on_click(select_core_item(state.viewer_tab.clone(), "recent:diff"))
+                            .on_click(select_core_item(state.seg_tab.clone(), "recent:diff"))
                             .child(list_item_text("Diff viewer", "Unified file delta", theme)),
                     ),
                 SectionedListGroup::new("Pinned").child(
@@ -644,7 +668,7 @@ fn list_core_samples(
                         .start_slot(Icon::new(IconName::Zap))
                         .selected(selected == "pinned:command")
                         .on_click(select_core_item(
-                            state.viewer_tab.clone(),
+                            state.seg_tab.clone(),
                             "pinned:command",
                         ))
                         .child(list_item_text(

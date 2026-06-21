@@ -122,9 +122,9 @@ pub(super) fn render(
                         .tone(Tone::Warning)
                         .action(
                             Button::new("feedback-banner-action", "Open settings").on_click({
-                                let launcher = state.launcher_choice.clone();
+                                let seg_tab = state.seg_tab.clone();
                                 move |_event, _window, cx| {
-                                    launcher.set(cx, "settings");
+                                    seg_tab.set(cx, "settings");
                                 }
                             }),
                         ),
@@ -238,8 +238,8 @@ pub(super) fn render(
                     )
                 })
                 .child(div().text_xs().text_color(theme.text_muted).child(format!(
-                    "Current launcher choice: {}",
-                    state.launcher_choice.get(cx)
+                    "Current tab: {}",
+                    state.seg_tab.get(cx)
                 ))),
         ))
 }

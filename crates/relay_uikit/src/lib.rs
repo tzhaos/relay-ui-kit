@@ -1,7 +1,7 @@
 //! Relay UIKit for GPUI.
 //!
 //! This crate groups Relay's GPUI visual tokens, controls, reusable interaction
-//! patterns, workbench compositions, and gallery binary into one UI package.
+//! patterns, and gallery binary into one UI package.
 //!
 //! Components render ordinary GPUI elements and can be wired in two styles:
 //!
@@ -19,12 +19,10 @@ pub mod components;
 pub mod interaction;
 pub mod patterns;
 pub mod styles;
-pub mod workbench;
 
 pub use components::{button, choice, controls, display, feedback, form, icon, input, list, row};
 pub use patterns::{command, layout, navigation, scroll_surface, shell};
 pub use styles::{motion, theme, tone};
-pub use workbench::{composer, git, launcher, terminal, viewer};
 
 pub use button::{Button, ButtonVariant, IconButton};
 pub use choice::{Checkbox, Radio, Toggle};
@@ -61,15 +59,6 @@ pub use shell::{
 };
 pub use theme::{ActiveTheme, Theme, radius, space};
 pub use tone::Tone;
-#[allow(deprecated)]
-pub use workbench::AgentQuickLaunch;
-pub use workbench::{
-    BranchActionKind, BranchActionsMenu, BranchOption, BranchPickerAction, BranchSelector,
-    CodeView, Composer, DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileView,
-    LauncherItem, LauncherItemKind, LauncherMenu, MarkdownView, TaskRow, TaskRowData,
-    TerminalAgentQuickLaunch, TerminalLine, TerminalLineStyle, TerminalSessionRow,
-    TerminalStatusBadge, TerminalSurface, TerminalTab, TerminalToolbar, TerminalTranscript,
-};
 
 /// Core controls, tokens, and interaction types.
 pub mod core {
