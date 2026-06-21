@@ -33,6 +33,11 @@ pub trait ReactiveAppExt {
     /// Convenience wrapper around [`crate::untrack`].
     fn untrack<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R;
 
+    /// Batch signal writes and flush affected observers once at the end.
+    ///
+    /// This is a convenience wrapper around [`crate::batch`].
+    fn batch<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R;
+
     /// Create a derived value that updates when its dependencies change.
     ///
     /// This is a semantic alias for [`ReactiveAppExt::memo`], intended for call
@@ -80,6 +85,10 @@ where
 
     fn untrack<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
         untrack(self.borrow_mut(), f)
+    }
+
+    fn batch<R>(&mut self, f: impl FnOnce(&mut App) -> R) -> R {
+        crate::batch(self.borrow_mut(), f)
     }
 }
 
@@ -235,6 +244,41 @@ mod tests {
 
         // `other` is untracked, so changing it should not notify.
         assert_eq!(notifications.get(), 0);
+    }
+
+    #[test]
+    fn app_ext_batch_flushes_effect_once() {
+        use std::{cell::Cell, rc::Rc};
+
+        use crate::{effect, init};
+
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            cx.signal(0)
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let runs = runs.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = signal.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+        assert_eq!(runs.get(), 1);
+
+        app.update(|cx| {
+            cx.batch(|cx| {
+                signal.set(cx, 1);
+                signal.set(cx, 2);
+            });
+        });
+
+        assert_eq!(runs.get(), 2);
     }
 
     #[test]
