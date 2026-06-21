@@ -56,6 +56,12 @@ window lifecycles as the source of truth.
   Home/End/arrow navigation, Enter activation, and Delete removal. Its tests
   verify row entity reuse, row-local state survival across reorder, and command
   keyboard behavior.
+- The gallery workbench page is now a compiled app-like surface. It wires
+  task/session state through stable-id `Selector<u64>` values, renders the task
+  rail and session context list as `KeyedSubViews`, and keeps center/status
+  projections reading from the same runtime state. Its tests cover task row
+  entity reuse while selection changes and session selection cleanup when the
+  active session is removed.
 
 ## List Boundary
 
@@ -93,19 +99,19 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Carry the verified `session_surface` shape into a compiled workbench binary
-   once the missing workbench modules exist. Keep presentation components
-   value-first; use keyed entity retention only when rows have state or enough
-   render cost.
-2. Add UIKit command or picker adapters only if repeated host-level call sites
+1. Add UIKit command or picker adapters only if repeated host-level call sites
    prove the component API needs them. The Relay primitive should remain
    `Selector<K>` plus host-owned key order.
-3. Add a shared async UI boundary only after at least two real app surfaces
+2. Add a shared async UI boundary only after at least two real app surfaces
    repeat the same `fold_latest` render shape. Current evidence is still one
    gallery output surface plus examples, so `Resource` remains a UI-agnostic
    state primitive.
-4. Revisit show/switch style helpers only after there is repeated app code that
+3. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
+4. Keep expanding compiled app-shaped surfaces before adding new Relay
+   primitives. The workbench migration did not require a new UIKit adapter:
+   existing `selected_by` / `active_by` hooks were enough once state lived in
+   `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.
 
 ## Verification Gates
 
