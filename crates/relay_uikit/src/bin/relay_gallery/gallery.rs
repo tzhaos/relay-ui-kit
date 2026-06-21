@@ -258,7 +258,7 @@ fn render_surface(
             .flex()
             .flex_col()
             .gap(px(space::XL))
-            .child(core_scene::render(state, host, theme, cx))
+            .child(core_scene::render(state, host, window, theme, cx))
             .child(settings_scene::render(state, host, window, theme, cx))
             .into_any_element(),
         GallerySurface::Patterns => div()

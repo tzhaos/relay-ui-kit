@@ -8,7 +8,7 @@ use relay::Binding;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 /// A horizontal row for search/filter chips above lists or history views.
@@ -63,6 +63,7 @@ pub struct FilterChip {
     selected: bool,
     open: bool,
     dropdown: bool,
+    disabled: bool,
     binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
@@ -77,9 +78,15 @@ impl FilterChip {
             selected: false,
             open: false,
             dropdown: false,
+            disabled: false,
             binding: None,
             on_click: None,
         }
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
     }
 
     pub fn bound(id: impl Into<ElementId>, label: impl Into<String>, binding: Binding<bool>) -> Self {
@@ -91,6 +98,7 @@ impl FilterChip {
             selected: false,
             open: false,
             dropdown: false,
+            disabled: false,
             binding: Some(binding),
             on_click: None,
         }
@@ -146,8 +154,9 @@ impl RenderOnce for FilterChip {
         } else {
             theme.text_muted
         };
+        let disabled = self.disabled;
         let handler = self.on_click;
-        let clickable = binding.is_some() || handler.is_some();
+        let clickable = !disabled && (binding.is_some() || handler.is_some());
 
         div()
             .id(self.id)
@@ -166,6 +175,7 @@ impl RenderOnce for FilterChip {
             })
             .bg(if active { theme.panel_alt } else { theme.panel })
             .text_color(fg)
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))

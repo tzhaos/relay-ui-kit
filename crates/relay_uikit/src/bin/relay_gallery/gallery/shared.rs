@@ -1,4 +1,4 @@
-use gpui::{Context, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
+use gpui::{App, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
 use relay::Binding;
 use relay_uikit::{
     ActiveTheme, Icon, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme, Tone, radius,
@@ -8,7 +8,7 @@ use relay_uikit::{
 use super::GalleryScenesApp;
 
 pub(super) fn section<T: IntoElement>(
-    cx: &mut Context<GalleryScenesApp>,
+    cx: &App,
     title: &str,
     body: T,
 ) -> impl IntoElement + use<T> {

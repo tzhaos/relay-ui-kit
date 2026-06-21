@@ -1,747 +1,176 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder};
-use relay::Binding;
-use relay_uikit::patterns::navigation::{Tab, Tabs};
-use relay_uikit::patterns::overlay::{DropdownMenu, MenuItem};
-use relay_uikit::{
-    Badge, Button, ButtonVariant, ColorField, ColorSwatch, CountBadge, Disclosure, Divider,
-    EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton, IconName,
-    Label, LabelSize, ListItem, NavRow, Radio, SearchField, SectionedList, SectionedListGroup,
-    Segment, SegmentedControl, Stepper, Theme, Tone, ToolbarGroup, TreeRow, TreeView,
-};
+//! Core kit gallery — every component wired to relay signals and actually working.
 
-use super::{
-    GalleryScenesApp, GalleryState,
-    shared::{dot_label, icon_sample, scene_stack, section, strip},
+use gpui::{App, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
+use relay::Signal;
+use relay_uikit::{
+    ActiveTheme, Badge, Button, ButtonVariant, Checkbox, CountBadge, Disclosure, Divider,
+    FilterBar, FilterChip, Icon, IconButton, IconName, IconSize, Label, LabelSize, ListItem,
+    NavRow, NumberInput, Radio, SearchField, SegmentedControl, Segment, Slider, Stepper,
+    TextInput, TextInputState, Theme, Toggle, TreeRow,
 };
+use relay_uikit::patterns::navigation::{Tab, Tabs};
+
+use super::GalleryScenesApp;
+use super::GalleryState;
+use super::shared::{scene_stack, section, strip};
 
 pub(super) fn render(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
+    window: &gpui::Window,
     theme: Theme,
-    cx: &mut Context<GalleryScenesApp>,
+    cx: &mut gpui::Context<GalleryScenesApp>,
 ) -> impl IntoElement {
-    let contrast = state.contrast.get(cx);
+    let event_text = state.overlay_event.get(cx);
+    let disclosure_open = state.core_disclosure_open.get(cx);
+    let name_focused = state.name_focus.is_focused(window);
 
-    let stepper_body = stepper_filter_samples(state, contrast, cx);
-    let input_body = input_choice_samples(state, host, theme);
-    let label_body = label_badge_samples(state, cx);
-    let list_body = list_core_samples(state, theme, cx);
+    let buttons = section(cx, "Buttons", button_sample(state));
+    let icons = section(cx, "Icon Buttons", icon_button_sample(state));
+    let choices = section(cx, "Choices — Toggle, Checkbox, Radio", choice_sample(state));
+    let inputs = section(cx, "Text Input", text_input_sample(state, name_focused));
+    let search = section(cx, "Search & Filter", search_sample(state));
+    let numbers = section(cx, "Number & Slider & Stepper", number_sample(state));
+    let seg = section(cx, "Segmented Control", segmented_sample(state));
+    let disc = section(cx, "Disclosure", disclosure_sample(state, disclosure_open));
+    let lists = section(cx, "List & Tree Rows", list_sample(theme));
 
     scene_stack()
-        .child(section(cx, "Buttons", button_samples(state, host)))
-        .child(section(cx, "Icon buttons", icon_button_samples(state, host)))
-        .child(section(cx, "Steppers and filters", stepper_body))
-        .child(section(cx, "Inputs and choices", input_body))
-        .child(section(
-            cx,
-            "Status and icons",
-            div()
-                .flex()
-                .flex_col()
-                .gap_3()
-                .child(
-                    strip()
-                        .child(dot_label(theme, Tone::Accent, "running"))
-                        .child(dot_label(theme, Tone::Warning, "waiting"))
-                        .child(dot_label(theme, Tone::Danger, "failed"))
-                        .child(dot_label(theme, Tone::Muted, "idle")),
-                )
-                .child(
-                    strip()
-                        .child(icon_sample(theme, IconName::Terminal))
-                        .child(icon_sample(theme, IconName::Folder))
-                        .child(icon_sample(theme, IconName::FileText))
-                        .child(icon_sample(theme, IconName::FileDiff))
-                        .child(icon_sample(theme, IconName::GitBranch))
-                        .child(icon_sample(theme, IconName::Bot))
-                        .child(icon_sample(theme, IconName::Search))
-                        .child(icon_sample(theme, IconName::Zap))
-                        .child(icon_sample(theme, IconName::MessageSquareText)),
-                ),
+        .child(event_header(theme, &event_text))
+        .child(buttons).child(icons).child(choices)
+        .child(inputs).child(search).child(numbers)
+        .child(seg).child(disc).child(lists)
+}
+
+fn event_header(theme: Theme, text: &str) -> impl IntoElement {
+    div()
+        .px_3().py_2().rounded(px(relay_uikit::radius::MD))
+        .bg(theme.panel).border_1().border_color(theme.border)
+        .flex().items_center().gap_2()
+        .child(Label::new("Last event:").size(LabelSize::XSmall))
+        .child(div().text_sm().text_color(theme.accent).child(text.to_string()))
+}
+
+fn event_log(sig: Signal<String>, msg: &'static str) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut App) {
+    move |_, _, cx: &mut App| { sig.set(cx, msg.into()); }
+}
+
+// ── Button samples ────────────────────────────────────────────────────────
+
+fn button_sample(state: &GalleryState) -> impl IntoElement {
+    let log = state.overlay_event.clone();
+    div().flex().flex_col().gap_3()
+        .child(strip()
+            .child(Button::new("btn-pri", "Primary").primary().on_click(event_log(log.clone(), "Primary")))
+            .child(Button::new("btn-sec", "Secondary").variant(ButtonVariant::Secondary).on_click(event_log(log.clone(), "Secondary")))
+            .child(Button::new("btn-ghost", "Ghost").ghost().on_click(event_log(log.clone(), "Ghost")))
+            .child(Button::new("btn-dang", "Danger").danger().on_click(event_log(log.clone(), "Danger"))))
+        .child(strip()
+            .child(Button::new("btn-pri-icon", "With Icon").primary().icon(IconName::Play).on_click(event_log(log.clone(), "Play")))
+            .child(Button::new("btn-dis", "Disabled").primary().disabled(true)))
+        .child(strip()
+            .child(Button::new("btn-sec-icon", "Refresh").variant(ButtonVariant::Secondary).icon(IconName::RefreshCw).on_click(event_log(log.clone(), "Refresh")))
+            .child(Button::new("btn-ghost-icon", "Settings").ghost().icon(IconName::Settings).on_click(event_log(log, "Settings"))))
+}
+
+fn icon_button_sample(state: &GalleryState) -> impl IntoElement {
+    let log = state.overlay_event.clone();
+    div().flex().flex_col().gap_2()
+        .child(strip()
+            .child(IconButton::new("ib-plus", IconName::Plus).size(IconSize::Small).on_click(event_log(log.clone(), "Plus")))
+            .child(IconButton::new("ib-search", IconName::Search).size(IconSize::Small).on_click(event_log(log.clone(), "Search icon")))
+            .child(IconButton::new("ib-archive", IconName::Archive).size(IconSize::Small).on_click(event_log(log.clone(), "Archive")))
+            .child(IconButton::new("ib-panel", IconName::PanelLeft).size(IconSize::Small).active(true).on_click(event_log(log, "Panel toggle"))))
+        .child(strip()
+            .child(IconButton::new("ib-dis", IconName::Plus).size(IconSize::Small).disabled(true)))
+}
+
+// ── Choice samples ────────────────────────────────────────────────────────
+
+fn choice_sample(state: &GalleryState) -> impl IntoElement {
+    div().flex().flex_col().gap_3()
+        .child(strip()
+            .child(Toggle::bound("demo-toggle", state.notifications.clone()).label("Notifications"))
+            .child(Checkbox::bound("demo-check", state.auto_archive.clone()).label("Auto archive")))
+        .child(strip()
+            .child(Radio::bound("demo-radio-sys", state.radio_choice.clone(), "system", "System"))
+            .child(Radio::bound("demo-radio-light", state.radio_choice.clone(), "light", "Light"))
+            .child(Radio::bound("demo-radio-dark", state.radio_choice.clone(), "dark", "Dark")))
+}
+
+// ── Text input samples ────────────────────────────────────────────────────
+
+fn text_input_sample(state: &GalleryState, focused: bool) -> impl IntoElement {
+    div().flex().flex_col().gap_3()
+        .child(div().max_w(px(320.0)).child(
+            TextInput::bound("demo-name", state.name_focus.clone(), state.name_input.clone())
+                .placeholder("Enter your name")
+                .focused(focused)))
+        .child(div().max_w(px(320.0)).child(
+            TextInput::new("demo-dis", state.name_focus.clone(), &TextInputState::with_text("Disabled input"))
+                .disabled(true)))
+        .child(div().text_xs().child("TextInput accepts and displays text via binding"))
+}
+
+fn search_sample(state: &GalleryState) -> impl IntoElement {
+    let log = state.overlay_event.clone();
+    div().flex().flex_col().gap_3()
+        .child(div().max_w(px(280.0)).child(
+            SearchField::bound("demo-search", state.search_focus.clone(), state.search_input.clone())
+                .placeholder("Filter items..."),
         ))
-        .child(section(cx, "Labels, badges, disclosure", label_body))
-        .child(section(
-            cx,
-            "Navigation rows",
-            div()
-                .flex()
-                .items_start()
-                .gap_4()
-                .flex_wrap()
-                .child(nav_rows_sample())
-                .child(tree_rows_sample())
-                .child(task_rows_sample(theme)),
-        ))
-        .child(section(cx, "Core list patterns", list_body))
-        .child(section(cx, "Tabs and empty state", tab_samples(state)))
+        .child(strip()
+            .child(FilterBar::new("demo-fb")
+                .child(FilterChip::new("chip-all", "All").icon(IconName::LayoutGrid).on_click(event_log(log.clone(), "Filter: All")))
+                .child(FilterChip::new("chip-run", "running").icon(IconName::Play).selected(true))
+                .child(FilterChip::new("chip-ro", "readonly").disabled(true))))
+        .child(div().text_xs().child("Click chips to filter — all interactive"))
 }
 
-fn label_badge_samples(
-    state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement + use<> {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .child(
-            strip()
-                .child(Label::new("Primary label").strong())
-                .child(Label::new("Secondary metadata").secondary())
-                .child(Label::new("Muted caption").muted().size(LabelSize::XSmall))
-                .child(Label::new("Accent state").tone(Tone::Accent).strong()),
-        )
-        .child(
-            strip()
-                .child(Badge::new("running").tone(Tone::Accent).soft())
-                .child(
-                    Badge::new("review")
-                        .tone(Tone::Info)
-                        .icon(IconName::FileDiff),
-                )
-                .child(CountBadge::new(12).tone(Tone::Secondary))
-                .child(CountBadge::new(128).max(99).tone(Tone::Warning)),
-        )
-        .child(
-            div()
-                .w(gpui::px(360.0))
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    Disclosure::bound(
-                        "core-disclosure",
-                        "Recent terminal sessions",
-                        state.core_disclosure_open.clone(),
-                    )
-                    .detail("host-owned state")
-                    .count(3),
-                )
-                .when(state.core_disclosure_open.get(cx), |this| {
-                    this.child(
-                        div()
-                            .ml_6()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(Label::new("PowerShell").secondary())
-                            .child(Label::new("Codex attached").tone(Tone::Accent))
-                            .child(Label::new("Diff review").muted()),
-                    )
-                }),
-        )
+// ── Number / Slider / Stepper ─────────────────────────────────────────────
+
+fn number_sample(state: &GalleryState) -> impl IntoElement {
+    div().flex().flex_col().gap_3()
+        .child(strip()
+            .child(NumberInput::bound("demo-num", state.ui_font_size.clone()).range(10, 24).suffix("px"))
+            .child(Slider::bound("demo-slider", state.contrast.clone(), 0.0, 100.0)))
+        .child(strip()
+            .child(Stepper::bound("demo-step", state.ui_font_size.clone()).range(10, 24)))
 }
 
-fn input_choice_samples(
-    state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
-    theme: Theme,
-) -> impl IntoElement {
-    div()
-        .flex()
-        .items_start()
-        .gap_4()
-        .flex_wrap()
-        .child(
-            div()
-                .w(gpui::px(320.0))
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(FieldLabel::new("SearchField"))
-                .child(FieldDescription::new(
-                    "Focusable input shell with host-owned text",
-                ))
-                .child(
-                    SearchField::bound(
-                        "core-search-field",
-                        state.search_focus.clone(),
-                        state.search_input.clone(),
-                    )
-                    .placeholder("Filter sessions"),
-                ),
-        )
-        .child(
-            div()
-                .w(gpui::px(260.0))
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(FieldLabel::new("Radio"))
-                .child(Radio::bound(
-                    "core-radio-system",
-                    state.radio_choice.clone(),
-                    "system",
-                    "System",
-                ))
-                .child(Radio::bound(
-                    "core-radio-light",
-                    state.radio_choice.clone(),
-                    "light",
-                    "Light",
-                ))
-                .child(Radio::bound(
-                    "core-radio-dark",
-                    state.radio_choice.clone(),
-                    "dark",
-                    "Dark",
-                )),
-        )
-        .child(
-            div()
-                .w(gpui::px(260.0))
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(FieldLabel::new("Color primitives"))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(ColorSwatch::new("core-swatch-accent", theme.accent))
-                        .child(ColorSwatch::new("core-swatch-warning", theme.warning))
-                        .child(ColorSwatch::new("core-swatch-danger", theme.danger)),
-                )
-                .child(ColorField::new("core-color-field", theme.accent, "#16A34A")),
-        )
-}
+// ── Segmented control ─────────────────────────────────────────────────────
 
-fn button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    strip()
-        .child(
-            Button::new("btn-primary", "Primary Action")
-                .primary()
-                .icon(IconName::Play)
-                .on_click({
-                    let event = state.overlay_event.clone();
-                    move |_event, _window, cx| {
-                        event.set(cx, "Primary button clicked".into());
-                    }
-                }),
-        )
-        .child(
-            Button::new("btn-secondary", "Refresh")
-                .icon(IconName::RefreshCw)
-                .on_click({
-                    let search_input = state.search_input.clone();
-                    move |_event, _window, cx| {
-                        search_input.update(cx, |s| {
-                            s.clear();
-                            true
-                        });
-                    }
-                }),
-        )
-        .child(
-            Button::new("btn-ghost", "Archive")
-                .ghost()
-                .icon(IconName::Archive)
-                .on_click({
-                    let auto_archive = state.auto_archive.clone();
-                    move |_event, _window, cx| {
-                        let current = auto_archive.get(cx);
-                        auto_archive.set(cx, !current);
-                    }
-                }),
-        )
-        .child(
-            Button::new("btn-disabled", "Disabled")
-                .variant(ButtonVariant::Secondary)
-                .disabled(true),
-        )
-}
-
-fn icon_button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
-    strip()
-        .child(
-            ToolbarGroup::new("core-toolbar-group")
-                .child(
-                    IconButton::new("ib-filter", IconName::ListFilter).on_click({
-                        let seg_tab = state.seg_tab.clone();
-                        move |_event, _window, cx| {
-                            seg_tab.set(cx, "files");
-                        }
-                    }),
-                )
-                .child(
-                    IconButton::new("ib-refresh", IconName::RefreshCw).on_click({
-                        let search_input = state.search_input.clone();
-                        move |_event, _window, cx| {
-                            search_input.update(cx, |s| {
-                                s.clear();
-                                true
-                            });
-                        }
-                    }),
-                )
-                .child(
-                    IconButton::new("ib-settings", IconName::Settings).on_click({
-                        let event = state.overlay_event.clone();
-                        move |_event, _window, cx| {
-                            event.set(cx, "Settings clicked".into());
-                        }
-                    }),
-                ),
-        )
-        .child(IconButton::new("ib-active", IconName::PanelLeft).active(true))
-}
-
-fn stepper_filter_samples(
-    state: &GalleryState,
-    contrast: f32,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement + use<> {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .child(
-            FilterBar::new("core-filter-bar")
-                .child(session_filter_menu(state, cx))
-                .child(
-                    FilterChip::new("filter-running", "Running")
-                        .icon(IconName::CircleDot)
-                        .selected(state.filter_choice.get(cx) == "running")
-                        .on_click({
-                            let filter_choice = state.filter_choice.clone();
-                            let filter_menu_open = state.filter_menu_open.clone();
-                            move |_event, _window, cx| {
-                                filter_choice.set(cx, "running");
-                                filter_menu_open.set(cx, "");
-                            }
-                        }),
-                )
-                .child(project_filter_menu(state, cx)),
-        )
-        .child(
-            Stepper::new("core-stepper", format!("{}%", contrast.round() as i32))
-                .on_decrement({
-                    let contrast = state.contrast.clone();
-                    move |_event, _window, cx| {
-                        let value = (contrast.get(cx) - 5.0).max(0.0);
-                        contrast.set(cx, value);
-                    }
-                })
-                .on_increment({
-                    let contrast = state.contrast.clone();
-                    move |_event, _window, cx| {
-                        let value = (contrast.get(cx) + 5.0).min(100.0);
-                        contrast.set(cx, value);
-                    }
-                })
-                .on_reset({
-                    let contrast = state.contrast.clone();
-                    move |_event, _window, cx| {
-                        contrast.set(cx, 60.0);
-                    }
-                }),
-        )
-}
-
-fn session_filter_menu(
-    state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement + use<> {
-    let open = state.filter_menu_open.get(cx) == "sessions";
-    let current_choice = state.filter_choice.get(cx);
-    DropdownMenu::new(
-        "core-session-filter-menu",
-        FilterChip::new(
-            "filter-all-sessions",
-            match current_choice {
-                "running" => "Running",
-                "failed" => "Failed",
-                _ => "All sessions",
-            },
-        )
-        .icon(IconName::ListFilter)
-        .count(4)
-        .selected(current_choice != "all")
-        .open(open)
-        .dropdown(true)
-        .on_click(toggle_filter_menu(state.filter_menu_open.clone(), "sessions", open)),
+fn segmented_sample(state: &GalleryState) -> impl IntoElement {
+    SegmentedControl::bound(
+        "demo-seg",
         vec![
-            filter_action(
-                state.filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "all",
-                "All sessions",
-                IconName::ListFilter,
-            ),
-            filter_action(
-                state.filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "running",
-                "Running",
-                IconName::CircleDot,
-            ),
-            filter_action(
-                state.filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "failed",
-                "Failed",
-                IconName::Archive,
-            ),
+            Segment::new("files", "Files"),
+            Segment::new("diff", "Diff"),
+            Segment::new("review", "Review"),
         ],
+        state.seg_tab.clone(),
     )
-    .open(open)
-    .min_width(190.0)
-    .on_dismiss(close_filter_menu(state.filter_menu_open.clone()))
 }
 
-fn project_filter_menu(
-    state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement + use<> {
-    let open = state.filter_menu_open.get(cx) == "projects";
-    let current_choice = state.project_filter_choice.get(cx);
-    DropdownMenu::new(
-        "core-project-filter-menu",
-        FilterChip::new(
-            "filter-projects",
-            match current_choice {
-                "relay" => "Relay",
-                "gallery" => "Gallery",
-                _ => "All projects",
-            },
-        )
-        .icon(IconName::Folder)
-        .selected(current_choice != "all-projects")
-        .open(open)
-        .dropdown(true)
-        .on_click(toggle_filter_menu(
-            state.filter_menu_open.clone(),
-            "projects",
-            open,
-        )),
-        vec![
-            project_filter_action(
-                state.project_filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "all-projects",
-                "All projects",
-            ),
-            project_filter_action(
-                state.project_filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "relay",
-                "Relay",
-            ),
-            project_filter_action(
-                state.project_filter_choice.clone(),
-                state.filter_menu_open.clone(),
-                "gallery",
-                "Gallery",
-            ),
-        ],
-    )
-    .open(open)
-    .min_width(180.0)
-    .on_dismiss(close_filter_menu(state.filter_menu_open.clone()))
-}
+// ── Disclosure ────────────────────────────────────────────────────────────
 
-fn toggle_filter_menu(
-    filter_menu_open: Binding<&'static str>,
-    menu: &'static str,
-    open: bool,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    move |_event, _window, cx| {
-        filter_menu_open.set(cx, if open { "" } else { menu });
-    }
-}
-
-fn close_filter_menu(
-    filter_menu_open: Binding<&'static str>,
-) -> impl Fn(&mut gpui::Window, &mut gpui::App) + 'static {
-    move |_window, cx| {
-        filter_menu_open.set(cx, "");
-    }
-}
-
-fn filter_action(
-    filter_choice: Binding<&'static str>,
-    filter_menu_open: Binding<&'static str>,
-    key: &'static str,
-    label: &'static str,
-    icon: IconName,
-) -> MenuItem {
-    MenuItem::new(label).icon(icon).on_click(move |_event, _window, cx| {
-        filter_choice.set(cx, key);
-        filter_menu_open.set(cx, "");
-    })
-}
-
-fn project_filter_action(
-    project_filter_choice: Binding<&'static str>,
-    filter_menu_open: Binding<&'static str>,
-    key: &'static str,
-    label: &'static str,
-) -> MenuItem {
-    MenuItem::new(label)
-        .icon(IconName::Folder)
-        .on_click(move |_event, _window, cx| {
-            project_filter_choice.set(cx, key);
-            filter_menu_open.set(cx, "");
+fn disclosure_sample(state: &GalleryState, open: bool) -> impl IntoElement {
+    div().flex().flex_col().gap_2()
+        .child(Disclosure::bound("demo-disc", "Advanced settings", state.core_disclosure_open.clone())
+            .detail("Expand to configure"))
+        .when(open, |this| {
+            this.child(div().pl_4().child(
+                Checkbox::bound("demo-disc-opt", state.auto_archive.clone()).label("Auto archive")))
         })
 }
 
-fn nav_rows_sample() -> impl IntoElement {
-    div()
-        .w(gpui::px(280.0))
-        .flex()
-        .flex_col()
-        .gap_1()
-        .child(
-            NavRow::new("nav-tasks", IconName::ListChecks, "Tasks")
-                .count(3)
-                .selected(true),
-        )
-        .child(NavRow::new(
-            "nav-terminals",
-            IconName::Terminal,
-            "Terminals",
-        ))
-        .child(NavRow::new("nav-search", IconName::Search, "Search"))
-}
+// ── List rows ─────────────────────────────────────────────────────────────
 
-fn tree_rows_sample() -> impl IntoElement {
-    div()
-        .w(gpui::px(300.0))
-        .flex()
-        .flex_col()
-        .child(
-            TreeRow::new("tr-1", IconName::Folder, "crates")
-                .expandable(true)
-                .depth(0),
-        )
-        .child(
-            TreeRow::new("tr-2", IconName::Folder, "relay_uikit::core")
-                .expandable(false)
-                .depth(1),
-        )
-        .child(
-            TreeRow::new("tr-3", IconName::FileText, "theme.rs")
-                .depth(2)
-                .selected(true),
-        )
-        .child(TreeRow::new("tr-4", IconName::FileText, "icon.rs").depth(2))
-}
-
-fn task_rows_sample(theme: Theme) -> impl IntoElement {
-    div()
-        .w(gpui::px(320.0))
-        .flex()
-        .flex_col()
-        .gap_1()
-        .child(
-            gpui::div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded(gpui::px(relay_uikit::radius::MD))
-                .bg(theme.panel)
-                .child(relay_uikit::StatusDot::new(Tone::Accent))
-                .child(
-                    div()
-                        .flex_1()
-                        .truncate()
-                        .text_sm()
-                        .text_color(theme.text)
-                        .child("Wire diff pane"),
-                )
-                .child(
-                    div()
-                        .text_size(gpui::px(11.0))
-                        .text_color(Tone::Accent.fg(&theme))
-                        .child("RUNNING"),
-                ),
-        )
-        .child(
-            gpui::div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .rounded(gpui::px(relay_uikit::radius::MD))
-                .bg(theme.panel)
-                .child(relay_uikit::StatusDot::new(Tone::Warning))
-                .child(
-                    div()
-                        .flex_1()
-                        .truncate()
-                        .text_sm()
-                        .text_color(theme.text)
-                        .child("Refactor terminal session"),
-                )
-                .child(
-                    div()
-                        .text_size(gpui::px(11.0))
-                        .text_color(Tone::Warning.fg(&theme))
-                        .child("WAITING"),
-                ),
-        )
-}
-
-fn list_core_samples(
-    state: &GalleryState,
-    theme: Theme,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement + use<> {
-    let selected = state.seg_tab.get(cx);
-    let tree_nodes = state.core_tree_nodes.get(cx);
-    let select_tree = {
-        let viewer_tab = state.seg_tab.clone();
-        move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
-            viewer_tab.set(cx, key);
-        }
-    };
-    let toggle_tree = {
-        let core_tree_src_open = state.core_tree_src_open.clone();
-        let core_tree_components_open = state.core_tree_components_open.clone();
-        let core_tree_list_open = state.core_tree_list_open.clone();
-        move |key: &'static str, _window: &mut gpui::Window, cx: &mut gpui::App| {
-            match key {
-                "tree:src" => {
-                    let current = core_tree_src_open.get(cx);
-                    core_tree_src_open.set(cx, !current);
-                }
-                "tree:components" => {
-                    let current = core_tree_components_open.get(cx);
-                    core_tree_components_open.set(cx, !current);
-                }
-                "tree:list" => {
-                    let current = core_tree_list_open.get(cx);
-                    core_tree_list_open.set(cx, !current);
-                }
-                _ => {}
-            }
-        }
-    };
-
-    div()
-        .flex()
-        .items_start()
-        .gap_4()
-        .flex_wrap()
-        .child(
-            div().w(gpui::px(320.0)).child(
-                TreeView::new("core-tree-view", tree_nodes)
-                    .on_select(select_tree)
-                    .on_toggle(toggle_tree),
-            ),
-        )
-        .child(div().w(gpui::px(340.0)).child(SectionedList::new(
-            "core-sectioned-list",
-            vec![
-                SectionedListGroup::new("Recent")
-                    .count(2)
-                    .child(
-                        ListItem::new("recent-terminal")
-                            .height(gpui::px(48.0))
-                            .selected(selected == "recent:terminal")
-                            .start_slot(Icon::new(IconName::Terminal))
-                            .on_click(select_core_item(
-                                state.seg_tab.clone(),
-                                "recent:terminal",
-                            ))
-                            .child(list_item_text(
-                                "Terminal surface",
-                                "PTY host shell preview",
-                                theme,
-                            )),
-                    )
-                    .child(
-                        ListItem::new("recent-diff")
-                            .height(gpui::px(48.0))
-                            .selected(selected == "recent:diff")
-                            .start_slot(Icon::new(IconName::FileDiff))
-                            .on_click(select_core_item(state.seg_tab.clone(), "recent:diff"))
-                            .child(list_item_text("Diff viewer", "Unified file delta", theme)),
-                    ),
-                SectionedListGroup::new("Pinned").child(
-                    ListItem::new("pinned-command")
-                        .height(gpui::px(48.0))
-                        .start_slot(Icon::new(IconName::Zap))
-                        .selected(selected == "pinned:command")
-                        .on_click(select_core_item(
-                            state.seg_tab.clone(),
-                            "pinned:command",
-                        ))
-                        .child(list_item_text(
-                            "Command palette",
-                            "Keyboard-first launcher",
-                            theme,
-                        )),
-                ),
-            ],
-        )))
-}
-
-fn select_core_item(
-    viewer_tab: Binding<&'static str>,
-    key: &'static str,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static {
-    move |_event, _window, cx| {
-        viewer_tab.set(cx, key);
-    }
-}
-
-fn list_item_text(title: &'static str, detail: &'static str, theme: Theme) -> impl IntoElement {
-    div()
-        .min_w_0()
-        .flex_1()
-        .flex()
-        .flex_col()
-        .child(
-            div()
-                .truncate()
-                .text_sm()
-                .text_color(theme.text)
-                .child(title),
-        )
-        .child(
-            div()
-                .truncate()
-                .text_size(gpui::px(11.0))
-                .text_color(theme.text_muted)
-                .child(detail),
-        )
-}
-
-fn tab_samples(state: &GalleryState) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .child(Tabs::bound(
-            "demo-tabs",
-            vec![
-                Tab::new("files", "Files").icon(IconName::FileText),
-                Tab::new("diff", "Diff").icon(IconName::FileDiff).count(12),
-                Tab::new("review", "Review")
-                    .icon(IconName::MessageSquareText)
-                    .count(3),
-            ],
-            state.seg_tab.clone(),
-        ))
-        .child(
-            strip().child(SegmentedControl::bound(
-                "seg-demo",
-                vec![
-                    Segment::new("files", "Files"),
-                    Segment::new("diff", "Diff"),
-                    Segment::new("review", "Review"),
-                ],
-                state.seg_tab.clone(),
-            )),
-        )
+fn list_sample(theme: Theme) -> impl IntoElement {
+    div().flex().flex_col().gap_1()
+        .child(NavRow::new("demo-nav", IconName::Terminal, "Active session").count(3).selected(true))
+        .child(NavRow::new("demo-nav2", IconName::PanelLeft, "Files"))
         .child(Divider::horizontal())
-        .child(
-            EmptyState::new("No tasks yet", "Create a task to launch an agent.")
-                .icon(IconName::ListChecks),
-        )
+        .child(TreeRow::new("demo-tree", IconName::Folder, "src/components").expandable(true))
+        .child(TreeRow::new("demo-tree-file", IconName::FileText, "button.rs").depth(1).selected(true))
 }
