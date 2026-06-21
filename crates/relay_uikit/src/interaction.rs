@@ -11,9 +11,10 @@
 //! handler once per render).  Use `Rc` when a handler must be cloned into multiple
 //! sub-elements (e.g. a split-pane handle that renders two drag zones).
 
-use std::rc::Rc;
+use std::{hash::Hash, rc::Rc};
 
 use gpui::{App, ClickEvent, Hsla, KeyDownEvent, Window};
+use relay::Selector;
 
 // ---------------------------------------------------------------------------
 // Mouse click handlers
@@ -51,6 +52,40 @@ pub type SharedCancelHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 pub type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 pub type SharedSelectHandler = Rc<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
 
+/// Type-erased adapter from Relay's keyed [`Selector`] to boolean component
+/// selection state.
+#[derive(Clone)]
+pub struct SelectionBinding {
+    is_selected: Rc<dyn Fn(&mut App) -> bool + 'static>,
+    select: Rc<dyn Fn(&mut App) + 'static>,
+}
+
+impl SelectionBinding {
+    /// Bind one component instance to `key` in a Relay selector.
+    pub fn selector<K>(selector: Selector<K>, key: K) -> Self
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        let read_selector = selector.clone();
+        let read_key = key.clone();
+
+        Self {
+            is_selected: Rc::new(move |cx| read_selector.is_selected(cx, read_key.clone())),
+            select: Rc::new(move |cx| selector.select(cx, key.clone())),
+        }
+    }
+
+    /// Return whether the bound key is selected.
+    pub fn is_selected(&self, cx: &mut App) -> bool {
+        (self.is_selected)(cx)
+    }
+
+    /// Select the bound key.
+    pub fn select(&self, cx: &mut App) {
+        (self.select)(cx);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Generic action / change handlers
 // ---------------------------------------------------------------------------
@@ -84,3 +119,34 @@ pub type KeyCaptureHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) ->
 /// key and the chosen [`Hsla`] value.
 pub type ColorSelectHandler = Box<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
 pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{ReactiveAppExt, init};
+
+    use super::SelectionBinding;
+
+    #[test]
+    fn selection_binding_selects_selector_key() {
+        let mut app = TestApp::new();
+        let (first, second) = app.update(|cx| {
+            init(cx);
+            let selector = cx.selector(Some("first"));
+            (
+                SelectionBinding::selector(selector.clone(), "first"),
+                SelectionBinding::selector(selector, "second"),
+            )
+        });
+
+        app.update(|cx| {
+            assert!(first.is_selected(cx));
+            assert!(!second.is_selected(cx));
+
+            second.select(cx);
+
+            assert!(!first.is_selected(cx));
+            assert!(second.is_selected(cx));
+        });
+    }
+}

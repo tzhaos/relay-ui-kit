@@ -1,18 +1,19 @@
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, Selector};
 
 use crate::{
+    display::StatusDot,
     icon::{Icon, IconName, IconSize},
-    interaction::ClickHandler,
+    interaction::{ClickHandler, SelectionBinding},
     theme::{ActiveTheme, BORDER_WIDTH, radius},
     tone::Tone,
 };
-
-use crate::display::StatusDot;
 
 /// One row in the terminal/session history panel.
 #[derive(IntoElement)]
@@ -23,6 +24,7 @@ pub struct SessionRow {
     status: Tone,
     active: bool,
     binding: Option<Binding<bool>>,
+    selection: Option<SelectionBinding>,
     on_click: Option<ClickHandler>,
 }
 
@@ -39,6 +41,7 @@ impl SessionRow {
             status: Tone::Muted,
             active: false,
             binding: None,
+            selection: None,
             on_click: None,
         }
     }
@@ -56,6 +59,7 @@ impl SessionRow {
             status: Tone::Muted,
             active: false,
             binding: Some(binding),
+            selection: None,
             on_click: None,
         }
     }
@@ -67,6 +71,14 @@ impl SessionRow {
 
     pub fn active(mut self, active: bool) -> Self {
         self.active = active;
+        self
+    }
+
+    pub fn active_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        self.selection = Some(SelectionBinding::selector(selector, key));
         self
     }
 
@@ -83,9 +95,14 @@ impl RenderOnce for SessionRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let active = binding.as_ref().map_or(self.active, |b| b.get(cx));
+        let selection = self.selection;
+        let active = if let Some(selection) = &selection {
+            selection.is_selected(cx)
+        } else {
+            binding.as_ref().map_or(self.active, |b| b.get(cx))
+        };
         let handler = self.on_click;
-        let clickable = binding.is_some() || handler.is_some();
+        let clickable = selection.is_some() || binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -144,10 +161,12 @@ impl RenderOnce for SessionRow {
                             .child(self.subtitle),
                     ),
             )
-            .child(crate::StatusDot::new(self.status))
+            .child(StatusDot::new(self.status))
             .when(clickable, |this| {
                 this.on_click(move |event, window, cx| {
-                    if let Some(binding) = &binding {
+                    if let Some(selection) = &selection {
+                        selection.select(cx);
+                    } else if let Some(binding) = &binding {
                         binding.update(cx, |active| {
                             *active = !*active;
                             true

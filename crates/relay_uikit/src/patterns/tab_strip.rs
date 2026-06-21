@@ -1,13 +1,15 @@
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, Selector};
 
 use crate::{
     display::StatusDot,
-    interaction::ClickHandler,
+    interaction::{ClickHandler, SelectionBinding},
     theme::{ActiveTheme, radius},
     tone::Tone,
 };
@@ -20,6 +22,7 @@ pub struct TabStrip {
     active: bool,
     status: Tone,
     binding: Option<Binding<bool>>,
+    selection: Option<SelectionBinding>,
     on_click: Option<ClickHandler>,
 }
 
@@ -31,23 +34,37 @@ impl TabStrip {
             active: false,
             status: Tone::Muted,
             binding: None,
+            selection: None,
             on_click: None,
         }
     }
 
-    pub fn bound(id: impl Into<ElementId>, label: impl Into<String>, binding: Binding<bool>) -> Self {
+    pub fn bound(
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        binding: Binding<bool>,
+    ) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
             active: false,
             status: Tone::Muted,
             binding: Some(binding),
+            selection: None,
             on_click: None,
         }
     }
 
     pub fn active(mut self, active: bool) -> Self {
         self.active = active;
+        self
+    }
+
+    pub fn active_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        self.selection = Some(SelectionBinding::selector(selector, key));
         self
     }
 
@@ -69,9 +86,14 @@ impl RenderOnce for TabStrip {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let active = binding.as_ref().map_or(self.active, |b| b.get(cx));
+        let selection = self.selection;
+        let active = if let Some(selection) = &selection {
+            selection.is_selected(cx)
+        } else {
+            binding.as_ref().map_or(self.active, |b| b.get(cx))
+        };
         let handler = self.on_click;
-        let clickable = binding.is_some() || handler.is_some();
+        let clickable = selection.is_some() || binding.is_some() || handler.is_some();
 
         div()
             .id(self.id)
@@ -88,11 +110,7 @@ impl RenderOnce for TabStrip {
             } else {
                 theme.border
             })
-            .bg(if active {
-                theme.panel
-            } else {
-                theme.panel_alt
-            })
+            .bg(if active { theme.panel } else { theme.panel_alt })
             .text_color(if active {
                 theme.text
             } else {
@@ -118,7 +136,9 @@ impl RenderOnce for TabStrip {
             )
             .when(clickable, |this| {
                 this.on_click(move |event, window, cx| {
-                    if let Some(binding) = &binding {
+                    if let Some(selection) = &selection {
+                        selection.select(cx);
+                    } else if let Some(binding) = &binding {
                         binding.update(cx, |active| {
                             *active = !*active;
                             true

@@ -65,8 +65,7 @@ pub(super) fn render(
 
 // ── Composite pattern samples ─────────────────────────────────────────────
 
-fn row_patterns(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    let active = state.seg_tab.get(cx) == "files";
+fn row_patterns(state: &GalleryState, _cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
     div().flex().flex_col().gap_2()
         .child(
             TaskRow::new("pat-task", TaskRowData {
@@ -76,27 +75,27 @@ fn row_patterns(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> imp
                 branch: Some("relay/patterns".into()),
                 changed: 5,
                 review: 2,
-            }).selected(true)
+            }).selected_by(state.pattern_row_selection.clone(), "task")
         )
         .child(
             SessionRow::new("pat-session", "codex", "relay/patterns")
                 .status(Tone::Accent)
-                .active(active)
+                .active_by(state.pattern_row_selection.clone(), "session")
         )
 }
 
-fn tab_patterns(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    let active = state.seg_tab.get(cx);
+fn tab_patterns(state: &GalleryState, _cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
     div().flex().flex_col().gap_2()
         .child(
             div().flex().gap_1()
                 .child(TabStrip::new("pat-tab1", "Terminal")
-                    .active(active == "files")
+                    .active_by(state.pattern_tab_selection.clone(), "terminal")
                     .status(Tone::Accent))
                 .child(TabStrip::new("pat-tab2", "Preview")
-                    .active(active == "diff")
+                    .active_by(state.pattern_tab_selection.clone(), "preview")
                     .status(Tone::Muted))
-                .child(TabStrip::new("pat-tab3", "Review").active(false))
+                .child(TabStrip::new("pat-tab3", "Review")
+                    .active_by(state.pattern_tab_selection.clone(), "review"))
         )
 }
 

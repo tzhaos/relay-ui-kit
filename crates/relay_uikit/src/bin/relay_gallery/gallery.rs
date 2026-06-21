@@ -10,7 +10,7 @@ use gpui::{
     Render, Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Selector, Signal, SignalVecExt,
     view::StateScope,
 };
 use relay_uikit::patterns::ScrollSurface;
@@ -76,6 +76,9 @@ pub struct GalleryState {
     pub command_context_open: Binding<bool>,
     pub confirm_dialog_open: Binding<bool>,
     pub pattern_dialog_open: Binding<bool>,
+    pub pattern_row_selection: Selector<&'static str>,
+    pub pattern_tab_selection: Selector<&'static str>,
+    stress_session_list: Entity<stress_scene::StressSessionList>,
     pub feedback_toasts: Signal<Vec<FeedbackToast>>,
     pub feedback_toast_serial: u64,
     pub accent_choice: Signal<&'static str>,
@@ -152,6 +155,9 @@ impl GalleryState {
             command_context_open: cx.binding(false),
             confirm_dialog_open: cx.binding(false),
             pattern_dialog_open: cx.binding(false),
+            pattern_row_selection: cx.selector(Some("task")),
+            pattern_tab_selection: cx.selector(Some("terminal")),
+            stress_session_list: cx.new(stress_scene::StressSessionList::new),
             feedback_toasts: cx.signal(Vec::new()),
             feedback_toast_serial: 0,
             accent_choice: cx.signal("green"),

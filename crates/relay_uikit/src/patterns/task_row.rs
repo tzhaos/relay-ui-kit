@@ -1,12 +1,14 @@
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
     div, prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, Selector};
 
 use crate::{
     StatusDot,
-    interaction::ClickHandler,
+    interaction::{ClickHandler, SelectionBinding},
     list::{ListItem, ListItemSpacing},
     theme::{ActiveTheme, space},
     tone::Tone,
@@ -29,6 +31,7 @@ pub struct TaskRow {
     data: TaskRowData,
     selected: bool,
     binding: Option<Binding<bool>>,
+    selection: Option<SelectionBinding>,
     on_click: Option<ClickHandler>,
 }
 
@@ -39,6 +42,7 @@ impl TaskRow {
             data,
             selected: false,
             binding: None,
+            selection: None,
             on_click: None,
         }
     }
@@ -49,8 +53,17 @@ impl TaskRow {
             data,
             selected: false,
             binding: Some(binding),
+            selection: None,
             on_click: None,
         }
+    }
+
+    pub fn selected_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        self.selection = Some(SelectionBinding::selector(selector, key));
+        self
     }
 
     pub fn selected(mut self, selected: bool) -> Self {
@@ -73,7 +86,12 @@ impl RenderOnce for TaskRow {
         let data = self.data;
         let meta = task_meta(&data);
         let binding = self.binding;
-        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let selection = self.selection;
+        let selected = if let Some(selection) = &selection {
+            selection.is_selected(cx)
+        } else {
+            binding.as_ref().map_or(self.selected, |b| b.get(cx))
+        };
         let handler = self.on_click;
 
         let mut row = ListItem::new(self.id)
@@ -125,10 +143,12 @@ impl RenderOnce for TaskRow {
                     }),
             );
 
-        let has_click = binding.is_some() || handler.is_some();
+        let has_click = selection.is_some() || binding.is_some() || handler.is_some();
         if has_click {
             row = row.on_click(move |event, window, cx| {
-                if let Some(binding) = &binding {
+                if let Some(selection) = &selection {
+                    selection.select(cx);
+                } else if let Some(binding) = &binding {
                     binding.update(cx, |selected| {
                         *selected = !*selected;
                         true
