@@ -136,7 +136,7 @@ fn child_render(cx: &App) {
 
 ## 异步资源
 
-`Resource::load` 会重置为 `Pending` 并开始加载。`Resource::reload` 会把上一份 ready 值保留为 `Reloading(value)`，让 view 可以继续展示最新可用数据，同时表达刷新进度。UI 需要“最后一份可用值”语义时，用 `state.latest()` 或 `resource.latest(cx)`。当 view 只需要处理 pending、latest-value 和 error 三类分支时，用 `fold_latest` 避免重复匹配 `Ready` / `Reloading`。
+`Resource::load` 会重置为 `Pending` 并开始加载。`Resource::reload` 会把上一份 ready 值保留为 `Reloading(value)`，让 view 可以继续展示最新可用数据，同时表达刷新进度。UI 需要“最后一份可用值”语义时，用 `state.latest()` 或 `resource.latest(cx)`。状态读取可以用 `is_loading(cx)`、`has_latest(cx)`、`read_error(cx, ...)` 和 `error_value(cx)`，避免为了 loading/error 这类状态匹配整份 state。当 view 只需要处理 pending、latest-value 和 error 三类分支时，用 `fold_latest` 避免重复匹配 `Ready` / `Reloading`。
 
 ```rust
 resource.reload(cx, |cx| async move {
@@ -146,6 +146,7 @@ resource.reload(cx, |cx| async move {
 
 let state = resource.get(cx);
 let latest = state.latest();
+let loading = resource.is_loading(cx);
 
 let label = resource.fold_latest(
     cx,
@@ -155,6 +156,8 @@ let label = resource.fold_latest(
     },
     |error| format!("Failed: {error}"),
 );
+
+let error_label = resource.read_error(cx, |error| error.map(|error| error.to_string()));
 ```
 
 ## Entity 粒度 UI

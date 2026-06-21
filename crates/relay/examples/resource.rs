@@ -17,7 +17,7 @@ use gpui::{
     rgb, size,
 };
 use gpui_platform::application;
-use relay::{ReactiveContextExt, Resource, ResourceState, init};
+use relay::{ReactiveContextExt, Resource, init};
 
 struct ResourceDemo {
     data: Resource<String, String>,
@@ -56,19 +56,26 @@ impl ResourceDemo {
 impl Render for ResourceDemo {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         cx.tracked(|cx| {
-            // Clone the state out so we own the strings (avoids lifetime issues
-            // with borrowing into 'static closures below).
-            let state = self.data.get(cx);
-            let latest = self.data.latest(cx);
-            let (status_text, status_color) = match &state {
-                ResourceState::Pending => ("Loading...".to_string(), rgb(0xfbbf24)),
-                ResourceState::Reloading(value) => {
-                    (format!("{value} (refreshing...)"), rgb(0x60a5fa))
-                }
-                ResourceState::Ready(v) => (v.clone(), rgb(0x4ade80)),
-                ResourceState::Error(e) => (e.clone(), rgb(0xef4444)),
-            };
-            let latest_text = latest.unwrap_or_else(|| "No latest value".to_string());
+            let loading = self.data.is_loading(cx);
+            let (status_text, status_color, latest_text) = self.data.fold_latest(
+                cx,
+                || {
+                    (
+                        "Loading...".to_string(),
+                        rgb(0xfbbf24),
+                        "No latest value".to_string(),
+                    )
+                },
+                |value, reloading| {
+                    let (status, color) = if reloading {
+                        (format!("{value} (refreshing...)"), rgb(0x60a5fa))
+                    } else {
+                        (value.clone(), rgb(0x4ade80))
+                    };
+                    (status, color, value.clone())
+                },
+                |error| (error.clone(), rgb(0xef4444), "No latest value".to_string()),
+            );
 
             div()
                 .flex()
@@ -99,7 +106,11 @@ impl Render for ResourceDemo {
                                 .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
-                                .child("Load (2s delay)")
+                                .child(if loading {
+                                    "Loading..."
+                                } else {
+                                    "Load (2s delay)"
+                                })
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.load_success(cx);
                                 })),

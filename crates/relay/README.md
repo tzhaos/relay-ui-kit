@@ -134,7 +134,7 @@ fn child_render(cx: &App) {
 
 ## Async resources
 
-`Resource::load` starts a reset load and enters `Pending`. `Resource::reload` keeps a previous ready value available as `Reloading(value)`, so views can keep rendering the latest data while showing refresh progress. Use `state.latest()` or `resource.latest(cx)` when the UI wants "last usable value" semantics. Use `fold_latest` when a view wants to handle pending, latest-value, and error branches without repeating the `Ready` / `Reloading` match.
+`Resource::load` starts a reset load and enters `Pending`. `Resource::reload` keeps a previous ready value available as `Reloading(value)`, so views can keep rendering the latest data while showing refresh progress. Use `state.latest()` or `resource.latest(cx)` when the UI wants "last usable value" semantics. Use `is_loading(cx)`, `has_latest(cx)`, `read_error(cx, ...)`, and `error_value(cx)` for signal-backed status reads without matching the whole state. Use `fold_latest` when a view wants to handle pending, latest-value, and error branches without repeating the `Ready` / `Reloading` match.
 
 ```rust
 resource.reload(cx, |cx| async move {
@@ -144,6 +144,7 @@ resource.reload(cx, |cx| async move {
 
 let state = resource.get(cx);
 let latest = state.latest();
+let loading = resource.is_loading(cx);
 
 let label = resource.fold_latest(
     cx,
@@ -153,6 +154,8 @@ let label = resource.fold_latest(
     },
     |error| format!("Failed: {error}"),
 );
+
+let error_label = resource.read_error(cx, |error| error.map(|error| error.to_string()));
 ```
 
 ## Entity-grained UI

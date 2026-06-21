@@ -38,6 +38,11 @@ impl<T, E> ResourceState<T, E> {
         matches!(self, Self::Ready(_))
     }
 
+    /// Return whether the resource has a latest usable value.
+    pub fn has_latest(&self) -> bool {
+        matches!(self, Self::Reloading(_) | Self::Ready(_))
+    }
+
     /// Return whether the resource has an error.
     pub fn is_error(&self) -> bool {
         matches!(self, Self::Error(_))
@@ -130,6 +135,41 @@ impl<T, E> Resource<T, E> {
     /// Read the latest available value with dependency tracking.
     pub fn read_latest<R>(&self, cx: &App, f: impl FnOnce(Option<&T>) -> R) -> R {
         self.read(cx, |state| f(state.latest()))
+    }
+
+    /// Read the current error with dependency tracking.
+    pub fn read_error<R>(&self, cx: &App, f: impl FnOnce(Option<&E>) -> R) -> R {
+        self.read(cx, |state| f(state.error()))
+    }
+
+    /// Return whether the resource has no current value and is loading.
+    pub fn is_pending(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_pending)
+    }
+
+    /// Return whether the resource is loading while retaining a previous value.
+    pub fn is_reloading(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_reloading)
+    }
+
+    /// Return whether the resource is currently loading.
+    pub fn is_loading(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_loading)
+    }
+
+    /// Return whether the resource has a ready value.
+    pub fn is_ready(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_ready)
+    }
+
+    /// Return whether the resource has a latest usable value.
+    pub fn has_latest(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::has_latest)
+    }
+
+    /// Return whether the resource has an error.
+    pub fn is_error(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_error)
     }
 
     /// Read the state and fold it into pending, latest-value, and error branches.
@@ -338,6 +378,16 @@ where
     }
 }
 
+impl<T, E> Resource<T, E>
+where
+    E: Clone,
+{
+    /// Clone the current error with dependency tracking.
+    pub fn error_value(&self, cx: &App) -> Option<E> {
+        self.read_error(cx, |error| error.cloned())
+    }
+}
+
 impl<T, E> Clone for Resource<T, E> {
     fn clone(&self) -> Self {
         Self {
@@ -401,6 +451,18 @@ mod tests {
     }
 
     #[test]
+    fn resource_state_has_latest_for_ready_and_reloading() {
+        let ready = ResourceState::<_, &'static str>::Ready(7);
+        assert!(ready.has_latest());
+
+        let reloading = ResourceState::<_, &'static str>::Reloading(8);
+        assert!(reloading.has_latest());
+
+        let pending = ResourceState::<i32, &'static str>::Pending;
+        assert!(!pending.has_latest());
+    }
+
+    #[test]
     fn resource_state_fold_latest_collapses_ready_and_reloading() {
         let ready = ResourceState::<_, &'static str>::Ready(7);
         let reloading = ResourceState::<_, &'static str>::Reloading(8);
@@ -438,6 +500,59 @@ mod tests {
         });
 
         assert_eq!(result, 7);
+    }
+
+    #[test]
+    fn resource_status_queries_read_current_state() {
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 7)
+        });
+
+        app.read(|cx| {
+            assert!(resource.is_ready(cx));
+            assert!(resource.has_latest(cx));
+            assert!(!resource.is_loading(cx));
+        });
+
+        app.update(|cx| {
+            resource.set_pending(cx);
+        });
+
+        app.read(|cx| {
+            assert!(resource.is_pending(cx));
+            assert!(resource.is_loading(cx));
+            assert!(!resource.has_latest(cx));
+        });
+    }
+
+    #[test]
+    fn resource_read_error_borrows_non_clone_error() {
+        struct NonCloneError(&'static str);
+
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            init(cx);
+            Resource::<i32, NonCloneError>::error(cx, NonCloneError("failed"))
+        });
+
+        let label = app.read(|cx| resource.read_error(cx, |error| error.map(|error| error.0)));
+
+        assert_eq!(label, Some("failed"));
+    }
+
+    #[test]
+    fn resource_error_value_clones_current_error() {
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            init(cx);
+            Resource::<i32, String>::error(cx, "failed".to_string())
+        });
+
+        let error = app.read(|cx| resource.error_value(cx));
+
+        assert_eq!(error, Some("failed".to_string()));
     }
 
     #[gpui::test]

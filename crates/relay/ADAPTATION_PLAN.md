@@ -12,9 +12,9 @@ window lifecycles as the source of truth.
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.
-- `Resource::load`, `Resource::reload`, `latest`, and `fold_latest` cover
-  async pending, reloading, ready, and error states without baking in a UI
-  boundary.
+- `Resource::load`, `Resource::reload`, status query helpers, `latest`,
+  `read_error`, and `fold_latest` cover async pending, reloading, ready, and
+  error states without baking in a UI boundary.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
 - `Selector<K>` gives selection-heavy lists per-key tracking, can reconcile
   selection against the current item keys, and owns ordered next/previous plus
@@ -29,6 +29,9 @@ window lifecycles as the source of truth.
 - The gallery Patterns output surface consumes `Resource::reload` / `latest`
   semantics through `fold_latest`, keeping the previous output visible while an
   async refresh is in flight.
+- Resource status reads (`is_loading`, `has_latest`, `read_error`,
+  `error_value`) are available at the runtime layer, so app surfaces can expose
+  loading/error state without cloning or matching the whole resource state.
 - The gallery Patterns item picker now has an app-like keyed host that combines
   `KeyedSubViews` row retention with `Selector<u64>` mutual selection, with
   tests covering row entity reuse across reorder and selected-row updates. The
@@ -97,9 +100,10 @@ runtime adapters only where they simplify real app state:
 2. Add UIKit command or picker adapters only if repeated host-level call sites
    prove the component API needs them. The Relay primitive should remain
    `Selector<K>` plus host-owned key order.
-3. Add a shared async UI boundary only after at least two app surfaces repeat
-   the same `fold_latest` render shape. Until then, `Resource` should remain a
-   UI-agnostic state primitive.
+3. Add a shared async UI boundary only after at least two real app surfaces
+   repeat the same `fold_latest` render shape. Current evidence is still one
+   gallery output surface plus examples, so `Resource` remains a UI-agnostic
+   state primitive.
 4. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 
