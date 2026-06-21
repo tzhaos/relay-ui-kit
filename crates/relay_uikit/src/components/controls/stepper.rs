@@ -222,7 +222,7 @@ fn stepper_button(
         }
     });
     let interactive = !disabled && !at_limit && (binding.is_some() || handler.is_some());
-    let opacity = if at_limit && !disabled { DISABLED_OPACITY } else { 1.0 };
+    let is_dimmed = disabled || at_limit;
     div()
         .id(id)
         .w(px(30.0))
@@ -230,7 +230,9 @@ fn stepper_button(
         .flex()
         .items_center()
         .justify_center()
-        .opacity(opacity)
+        .when(is_dimmed, |this| {
+            this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed)
+        })
         .when(interactive, |this| {
             this.cursor_pointer()
                 .hover(move |style| style.bg(hover_bg))
