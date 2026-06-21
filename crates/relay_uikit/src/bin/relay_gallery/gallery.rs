@@ -10,7 +10,7 @@ use gpui::{
     Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    Binding, Form, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
 };
 use relay_uikit::patterns::{ScrollSurface, SplitPaneState};
 use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
@@ -103,6 +103,9 @@ pub struct GalleryState {
     /// Derived tree node list — recomputed only when the expand/selection
     /// signals change, instead of rebuilding on every render.
     pub core_tree_nodes: Memo<Vec<TreeNode>>,
+    /// Whether any settings field differs from its initial value.
+    /// Derived declaratively via `Form::build_is_dirty`.
+    pub settings_dirty: Memo<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +142,24 @@ impl GalleryState {
             })
         };
 
+        // Create the settings bindings first so the Form can register them
+        // and produce a dirty-check memo before the struct is assembled.
+        let notifications: Binding<bool> = cx.binding(true);
+        let auto_archive: Binding<bool> = cx.binding(false);
+        let ui_font_size: Binding<i32> = cx.binding(14);
+        let theme_choice: Binding<&'static str> = cx.binding("system");
+        let settings_dirty = {
+            let mut form = Form::new();
+            form.field("notifications", notifications.clone(), cx);
+            form.field("auto_archive", auto_archive.clone(), cx);
+            form.field("ui_font_size", ui_font_size.clone(), cx);
+            form.field("theme_choice", theme_choice.clone(), cx);
+            let dirty = form.build_is_dirty(cx);
+            // Leak the form so the dirty memo's effect stays alive.
+            std::mem::forget(form);
+            dirty
+        };
+
         let state = Self {
             name_input: TextInputState::with_text("relay-agent"),
             name_focus: cx.focus_handle(),
@@ -148,9 +169,9 @@ impl GalleryState {
             composer_focus: cx.focus_handle(),
             ui_font_size_input: cx.binding(TextInputState::with_text("14")),
             ui_font_size_focus: cx.focus_handle(),
-            notifications: cx.binding(true),
-            auto_archive: cx.binding(false),
-            theme_choice: cx.binding("system"),
+            notifications,
+            auto_archive,
+            theme_choice,
             filter_choice: cx.binding("all"),
             project_filter_choice: cx.binding("all-projects"),
             filter_menu_open: cx.binding(""),
@@ -163,7 +184,7 @@ impl GalleryState {
             viewer_tab: viewer_tab_for_tree,
             shell_split: cx.new(|_| SplitPaneState::new(260.0)),
             settings_select_open: cx.binding(false),
-            ui_font_size: cx.binding(14),
+            ui_font_size,
             contrast: cx.binding(60.0),
             branch_picker_open: cx.binding(false),
             branch_actions_open: cx.binding(false),
@@ -180,6 +201,7 @@ impl GalleryState {
             core_tree_components_open: core_tree_components_open.clone(),
             core_tree_list_open: core_tree_list_open.clone(),
             core_tree_nodes,
+            settings_dirty,
         };
 
         // Declarative side effect: when the branch choice changes, derive the

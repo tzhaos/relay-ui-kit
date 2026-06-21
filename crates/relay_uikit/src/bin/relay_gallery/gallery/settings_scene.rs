@@ -7,7 +7,7 @@ use relay_uikit::patterns::overlay::{Select, SelectOption, overlay};
 use relay_uikit::{
     Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
     InlineError, LoadingSpinner, NumberInput, ProgressBar, SettingsRow, SettingsSection, Skeleton,
-    Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone,
+    Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone, radius,
 };
 
 use super::{
@@ -24,8 +24,23 @@ pub(super) fn render(
 ) -> impl IntoElement {
     let name_focused = state.name_focus.is_focused(window);
     let search_focused = state.search_focus.is_focused(window);
+    let settings_dirty = state.settings_dirty.get(cx);
 
     scene_stack()
+        .when(settings_dirty, |this| {
+            this.child(
+                div()
+                    .px_3()
+                    .py_2()
+                    .rounded(px(radius::LG))
+                    .bg(theme.panel_alt)
+                    .border_1()
+                    .border_color(theme.accent.opacity(0.4))
+                    .text_sm()
+                    .text_color(theme.accent)
+                    .child("Unsaved changes — derived via Form::is_dirty"),
+            )
+        })
         .child(
             SettingsSection::new("Agent profile")
                 .row(
