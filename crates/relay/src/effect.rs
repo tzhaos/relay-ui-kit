@@ -18,6 +18,11 @@ impl Effect {
         self.id
     }
 
+    /// Create an effect handle from a known id (crate-internal use only).
+    pub(crate) fn from_id(id: EffectId) -> Self {
+        Self { id }
+    }
+
     /// Remove the effect and unsubscribe it from all signals.
     pub fn dispose(self, cx: &mut App) {
         if let Some(runtime) = cx.try_global::<ReactiveRuntime>() {

@@ -50,3 +50,14 @@ where
         self.signal.get(cx)
     }
 }
+
+impl<T> Clone for Memo<T> {
+    fn clone(&self) -> Self {
+        Self {
+            signal: self.signal.clone(),
+            // Effect holds only an id; cloning is safe — the underlying effect
+            // is shared, not duplicated.
+            _effect: Effect::from_id(self._effect.id()),
+        }
+    }
+}
