@@ -5,9 +5,9 @@ mod context;
 mod data;
 mod rail;
 
-use gpui::{AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
+use gpui::{AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
 use gpui::App;
-use relay::{Binding, ReactiveAppExt, ReactiveContextExt, Signal};
+use relay::{Binding, ReactiveAppExt, Signal, view::{ReactiveView, StateScope, reactive_render}};
 use relay_uikit::patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
 use relay_uikit::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
 
@@ -18,12 +18,16 @@ use rail::left_rail;
 
 pub struct WorkbenchApp {
     pub state: WorkbenchState,
+    #[allow(dead_code)]
+    pub scope: StateScope,
 }
 
 impl WorkbenchApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let scope = StateScope::new();
         Self {
             state: WorkbenchState::new(cx),
+            scope,
         }
     }
 }
@@ -57,26 +61,32 @@ impl WorkbenchState {
     }
 }
 
-impl Render for WorkbenchApp {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl ReactiveView for WorkbenchApp {
+    fn render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = *cx.theme();
         let state = &self.state;
-        cx.tracked(|cx| {
-            let left = left_rail(state, theme, cx);
-            let center = center_pane(state, theme, cx);
-            let right = right_context(state, window, theme, cx);
-            let center_and_context = SplitPane::new("center-context-split", center, right)
-                .state(state.terminal_split.clone())
-                .min_sizes(560.0, 320.0)
-                .first_size(760.0);
+        let left = left_rail(state, theme, cx);
+        let center = center_pane(state, theme, cx);
+        let right = right_context(state, window, theme, cx);
+        let center_and_context = SplitPane::new("center-context-split", center, right)
+            .state(state.terminal_split.clone())
+            .min_sizes(560.0, 320.0)
+            .first_size(760.0);
 
-            let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
-                .state(state.left_split.clone())
-                .min_sizes(260.0, 780.0)
-                .first_size(space::RAIL_WIDTH);
+        let workbench = SplitPane::new("workbench-left-split", left, center_and_context)
+            .state(state.left_split.clone())
+            .min_sizes(260.0, 780.0)
+            .first_size(space::RAIL_WIDTH);
 
-            AppShell::new(workbench).status_bar(status_bar(state, cx))
-        })
+        AppShell::new(workbench)
+            .status_bar(status_bar(state, cx))
+            .into_any_element()
+    }
+}
+
+impl Render for WorkbenchApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
     }
 }
 

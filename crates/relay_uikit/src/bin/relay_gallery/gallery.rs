@@ -6,11 +6,12 @@
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
-    Styled, Window, div, px,
+    AnyElement, App, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement,
+    Render, Styled, Window, div, px,
 };
 use relay::{
-    Binding, Form, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{ScrollSurface, SplitPaneState};
 use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
@@ -40,13 +41,16 @@ pub enum GallerySurface {
 pub struct GalleryScenesApp {
     pub surface: GallerySurface,
     pub state: GalleryState,
+    pub scope: StateScope,
 }
 
 impl GalleryScenesApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let mut scope = StateScope::new();
         Self {
             surface: GallerySurface::Core,
-            state: GalleryState::new(cx),
+            state: GalleryState::new(cx, &mut scope),
+            scope,
         }
     }
 
@@ -120,7 +124,7 @@ impl FeedbackToast {
 }
 
 impl GalleryState {
-    pub fn new(cx: &mut Context<GalleryScenesApp>) -> Self {
+    pub fn new(cx: &mut Context<GalleryScenesApp>, scope: &mut StateScope) -> Self {
         // Create the tree-expand bindings first so the derived tree node list
         // can subscribe to them.
         let core_tree_src_open: Binding<bool> = cx.binding(true);
@@ -148,17 +152,13 @@ impl GalleryState {
         let auto_archive: Binding<bool> = cx.binding(false);
         let ui_font_size: Binding<i32> = cx.binding(14);
         let theme_choice: Binding<&'static str> = cx.binding("system");
-        let settings_dirty = {
-            let mut form = Form::new();
-            form.field("notifications", notifications.clone(), cx);
-            form.field("auto_archive", auto_archive.clone(), cx);
-            form.field("ui_font_size", ui_font_size.clone(), cx);
-            form.field("theme_choice", theme_choice.clone(), cx);
-            let dirty = form.build_is_dirty(cx);
-            // Leak the form so the dirty memo's effect stays alive.
-            std::mem::forget(form);
-            dirty
-        };
+        let settings_dirty = scope
+            .form()
+            .field("notifications", notifications.clone(), cx)
+            .field("auto_archive", auto_archive.clone(), cx)
+            .field("ui_font_size", ui_font_size.clone(), cx)
+            .field("theme_choice", theme_choice.clone(), cx)
+            .build_is_dirty(cx);
 
         let state = Self {
             name_input: cx.binding(TextInputState::with_text("relay-agent")),
@@ -205,14 +205,13 @@ impl GalleryState {
         };
 
         // Declarative side effect: when the branch choice changes, derive the
-        // branch event string automatically. This replaces the previous
-        // pattern of setting `branch_event` imperatively inside every
-        // `on_select` callback — now those callbacks only set `branch_choice`.
+        // branch event string automatically. Held by scope — no `let _ =` needed.
         {
             let branch_choice = state.branch_choice.clone();
             let branch_event = state.branch_event.clone();
             let choice_for_react = branch_choice.clone();
-            let _ = cx.watch(
+            scope.watch(
+                cx,
                 move |cx| {
                     let _ = branch_choice.get(cx);
                 },
@@ -306,12 +305,18 @@ impl GalleryScenesApp {
     }
 }
 
-impl Render for GalleryScenesApp {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl ReactiveView for GalleryScenesApp {
+    fn render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let surface = self.surface;
         let state = &self.state;
         let host = cx.entity();
-        cx.tracked(|cx| render_surface(surface, state, &host, window, cx))
+        render_surface(surface, state, &host, window, cx).into_any_element()
+    }
+}
+
+impl Render for GalleryScenesApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
     }
 }
 

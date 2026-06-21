@@ -415,7 +415,7 @@ mod tests {
             let runs = runs.clone();
             let signal = signal.clone();
             move |cx| {
-                effect(cx, move |cx| {
+                effect(cx, move |_cx| {
                     let _ = signal.peek(|v| *v);
                     runs.set(runs.get() + 1);
                 })

@@ -37,6 +37,7 @@ mod resource;
 mod runtime;
 mod signal;
 mod signal_vec;
+pub mod view;
 mod window_ext;
 
 pub use binding::Binding;
@@ -50,13 +51,16 @@ pub use resource::{Resource, ResourceState};
 pub use runtime::{EffectId, ReactiveRuntime, SignalId, batch, init, is_installed, track, untrack};
 pub use signal::{ReadSignal, Signal, WriteSignal};
 pub use signal_vec::SignalVecExt;
+pub use view::{FormBuilder, ReactiveView, StateScope};
 pub use window_ext::WindowSignalExt;
 
 /// Common relay imports for GPUI views.
 pub mod prelude {
     pub use crate::{
-        Binding, ContextHandle, Effect, Form, Memo, Reactive, ReactiveAppExt, ReactiveContextExt,
-        Resource, ResourceState, Signal, SignalVecExt, WindowSignalExt, batch, effect, effect_in,
-        init, install, provide_context, track, untrack, use_context,
+        Binding, ContextHandle, Effect, Form, FormBuilder, Memo, Reactive, ReactiveAppExt,
+        ReactiveContextExt, ReactiveView, Resource, ResourceState, Signal, SignalVecExt,
+        StateScope, WindowSignalExt, batch, effect, effect_in, init, install, provide_context,
+        track, untrack, use_context,
     };
+    pub use crate::view;
 }
