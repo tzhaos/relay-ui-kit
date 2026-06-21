@@ -102,28 +102,35 @@ impl RenderOnce for SearchField {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let value = binding.as_ref().map_or_else(
-            || self.value,
-            |binding| binding.read(cx, |state| state.value().to_string()),
-        );
-        let is_empty = value.is_empty();
-        let display = if is_empty {
-            self.placeholder.clone()
-        } else {
-            value
+        let (display_text, before_str, sel_str, after_str, cursor_visible, is_empty) = match binding.as_ref() {
+            Some(b) => {
+                let state = b.get(cx);
+                let val = state.value().to_string();
+                let is_empty = val.is_empty();
+                let sel_range = state.selection_range();
+                if let Some((start, end)) = sel_range {
+                    let before = val[..start].to_string();
+                    let selected = val[start..end].to_string();
+                    let after = val[end..].to_string();
+                    (val.clone(), before, selected, after, false, is_empty)
+                } else {
+                    let (before, after) = state.split();
+                    (val.clone(), before.to_string(), String::new(), after.to_string(), false, is_empty)
+                }
+            }
+            None => {
+                let val = self.value.clone();
+                (val.clone(), String::new(), String::new(), String::new(), false, val.is_empty())
+            }
         };
-        let text_color = if is_empty {
-            theme.text_muted
-        } else {
-            theme.text
-        };
+        let placeholder_text = if is_empty { self.placeholder.clone() } else { String::new() };
+        let text_color = if is_empty { theme.text_muted } else { theme.text };
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
         let disabled = self.disabled;
         let on_clear = self.on_clear;
-
         div()
             .id(self.id)
             .h(px(30.0))
@@ -153,10 +160,23 @@ impl RenderOnce for SearchField {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .truncate()
+                    .flex()
+                    .items_center()
                     .text_sm()
                     .text_color(text_color)
-                    .child(display),
+                    .when(is_empty, |this| {
+                        this.child(placeholder_text)
+                    })
+                    .when(!is_empty, |this| {
+                        this.child(div().child(before_str))
+                            .when(!sel_str.is_empty(), |this| {
+                                this.child(div().bg(theme.selection).text_color(theme.text).child(sel_str))
+                            })
+                            .when(cursor_visible, |this| {
+                                this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
+                            })
+                            .child(div().child(after_str))
+                    }),
             )
             .when(!is_empty && !disabled, |this| {
                 let on_clear_for_click = on_clear.map(std::rc::Rc::new);
