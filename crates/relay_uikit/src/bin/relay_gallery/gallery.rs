@@ -57,11 +57,11 @@ impl GalleryScenesApp {
 
 /// Interactive state shared by the gallery scenes.
 pub struct GalleryState {
-    pub name_input: TextInputState,
+    pub name_input: Binding<TextInputState>,
     pub name_focus: FocusHandle,
-    pub search_input: TextInputState,
+    pub search_input: Binding<TextInputState>,
     pub search_focus: FocusHandle,
-    pub composer_input: TextInputState,
+    pub composer_input: Binding<TextInputState>,
     pub composer_focus: FocusHandle,
     pub ui_font_size_input: Binding<TextInputState>,
     pub ui_font_size_focus: FocusHandle,
@@ -161,11 +161,11 @@ impl GalleryState {
         };
 
         let state = Self {
-            name_input: TextInputState::with_text("relay-agent"),
+            name_input: cx.binding(TextInputState::with_text("relay-agent")),
             name_focus: cx.focus_handle(),
-            search_input: TextInputState::new(),
+            search_input: cx.binding(TextInputState::new()),
             search_focus: cx.focus_handle(),
-            composer_input: TextInputState::new(),
+            composer_input: cx.binding(TextInputState::new()),
             composer_focus: cx.focus_handle(),
             ui_font_size_input: cx.binding(TextInputState::with_text("14")),
             ui_font_size_focus: cx.focus_handle(),

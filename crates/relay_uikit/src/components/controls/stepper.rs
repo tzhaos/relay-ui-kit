@@ -35,7 +35,7 @@ impl Stepper {
     }
 
     pub fn bound(id: impl Into<ElementId>, binding: Binding<i32>) -> Self {
-        let value = binding.signal().get_untracked().to_string();
+        let value = binding.signal().peek(|v| v.to_string());
         Self {
             id: id.into(),
             value,

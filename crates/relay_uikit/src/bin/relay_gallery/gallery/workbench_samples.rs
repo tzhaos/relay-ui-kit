@@ -9,7 +9,7 @@ use relay_uikit::workbench::{
     TerminalToolbar, TerminalTranscript,
 };
 use relay_uikit::{
-    Button, IconName, NavRow, PanelHeader, TextInput, TextInputAction, Theme, Tone, TreeRow, radius,
+    Button, IconName, NavRow, PanelHeader, TextInput, Theme, Tone, TreeRow, radius,
 };
 
 use super::{GalleryScenesApp, GalleryState};
@@ -189,7 +189,7 @@ fn terminal_sample_lines(active: &'static str) -> Vec<TerminalLine> {
 
 pub(super) fn command_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     let command_handler = {
@@ -209,26 +209,23 @@ pub(super) fn command_sample(
 
     CommandPalette::new("Run Command")
         .query(
-            TextInput::new(
+            TextInput::bound(
                 "command-query",
                 state.search_focus.clone(),
-                &state.search_input,
+                state.search_input.clone(),
             )
             .placeholder("Search commands")
             .leading_icon(IconName::Search)
             .on_key({
-                let host = host.clone();
+                let search_input = state.search_input.clone();
                 move |event, _window, cx| {
-                    host.update(cx, |this, cx| {
-                        match this.state.search_input.handle_key(event) {
-                            TextInputAction::Cancel => {
-                                this.state.search_input.clear();
-                                cx.notify();
-                            }
-                            action if action.should_notify() => cx.notify(),
-                            _ => {}
-                        }
-                    });
+                    // Handle Cancel specially — clear the input on Escape.
+                    if event.keystroke.key.as_str() == "escape" {
+                        search_input.update(cx, |s| {
+                            s.clear();
+                            true
+                        });
+                    }
                 }
             }),
         )

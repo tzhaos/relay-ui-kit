@@ -1,6 +1,6 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div};
 use relay_uikit::workbench::Composer;
-use relay_uikit::{Button, IconButton, IconName, TextArea, TextInputAction, Theme};
+use relay_uikit::{Button, IconButton, IconName, TextArea, Theme};
 
 use super::{
     GalleryScenesApp, GalleryState,
@@ -32,7 +32,7 @@ pub(super) fn render(
 
 fn composer_sample(
     state: &GalleryState,
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     window: &Window,
     theme: Theme,
 ) -> impl IntoElement {
@@ -40,28 +40,25 @@ fn composer_sample(
 
     Composer::new(
         "terminal-composer",
-        TextArea::new(
+        TextArea::bound(
             "terminal-composer-input",
             state.composer_focus.clone(),
-            &state.composer_input,
+            state.composer_input.clone(),
         )
         .placeholder("Ask an agent to work in the active terminal")
         .focused(composer_focused)
         .min_rows(3)
         .bordered(false)
         .on_key({
-            let host = host.clone();
+            let composer_input = state.composer_input.clone();
             move |event, _window, cx| {
-                host.update(cx, |this, cx| {
-                    match this.state.composer_input.handle_multiline_key(event) {
-                        TextInputAction::Cancel => {
-                            this.state.composer_input.clear();
-                            cx.notify();
-                        }
-                        action if action.should_notify() => cx.notify(),
-                        _ => {}
-                    }
-                });
+                // Handle Cancel specially — clear the input on Escape.
+                if event.keystroke.key.as_str() == "escape" {
+                    composer_input.update(cx, |s| {
+                        s.clear();
+                        true
+                    });
+                }
             }
         }),
     )

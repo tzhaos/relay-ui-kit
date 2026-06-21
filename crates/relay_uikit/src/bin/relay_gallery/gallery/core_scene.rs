@@ -154,23 +154,12 @@ fn input_choice_samples(
                     "Focusable input shell with host-owned text",
                 ))
                 .child(
-                    SearchField::new("core-search-field", state.search_focus.clone())
-                        .value(state.search_input.value())
-                        .placeholder("Filter sessions")
-                        .on_key({
-                            let host = host.clone();
-                            move |event, _window, cx| {
-                                let mut handled = false;
-                                host.update(cx, |this, cx| {
-                                    let action = this.state.search_input.handle_key(event);
-                                    if action.should_notify() {
-                                        handled = true;
-                                        cx.notify();
-                                    }
-                                });
-                                handled
-                            }
-                        }),
+                    SearchField::bound(
+                        "core-search-field",
+                        state.search_focus.clone(),
+                        state.search_input.clone(),
+                    )
+                    .placeholder("Filter sessions"),
                 ),
         )
         .child(
@@ -236,11 +225,11 @@ fn button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl
             Button::new("btn-secondary", "Refresh")
                 .icon(IconName::RefreshCw)
                 .on_click({
-                    let host = host.clone();
+                    let search_input = state.search_input.clone();
                     move |_event, _window, cx| {
-                        host.update(cx, |this, cx| {
-                            this.state.search_input.clear();
-                            cx.notify();
+                        search_input.update(cx, |s| {
+                            s.clear();
+                            true
                         });
                     }
                 }),
@@ -278,11 +267,11 @@ fn icon_button_samples(state: &GalleryState, host: &Entity<GalleryScenesApp>) ->
                 )
                 .child(
                     IconButton::new("ib-refresh", IconName::RefreshCw).on_click({
-                        let host = host.clone();
+                        let search_input = state.search_input.clone();
                         move |_event, _window, cx| {
-                            host.update(cx, |this, cx| {
-                                this.state.search_input.clear();
-                                cx.notify();
+                            search_input.update(cx, |s| {
+                                s.clear();
+                                true
                             });
                         }
                     }),

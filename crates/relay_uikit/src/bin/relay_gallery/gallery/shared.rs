@@ -46,32 +46,19 @@ pub(super) fn strip() -> gpui::Div {
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn text_input_field(
-    host: &Entity<GalleryScenesApp>,
+    _host: &Entity<GalleryScenesApp>,
     id: &'static str,
-    input: &TextInputState,
+    input: &Binding<TextInputState>,
     focus: FocusHandle,
     focused: bool,
     icon: Option<IconName>,
     placeholder: &'static str,
 ) -> impl IntoElement {
-    let host = host.clone();
-    let is_name = id.contains("name");
-    let mut field = TextInput::new(id, focus, input)
+    let mut field = TextInput::bound(id, focus, input.clone())
         .placeholder(placeholder)
-        .focused(focused)
-        .on_key(move |event, _window, cx| {
-            host.update(cx, |this, cx| {
-                let target = if is_name {
-                    &mut this.state.name_input
-                } else {
-                    &mut this.state.search_input
-                };
-                let action = target.handle_key(event);
-                if action.should_notify() {
-                    cx.notify();
-                }
-            });
-        });
+        .focused(focused);
+    // The binding.update inside TextInput::bound's on_key handler already
+    // notifies via the signal — no manual cx.notify() needed.
     if let Some(icon) = icon {
         field = field.leading_icon(icon);
     }
