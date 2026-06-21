@@ -697,4 +697,249 @@ mod tests {
         });
         assert_eq!(notifications.get(), 1);
     }
+
+    // --- Nested batch ---
+
+    #[test]
+    fn nested_batch_only_flushes_on_outermost_exit() {
+        let runtime = ReactiveRuntime::default();
+        let entity_id = EntityId::from(42);
+        let signal_id = runtime.allocate_signal();
+        runtime.replace_entity_dependencies(entity_id, HashSet::from([signal_id]));
+
+        runtime.enter_batch(); // outer
+        runtime.enter_batch(); // inner
+
+        let queued = runtime.notify_signal(signal_id);
+        assert!(queued.is_empty(), "inner batch should not flush");
+
+        let inner_notifications = runtime.exit_batch();
+        assert!(
+            inner_notifications.is_empty(),
+            "exiting inner batch should not flush"
+        );
+
+        let outer_notifications = runtime.exit_batch();
+        assert_eq!(
+            outer_notifications.entities, vec![entity_id],
+            "exiting outer batch should flush"
+        );
+    }
+
+    // --- Batch with effects ---
+
+    #[test]
+    fn batch_flushes_pending_effects_on_exit() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+
+        let seen = Rc::new(Cell::new(-1));
+        let _effect = app.update({
+            let seen = seen.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    seen.set(signal.get(cx));
+                })
+            }
+        });
+        assert_eq!(seen.get(), 0);
+
+        // Batch two writes — effect should only run once after batch exits.
+        app.update(|cx| {
+            batch(cx, |cx| {
+                signal.set(cx, 1);
+                signal.set(cx, 2);
+                signal.set(cx, 3);
+            });
+        });
+
+        assert_eq!(seen.get(), 3, "effect should see final value");
+    }
+
+    // --- Effect cascade ---
+
+    #[test]
+    fn effect_cascade_writes_trigger_dependent_effect() {
+        let mut app = TestApp::new();
+        let s1 = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+        let s2 = app.update(|cx| Signal::new(cx, 0));
+
+        // Effect A: reads s1, writes s2 = s1 * 10
+        let _effect_a = app.update({
+            let s1 = s1.clone();
+            let s2 = s2.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let val = s1.get(cx);
+                    s2.set(cx, val * 10);
+                })
+            }
+        });
+
+        // Effect B: reads s2, records value
+        let seen = Rc::new(Cell::new(0));
+        let _effect_b = app.update({
+            let seen = seen.clone();
+            let s2 = s2.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    seen.set(s2.get(cx));
+                })
+            }
+        });
+
+        // Initial: s1=0 → s2=0 → seen=0
+        assert_eq!(seen.get(), 0);
+
+        // Change s1 → cascade: effect A writes s2 → effect B sees new s2
+        app.update(|cx| s1.set(cx, 5));
+        assert_eq!(seen.get(), 50, "cascade should propagate to effect B");
+    }
+
+    // --- Disposed effect ---
+
+    #[test]
+    fn disposed_effect_does_not_rerun_on_signal_change() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+
+        let seen = Rc::new(Cell::new(0));
+        let effect_handle = app.update({
+            let seen = seen.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    seen.set(signal.get(cx) + 1);
+                })
+            }
+        });
+        assert_eq!(seen.get(), 1);
+
+        // Dispose the effect.
+        app.update(|cx| effect_handle.dispose(cx));
+
+        // Signal change should NOT trigger the disposed effect.
+        app.update(|cx| signal.set(cx, 99));
+        assert_eq!(seen.get(), 1, "disposed effect should not rerun");
+    }
+
+    // --- Effect with no dependencies ---
+
+    #[test]
+    fn effect_with_no_dependencies_does_not_rerun() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let runs = runs.clone();
+            move |cx| {
+                effect(cx, move |_cx| {
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+        assert_eq!(runs.get(), 1, "effect runs once on creation");
+
+        // Signal change should NOT trigger the effect (no deps registered).
+        app.update(|cx| signal.set(cx, 42));
+        assert_eq!(runs.get(), 1, "effect with no deps should not rerun");
+    }
+
+    // --- Effect rerun updates dependencies ---
+
+    #[test]
+    fn effect_rerun_updates_dependencies() {
+        let mut app = TestApp::new();
+        let s1 = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 1)
+        });
+        let s2 = app.update(|cx| Signal::new(cx, 2));
+        let flag = app.update(|cx| Signal::new(cx, false));
+
+        // Effect reads s1 or s2 depending on flag.
+        let seen = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let seen = seen.clone();
+            let s1 = s1.clone();
+            let s2 = s2.clone();
+            let flag = flag.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    if flag.get(cx) {
+                        seen.set(s2.get(cx));
+                    } else {
+                        seen.set(s1.get(cx));
+                    }
+                })
+            }
+        });
+        assert_eq!(seen.get(), 1, "initial: reads s1");
+
+        // Flip flag → effect reruns, now reads s2, drops s1 dependency.
+        app.update(|cx| flag.set(cx, true));
+        assert_eq!(seen.get(), 2, "after flag flip: reads s2");
+
+        // s1 change should NOT trigger effect (s1 dep was dropped).
+        app.update(|cx| s1.set(cx, 100));
+        assert_eq!(
+            seen.get(),
+            2,
+            "s1 change should not trigger effect after dep switch"
+        );
+
+        // s2 change SHOULD trigger effect.
+        app.update(|cx| s2.set(cx, 200));
+        assert_eq!(seen.get(), 200, "s2 change should trigger effect");
+    }
+
+    // --- init idempotency ---
+
+    #[test]
+    fn init_is_idempotent() {
+        let mut app = TestApp::new();
+        app.update(|cx| {
+            init(cx);
+            init(cx);
+            init(cx);
+        });
+        assert!(app.read(|cx| is_installed(cx)));
+    }
+
+    #[test]
+    fn is_installed_returns_false_before_init() {
+        let app = TestApp::new();
+        assert!(!app.read(|cx| is_installed(cx)));
+    }
+
+    // --- track_signal in non-tracking context is a no-op ---
+
+    #[test]
+    fn reading_signal_outside_tracking_context_does_not_panic() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 42)
+        });
+
+        // Read without any tracking scope — should not panic, just not register deps.
+        app.read(|cx| {
+            let val = signal.get(cx);
+            assert_eq!(val, 42);
+        });
+    }
 }

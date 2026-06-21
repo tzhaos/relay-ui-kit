@@ -56,3 +56,104 @@ pub fn effect_in<T: 'static>(cx: &mut Context<T>, f: impl FnMut(&mut App) + 'sta
         .insert_effect_release_subscription(effect_id, subscription);
     effect
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::Cell, rc::Rc};
+
+    use gpui::TestApp;
+
+    use crate::{Signal, effect, effect_in, init};
+
+    #[test]
+    fn effect_dispose_removes_callback() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let effect_handle = app.update({
+            let runs = runs.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = signal.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+
+        assert_eq!(runs.get(), 1, "effect runs once on creation");
+
+        app.update(|cx| effect_handle.dispose(cx));
+
+        app.update(|cx| signal.set(cx, 5));
+        assert_eq!(runs.get(), 1, "disposed effect should not rerun");
+    }
+
+    #[test]
+    fn effect_in_is_scoped_to_entity() {
+        // effect_in creates an effect that is disposed when the entity is
+        // released. We verify the effect runs initially and responds to
+        // signal changes.
+        use gpui::{Context, IntoElement, Render, Window, div};
+
+        struct EffectHost {
+            seen: Rc<Cell<i32>>,
+            _effect: crate::Effect,
+        }
+
+        impl EffectHost {
+            fn new(cx: &mut Context<Self>, seen: Rc<Cell<i32>>, signal: Signal<i32>) -> Self {
+                let seen_for_effect = seen.clone();
+                let _effect = effect_in(cx, move |cx| {
+                    seen_for_effect.set(signal.get(cx));
+                });
+                Self { seen, _effect }
+            }
+        }
+
+        impl Render for EffectHost {
+            fn render(&mut self, _w: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+                div()
+            }
+        }
+
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 42)
+        });
+
+        let seen = Rc::new(Cell::new(0));
+        let signal_for_entity = signal.clone();
+
+        let mut window = app.open_window(|_, cx| {
+            let seen = seen.clone();
+            let signal = signal_for_entity.clone();
+            EffectHost::new(cx, seen, signal)
+        });
+        let root = window.root();
+        window.draw();
+
+        assert_eq!(seen.get(), 42, "effect_in runs on creation");
+
+        app.update(|cx| signal.set(cx, 100));
+        assert_eq!(seen.get(), 100);
+
+        let _ = root;
+    }
+
+    #[test]
+    fn effect_id_is_unique() {
+        let mut app = TestApp::new();
+        app.update(|cx| init(cx));
+
+        let e1 = app.update(|cx| effect(cx, |_| {}));
+        let e2 = app.update(|cx| effect(cx, |_| {}));
+
+        assert_ne!(e1.id(), e2.id(), "each effect should have a unique id");
+    }
+}

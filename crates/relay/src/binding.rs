@@ -77,9 +77,11 @@ impl<T> From<Signal<T>> for Binding<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::Cell, rc::Rc};
+
     use gpui::TestApp;
 
-    use crate::{Signal, init};
+    use crate::{ReactiveAppExt, Signal, init};
 
     use super::*;
 
@@ -98,5 +100,67 @@ mod tests {
         app.read(|cx| {
             assert!(binding.get(cx));
         });
+    }
+
+    #[test]
+    fn binding_clone_shares_underlying_signal() {
+        let mut app = TestApp::new();
+        let binding = app.update(|cx| {
+            init(cx);
+            cx.binding(10)
+        });
+
+        let cloned = binding.clone();
+
+        // Write via the clone, read via the original.
+        app.update(|cx| cloned.set(cx, 20));
+        app.read(|cx| assert_eq!(binding.get(cx), 20));
+
+        // Write via the original, read via the clone.
+        app.update(|cx| binding.set(cx, 30));
+        app.read(|cx| assert_eq!(cloned.get(cx), 30));
+    }
+
+    #[test]
+    fn binding_update_silent_does_not_notify() {
+        let mut app = TestApp::new();
+        let binding = app.update(|cx| {
+            init(cx);
+            cx.binding(0)
+        });
+
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let runs = runs.clone();
+            let binding = binding.clone();
+            move |cx| {
+                crate::effect(cx, move |cx| {
+                    let _ = binding.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+        assert_eq!(runs.get(), 1);
+
+        // Silent update — effect should NOT rerun.
+        app.update(|_cx| binding.update_silent(|v| *v = 42));
+        assert_eq!(runs.get(), 1);
+
+        // But the value was changed.
+        app.read(|cx| assert_eq!(binding.get(cx), 42));
+    }
+
+    #[test]
+    fn binding_from_signal_preserves_identity() {
+        let mut app = TestApp::new();
+        let (signal_id, binding) = app.update(|cx| {
+            init(cx);
+            let signal = Signal::new(cx, "hello".into());
+            let id = signal.id();
+            let binding: Binding<String> = signal.into();
+            (id, binding)
+        });
+
+        assert_eq!(binding.signal().id(), signal_id);
     }
 }

@@ -233,4 +233,74 @@ mod tests {
             assert_eq!(value, None);
         });
     }
+
+    #[test]
+    fn multiple_consumers_all_notified_on_context_change() {
+        let mut app = TestApp::new();
+        let mut window1 = app.open_window(|_, cx| Consumer::new(cx));
+        let root1 = window1.root();
+        window1.draw();
+
+        let mut window2 = app.open_window(|_, cx| Consumer::new(cx));
+        let root2 = window2.root();
+        window2.draw();
+
+        let notif1 = Rc::new(Cell::new(0));
+        let notif2 = Rc::new(Cell::new(0));
+
+        let _sub1 = app.update({
+            let n = notif1.clone();
+            let root = root1.clone();
+            move |cx| cx.observe(&root, move |_, _| n.set(n.get() + 1))
+        });
+        let _sub2 = app.update({
+            let n = notif2.clone();
+            let root = root2.clone();
+            move |cx| cx.observe(&root, move |_, _| n.set(n.get() + 1))
+        });
+
+        // Change context from window1's handle — both consumers should refresh.
+        app.update_entity(&root1, |view, cx| {
+            view.theme_handle.set(cx, "dark".to_string());
+        });
+
+        assert_eq!(notif1.get(), 1, "provider's own view should be notified");
+        assert_eq!(notif2.get(), 1, "other consumer should also be notified");
+    }
+
+    #[test]
+    fn context_handle_can_be_cloned_and_used_independently() {
+        let mut app = TestApp::new();
+        let handle1 = app.update(|cx| {
+            init(cx);
+            provide_context(cx, "initial".to_string())
+        });
+
+        let handle2 = handle1.clone();
+
+        app.update(|cx| handle1.set(cx, "from_handle1".to_string()));
+        app.read(|cx| {
+            assert_eq!(use_context::<String>(cx), Some("from_handle1".into()));
+        });
+
+        app.update(|cx| handle2.set(cx, "from_handle2".to_string()));
+        app.read(|cx| {
+            assert_eq!(use_context::<String>(cx), Some("from_handle2".into()));
+        });
+    }
+
+    #[test]
+    fn different_types_get_separate_context_slots() {
+        let mut app = TestApp::new();
+        app.update(|cx| {
+            init(cx);
+            provide_context(cx, "string_value".to_string());
+            provide_context(cx, 42_i32);
+        });
+
+        app.read(|cx| {
+            assert_eq!(use_context::<String>(cx), Some("string_value".into()));
+            assert_eq!(use_context::<i32>(cx), Some(42));
+        });
+    }
 }

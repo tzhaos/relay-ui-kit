@@ -309,4 +309,148 @@ mod tests {
         app.update(|cx| signal.set(cx, 2));
         assert_eq!(runs.get(), 2);
     }
+
+    // --- split read/write isolation ---
+
+    #[test]
+    fn split_produces_isolated_read_and_write_handles() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 10)
+        });
+        let (read, write) = signal.split();
+
+        // Write handle can set the value.
+        app.update(|cx| write.set(cx, 20));
+        app.read(|cx| assert_eq!(read.get(cx), 20));
+    }
+
+    #[test]
+    fn read_handle_tracks_dependencies() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| SilentView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        // Replace the view's signal with a split read handle to verify
+        // tracking works the same way.
+        let signal = app.update_entity(&root, |view, _cx| view.signal.clone());
+        let (read, _write) = signal.split();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        // Reading the read handle in a tracked context subscribes.
+        app.update_entity(&root, |_, cx| {
+            track(cx, |cx| {
+                let _ = read.get(cx);
+            });
+        });
+
+        // Writing via the write handle should notify.
+        app.update_entity(&root, |view, cx| {
+            view.signal.set(cx, 99);
+        });
+        assert_eq!(notifications.get(), 1);
+    }
+
+    // --- update with false return does not notify ---
+
+    #[test]
+    fn update_returning_false_does_not_notify() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| SilentView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        // update closure returns false → no notification.
+        app.update_entity(&root, |view, cx| {
+            view.signal.update(cx, |_v| false);
+        });
+        assert_eq!(notifications.get(), 0);
+
+        // update closure returns true → notification.
+        app.update_entity(&root, |view, cx| {
+            view.signal.update(cx, |v| {
+                *v += 1;
+                true
+            });
+        });
+        assert_eq!(notifications.get(), 1);
+    }
+
+    // --- peek reads without tracking ---
+
+    #[test]
+    fn peek_reads_value_without_tracking() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 42)
+        });
+
+        // peek inside an effect — should NOT register as a dependency.
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let runs = runs.clone();
+            let signal = signal.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = signal.peek(|v| *v);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+        assert_eq!(runs.get(), 1);
+
+        // Signal change should NOT trigger the effect (peek doesn't track).
+        app.update(|cx| signal.set(cx, 100));
+        assert_eq!(runs.get(), 1, "peek should not register dependency");
+    }
+
+    // --- set with same value on non-PartialEq type via update ---
+
+    #[test]
+    fn update_works_for_non_partial_eq_types() {
+        // A type that doesn't implement PartialEq.
+        struct NonEq(i32);
+
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, NonEq(0))
+        });
+
+        // set() requires PartialEq, but update() works for any type.
+        app.update(|cx| {
+            signal.update(cx, |v| {
+                v.0 = 5;
+                true
+            });
+        });
+
+        app.read(|cx| {
+            signal.read(cx, |v| assert_eq!(v.0, 5));
+        });
+    }
 }
