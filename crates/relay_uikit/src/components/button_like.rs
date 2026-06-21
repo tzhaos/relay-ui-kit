@@ -1,7 +1,7 @@
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    KeyDownEvent, MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled,
+    Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -135,7 +135,7 @@ impl RenderOnce for ButtonLike {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let interactive = self.interactive();
         let colors = self.colors;
-        let on_click = self.on_click;
+        let on_click = self.on_click.map(std::rc::Rc::new);
 
         div()
             .id(self.id)
@@ -149,6 +149,7 @@ impl RenderOnce for ButtonLike {
             .gap(px(self.gap))
             .text_color(colors.foreground)
             .role(self.role)
+            .tab_index(0)
             .when_some(self.width, |this, width| this.w(px(width)))
             .when_some(self.height, |this, height| this.h(px(height)))
             .when_some(self.padding_x, |this, padding| this.px(px(padding)))
@@ -175,9 +176,18 @@ impl RenderOnce for ButtonLike {
             })
             .children(self.children)
             .when_some(on_click.filter(|_| interactive), |this, handler| {
+                let handler_for_key = handler.clone();
                 this.on_click(move |event: &ClickEvent, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key.as_str() == " "
+                        || event.keystroke.key.as_str() == "enter"
+                    {
+                        handler_for_key(&ClickEvent::default(), window, cx);
+                        cx.stop_propagation();
+                    }
                 })
             })
     }

@@ -1,6 +1,6 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use relay::{Binding, WindowSignalExt};
@@ -9,7 +9,7 @@ use crate::{
     components::display::CountBadge,
     icon::{Icon, IconName, IconSize},
     interaction::ClickHandler,
-    theme::{ActiveTheme, radius, space},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius, space},
     tone::Tone,
 };
 
@@ -29,6 +29,7 @@ pub struct Disclosure {
     open: bool,
     detail: Option<String>,
     count: Option<usize>,
+    disabled: bool,
     binding: Option<Binding<bool>>,
     on_toggle: Option<ClickHandler>,
 }
@@ -41,6 +42,7 @@ impl Disclosure {
             open,
             detail: None,
             count: None,
+            disabled: false,
             binding: None,
             on_toggle: None,
         }
@@ -57,6 +59,7 @@ impl Disclosure {
             open: false,
             detail: None,
             count: None,
+            disabled: false,
             binding: Some(binding),
             on_toggle: None,
         }
@@ -83,6 +86,7 @@ impl Disclosure {
             open: false,
             detail: None,
             count: None,
+            disabled: false,
             binding: Some(binding),
             on_toggle: None,
         }
@@ -95,6 +99,11 @@ impl Disclosure {
 
     pub fn count(mut self, count: usize) -> Self {
         self.count = Some(count);
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -113,7 +122,8 @@ impl RenderOnce for Disclosure {
         let binding = self.binding;
         let open = binding.as_ref().map_or(self.open, |b| b.get(cx));
         let handler = self.on_toggle;
-        let interactive = binding.is_some() || handler.is_some();
+        let disabled = self.disabled;
+        let interactive = !disabled && (binding.is_some() || handler.is_some());
 
         div()
             .id(self.id)
@@ -124,6 +134,8 @@ impl RenderOnce for Disclosure {
             .gap_2()
             .rounded(px(radius::MD))
             .text_color(theme.text_secondary)
+            .tab_index(0)
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover))
@@ -163,17 +175,37 @@ impl RenderOnce for Disclosure {
                 this.child(CountBadge::new(count).tone(Tone::Secondary))
             })
             .when(interactive, |this| {
+                let binding_for_click = binding.clone();
+                let binding_for_key = binding;
+                let handler_for_click = handler.map(std::rc::Rc::new);
+                let handler_for_key = handler_for_click.clone();
                 this.on_click(move |event, window, cx| {
-                    if let Some(binding) = &binding {
+                    if let Some(binding) = &binding_for_click {
                         binding.update(cx, |open| {
                             *open = !*open;
                             true
                         });
                     }
-                    if let Some(handler) = &handler {
+                    if let Some(handler) = &handler_for_click {
                         handler(event, window, cx);
                     }
                     cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key.as_str() == " "
+                        || event.keystroke.key.as_str() == "enter"
+                    {
+                        if let Some(binding) = &binding_for_key {
+                            binding.update(cx, |open| {
+                                *open = !*open;
+                                true
+                            });
+                        }
+                        if let Some(handler) = &handler_for_key {
+                            handler(&ClickEvent::default(), window, cx);
+                        }
+                        cx.stop_propagation();
+                    }
                 })
             })
     }
@@ -224,7 +256,7 @@ mod tests {
         impl Render for HostView {
             fn render(
                 &mut self,
-                window: &mut gpui::Window,
+                window: &mut Window,
                 cx: &mut gpui::Context<Self>,
             ) -> impl IntoElement {
                 // Create a stateful disclosure during render — use_signal
@@ -232,7 +264,7 @@ mod tests {
                 // derefs to &mut App.
                 let disclosure = Disclosure::stateful("test-group", "Test", window, cx);
                 *self.binding_created.lock().unwrap() = disclosure.binding.is_some();
-                gpui::div().child(disclosure)
+                div().child(disclosure)
             }
         }
 

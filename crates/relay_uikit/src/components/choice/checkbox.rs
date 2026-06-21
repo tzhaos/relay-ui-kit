@@ -1,6 +1,6 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled, Window, div,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled, Window, div,
     prelude::FluentBuilder, px,
 };
 use relay::Binding;
@@ -86,6 +86,7 @@ impl RenderOnce for Checkbox {
             .items_center()
             .gap_2()
             .role(Role::CheckBox)
+            .tab_index(0)
             .aria_toggled(Toggled::from(checked))
             .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(interactive, |this| {
@@ -117,17 +118,37 @@ impl RenderOnce for Checkbox {
                 this.child(div().text_sm().text_color(theme.text).child(label))
             })
             .when(interactive, |this| {
+                let binding_for_click = binding.clone();
+                let binding_for_key = binding;
+                let handler_for_click = handler.map(std::rc::Rc::new);
+                let handler_for_key = handler_for_click.clone();
                 this.on_click(move |event, window, cx| {
-                    if let Some(binding) = &binding {
+                    if let Some(binding) = &binding_for_click {
                         binding.update(cx, |checked| {
                             *checked = !*checked;
                             true
                         });
                     }
-                    if let Some(handler) = &handler {
+                    if let Some(handler) = &handler_for_click {
                         handler(event, window, cx);
                     }
                     cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key.as_str() == " "
+                        || event.keystroke.key.as_str() == "enter"
+                    {
+                        if let Some(binding) = &binding_for_key {
+                            binding.update(cx, |checked| {
+                                *checked = !*checked;
+                                true
+                            });
+                        }
+                        if let Some(handler) = &handler_for_key {
+                            handler(&ClickEvent::default(), window, cx);
+                        }
+                        cx.stop_propagation();
+                    }
                 })
             })
     }

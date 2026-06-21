@@ -1,6 +1,6 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use relay::Binding;
@@ -90,6 +90,7 @@ impl RenderOnce for Radio {
             .items_center()
             .gap_2()
             .role(Role::RadioButton)
+            .tab_index(0)
             .aria_selected(selected)
             .when(disabled, |this| this.opacity(DISABLED_OPACITY))
             .when(interactive, |this| {
@@ -121,14 +122,32 @@ impl RenderOnce for Radio {
                     .child(self.label),
             )
             .when(interactive, |this| {
+                let binding_for_click = binding.clone();
+                let binding_for_key = binding;
+                let value = value;
+                let handler_for_click = handler.map(std::rc::Rc::new);
+                let handler_for_key = handler_for_click.clone();
                 this.on_click(move |event, window, cx| {
-                    if let Some((binding, value)) = binding.as_ref().zip(value) {
+                    if let Some((binding, value)) = binding_for_click.as_ref().zip(value) {
                         binding.set(cx, value);
                     }
-                    if let Some(handler) = &handler {
+                    if let Some(handler) = &handler_for_click {
                         handler(event, window, cx);
                     }
                     cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key.as_str() == " "
+                        || event.keystroke.key.as_str() == "enter"
+                    {
+                        if let Some((binding, value)) = binding_for_key.as_ref().zip(value) {
+                            binding.set(cx, value);
+                        }
+                        if let Some(handler) = &handler_for_key {
+                            handler(&ClickEvent::default(), window, cx);
+                        }
+                        cx.stop_propagation();
+                    }
                 })
             })
     }

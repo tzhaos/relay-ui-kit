@@ -1,12 +1,13 @@
 use gpui::{
-    App, ClickEvent, ElementId, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use relay::Binding;
 
 use crate::{
     interaction::SelectHandler,
-    theme::{ActiveTheme, radius, space},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius, space},
 };
 
 /// One labelled segment in a [`SegmentedControl`].
@@ -27,6 +28,7 @@ pub struct SegmentedControl {
     id: ElementId,
     segments: Vec<Segment>,
     active: &'static str,
+    disabled: bool,
     binding: Option<Binding<&'static str>>,
     on_select: Option<SelectHandler>,
 }
@@ -37,6 +39,7 @@ impl SegmentedControl {
             id: id.into(),
             segments,
             active: "",
+            disabled: false,
             binding: None,
             on_select: None,
         }
@@ -51,6 +54,7 @@ impl SegmentedControl {
             id: id.into(),
             segments,
             active: "",
+            disabled: false,
             binding: Some(binding),
             on_select: None,
         }
@@ -58,6 +62,11 @@ impl SegmentedControl {
 
     pub fn active(mut self, active: &'static str) -> Self {
         self.active = active;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -78,8 +87,14 @@ impl RenderOnce for SegmentedControl {
         let active = binding
             .as_ref()
             .map_or(self.active, |binding| binding.get(cx));
+        let disabled = self.disabled;
+        let interactive = !disabled && (binding.is_some() || handler.is_some());
+        let segment_keys: Vec<&'static str> = self.segments.iter().map(|s| s.key).collect();
+        let segments = self.segments;
+        let id = self.id;
+
         let mut row = div()
-            .id(self.id)
+            .id(id.clone())
             .h(px(28.0))
             .p(px(space::XXS))
             .flex()
@@ -88,9 +103,12 @@ impl RenderOnce for SegmentedControl {
             .rounded(px(radius::MD))
             .bg(theme.inset)
             .border_1()
-            .border_color(theme.border);
+            .border_color(theme.border)
+            .role(Role::RadioGroup)
+            .tab_index(0)
+            .when(disabled, |this| this.opacity(DISABLED_OPACITY));
 
-        for (index, segment) in self.segments.into_iter().enumerate() {
+        for (index, segment) in segments.into_iter().enumerate() {
             let is_active = segment.key == active;
             let key = segment.key;
             let handler = handler.clone();
@@ -118,9 +136,12 @@ impl RenderOnce for SegmentedControl {
                         .hover(move |style| style.text_color(theme.text_secondary))
                 })
                 .when(
-                    (binding.is_some() || handler.is_some()) && !is_active,
+                    interactive && !is_active,
                     |this| {
-                        this.on_click(move |_: &ClickEvent, window, cx| {
+                        this.on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
+                        .on_click(move |_: &ClickEvent, window, cx| {
                             if let Some(binding) = &binding {
                                 binding.set(cx, key);
                             }
@@ -134,6 +155,45 @@ impl RenderOnce for SegmentedControl {
                 .child(segment.label);
             row = row.child(cell);
         }
+
+        if interactive {
+            let binding = binding.clone();
+            let handler = handler.clone();
+            row = row.on_key_down(move |event: &KeyDownEvent, window, cx| {
+                let key = event.keystroke.key.as_str();
+                if key == "arrow-left" || key == "arrow-right" {
+                    let current = binding
+                        .as_ref()
+                        .map_or(active, |b| b.get(cx));
+                    let current_idx = segment_keys
+                        .iter()
+                        .position(|&k| k == current)
+                        .unwrap_or(0);
+                    let next_idx = if key == "arrow-left" {
+                        if current_idx == 0 {
+                            segment_keys.len().saturating_sub(1)
+                        } else {
+                            current_idx - 1
+                        }
+                    } else {
+                        if current_idx + 1 >= segment_keys.len() {
+                            0
+                        } else {
+                            current_idx + 1
+                        }
+                    };
+                    let next_key = segment_keys[next_idx];
+                    if let Some(binding) = &binding {
+                        binding.set(cx, next_key);
+                    }
+                    if let Some(handler) = &handler {
+                        handler(next_key, window, cx);
+                    }
+                    cx.stop_propagation();
+                }
+            });
+        }
+
         row
     }
 }
@@ -157,5 +217,12 @@ mod tests {
         });
 
         assert!(control.binding.is_some());
+    }
+
+    #[test]
+    fn segmented_control_disabled_defaults_to_false() {
+        let control = SegmentedControl::new("segmented", vec![Segment::new("one", "One")]);
+
+        assert!(!control.disabled);
     }
 }

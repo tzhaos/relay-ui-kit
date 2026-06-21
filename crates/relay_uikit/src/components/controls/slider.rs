@@ -1,14 +1,14 @@
 use gpui::{
     App, AppContext as _, ClickEvent, DragMoveEvent, ElementId, Empty, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled,
-    Window, div, prelude::FluentBuilder, px, relative,
+    IntoElement, KeyDownEvent, MouseButton, ParentElement, RenderOnce, Role,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, SharedChangeHandler},
-    theme::{ActiveTheme, radius},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 /// A compact horizontal slider with optional step callbacks.
@@ -18,6 +18,7 @@ pub struct Slider {
     value: f32,
     min: f32,
     max: f32,
+    disabled: bool,
     on_decrement: Option<ClickHandler>,
     on_increment: Option<ClickHandler>,
     binding: Option<Binding<f32>>,
@@ -31,6 +32,7 @@ impl Slider {
             value,
             min,
             max,
+            disabled: false,
             on_decrement: None,
             on_increment: None,
             binding: None,
@@ -44,11 +46,17 @@ impl Slider {
             value: min,
             min,
             max,
+            disabled: false,
             on_decrement: None,
             on_increment: None,
             binding: Some(binding),
             on_change: None,
         }
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
     }
 
     pub fn on_decrement(
@@ -94,6 +102,52 @@ impl RenderOnce for Slider {
         };
         let min = self.min;
         let max = self.max;
+        let step = (max - min) / 10.0;
+
+        // Auto-wire step buttons for bound() sliders
+        let dec_handler = if binding.is_some() {
+            let binding = binding.clone();
+            let handler = on_change.clone();
+            let on_decrement = on_decrement;
+            Some(Box::new(move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
+                if let Some(binding) = &binding {
+                    binding.update(cx, |v| {
+                        *v = (*v - step).max(min);
+                        true
+                    });
+                }
+                if let Some(handler) = &handler {
+                    handler(binding.as_ref().map_or(value - step, |b| b.get(cx)), window, cx);
+                }
+                if let Some(h) = &on_decrement {
+                    h(event, window, cx);
+                }
+            }) as ClickHandler)
+        } else {
+            on_decrement
+        };
+
+        let inc_handler = if binding.is_some() {
+            let binding = binding.clone();
+            let handler = on_change.clone();
+            let on_increment = on_increment;
+            Some(Box::new(move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
+                if let Some(binding) = &binding {
+                    binding.update(cx, |v| {
+                        *v = (*v + step).min(max);
+                        true
+                    });
+                }
+                if let Some(handler) = &handler {
+                    handler(binding.as_ref().map_or(value + step, |b| b.get(cx)), window, cx);
+                }
+                if let Some(h) = &on_increment {
+                    h(event, window, cx);
+                }
+            }) as ClickHandler)
+        } else {
+            on_increment
+        };
 
         div()
             .id(self.id.clone())
@@ -102,10 +156,11 @@ impl RenderOnce for Slider {
             .items_center()
             .gap_2()
             .role(Role::Slider)
+            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY))
             .child(step_button(
                 "slider-decrement",
                 IconName::Minus,
-                on_decrement,
+                dec_handler,
                 theme.hover,
                 theme.text_muted,
             ))
@@ -117,6 +172,7 @@ impl RenderOnce for Slider {
                     .h(px(16.0))
                     .flex()
                     .items_center()
+                    .tab_index(0)
                     .child(
                         div()
                             .h(px(3.0))
@@ -165,12 +221,36 @@ impl RenderOnce for Slider {
                                 }
                                 cx.stop_propagation();
                             })
+                    })
+                    .when(can_change && !self.disabled, |this| {
+                        let binding = binding.clone();
+                        let handler = on_change.clone();
+                        this.on_key_down(move |event: &KeyDownEvent, window, cx| {
+                            let key = event.keystroke.key.as_str();
+                            if key == "arrow-left" || key == "arrow-right" {
+                                let current = binding
+                                    .as_ref()
+                                    .map_or(value, |b| b.get(cx));
+                                let new_value = if key == "arrow-left" {
+                                    (current - step).max(min)
+                                } else {
+                                    (current + step).min(max)
+                                };
+                                if let Some(binding) = &binding {
+                                    binding.set(cx, new_value);
+                                }
+                                if let Some(handler) = &handler {
+                                    handler(new_value, window, cx);
+                                }
+                                cx.stop_propagation();
+                            }
+                        })
                     }),
             )
             .child(step_button(
                 "slider-increment",
                 IconName::Plus,
-                on_increment,
+                inc_handler,
                 theme.hover,
                 theme.text_muted,
             ))
@@ -254,5 +334,12 @@ mod tests {
         let slider = app.update(|cx| Slider::bound("slider", cx.binding(50.0), 0.0, 100.0));
 
         assert!(slider.binding.is_some());
+    }
+
+    #[test]
+    fn slider_disabled_defaults_to_false() {
+        let slider = Slider::new("slider", 50.0, 0.0, 100.0);
+
+        assert!(!slider.disabled);
     }
 }
