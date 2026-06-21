@@ -11,7 +11,7 @@ use gpui::{
 };
 use relay::{
     Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
-    view::{ReactiveView, StateScope, reactive_render},
+    view::StateScope,
 };
 use relay_uikit::patterns::ScrollSurface;
 use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
@@ -230,18 +230,14 @@ impl GalleryScenesApp {
     }
 }
 
-impl ReactiveView for GalleryScenesApp {
-    fn render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let surface = self.surface;
-        let state = &self.state;
-        let host = cx.entity();
-        render_surface(surface, state, &host, window, cx).into_any_element()
-    }
-}
-
 impl Render for GalleryScenesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        reactive_render(self, window, cx)
+        cx.tracked(|cx| {
+            let surface = self.surface;
+            let state = &self.state;
+            let host = cx.entity();
+            render_surface(surface, state, &host, window, cx)
+        })
     }
 }
 
