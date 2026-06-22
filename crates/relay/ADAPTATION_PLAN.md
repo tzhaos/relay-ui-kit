@@ -9,6 +9,11 @@ window lifecycles as the source of truth.
 - `Signal`, `Binding`, `Memo` / `derived`, `Effect`, `watch`, `untrack`, and
   reactive context cover app state, derivation, side effects, and cross-layer
   state sharing.
+- `effect_with_cleanup` and `effect_in_with_cleanup` cover source-dependent
+  side-effect lifetimes. Cleanups run before the next effect body and on
+  dispose/entity release; cleanup reads are untracked while cleanup writes still
+  notify normally. This gives the useful SolidJS-style cleanup behavior without
+  introducing a separate owner tree outside GPUI's entity lifecycle.
 - `watch` now tracks only the declared `sources`; its `react` closure runs in
   `untrack` so side-effect reads do not expand the source set. `watch_changes`
   covers the common "seed initial state, react only to later source changes"
@@ -79,6 +84,10 @@ window lifecycles as the source of truth.
   source tracking to the owning GPUI entity, starts from `Pending`, and tests
   that source changes later enter `Reloading` while retaining the last ready
   value.
+- The compiled `effect_cleanup` Relay example promotes source-dependent
+  side-effect lifetime outside UIKit. It switches a channel subscription from a
+  signal source and verifies the old cleanup runs before the new subscription
+  is installed.
 - The compiled `command_picker` Relay example promotes command/picker-shaped
   host state outside UIKit. It combines host-owned command data, query
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
@@ -178,6 +187,10 @@ runtime adapters only where they simplify real app state:
   `SignalVecExt::extend` for write bursts that should notify once. Avoid
   assuming a global frame-boundary batch when code does not have a `Window`
   lifecycle hook.
+- Use `effect_in_with_cleanup` when a source-dependent effect owns a temporary
+  external handle. Keep the source reads inside the effect body, register the
+  handle release with `CleanupScope::on_cleanup`, and let GPUI entity release
+  dispose the effect.
 
 ## Next Landing Steps
 
@@ -188,7 +201,13 @@ runtime adapters only where they simplify real app state:
 2. Do not add a Show/Switch helper yet. The `branch_subviews` example covers
    persistent branch state with GPUI entity boundaries; revisit only if repeated
    app code shows a common typed helper would remove real boilerplate.
-3. Keep expanding compiled app-shaped surfaces before adding new Relay
+3. Do not add `watch_with_cleanup` yet. The lower-level
+   `effect_in_with_cleanup` covers the real subscription/listener lifetime
+   case, while existing `watch` remains the simpler source/react split for
+   ordinary side effects. Add a watch-specific cleanup helper only after
+   repeated app code shows the source/react split plus cleanup is common enough
+   to justify another API.
+4. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
    `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.

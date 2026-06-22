@@ -44,7 +44,9 @@ mod window_ext;
 
 pub use binding::Binding;
 pub use context::{ContextHandle, provide_context, use_context};
-pub use effect::{Effect, effect, effect_in};
+pub use effect::{
+    CleanupScope, Effect, effect, effect_in, effect_in_with_cleanup, effect_with_cleanup,
+};
 pub use form::Form;
 pub use hooks::{ReactiveAppExt, ReactiveContextExt, install};
 pub use keyed::{KeyedSubView, KeyedSubViews};
@@ -62,9 +64,10 @@ pub use window_ext::WindowSignalExt;
 pub mod prelude {
     pub use crate::view;
     pub use crate::{
-        Binding, ContextHandle, Effect, Form, FormBuilder, KeyedSubView, KeyedSubViews, Memo,
-        Reactive, ReactiveAppExt, ReactiveContextExt, ReactiveView, Resource, ResourceState,
-        Selector, Signal, SignalVecExt, StateScope, SubView, WindowSignalExt, batch, effect,
-        effect_in, init, install, provide_context, track, untrack, use_context,
+        Binding, CleanupScope, ContextHandle, Effect, Form, FormBuilder, KeyedSubView,
+        KeyedSubViews, Memo, Reactive, ReactiveAppExt, ReactiveContextExt, ReactiveView, Resource,
+        ResourceState, Selector, Signal, SignalVecExt, StateScope, SubView, WindowSignalExt, batch,
+        effect, effect_in, effect_in_with_cleanup, effect_with_cleanup, init, install,
+        provide_context, track, untrack, use_context,
     };
 }

@@ -4,6 +4,35 @@ use gpui::{App, Context};
 
 use crate::{EffectId, ReactiveRuntime, init};
 
+pub(crate) type EffectCleanup = Box<dyn FnOnce(&mut App)>;
+
+/// Cleanup registration for one effect run.
+///
+/// Register cleanups from [`effect_with_cleanup`] or
+/// [`effect_in_with_cleanup`] when a side effect owns a temporary handle, such
+/// as a subscription, listener, or source-dependent task. Cleanups run before
+/// the effect re-runs and when the effect is disposed.
+pub struct CleanupScope {
+    cleanups: Vec<EffectCleanup>,
+}
+
+impl CleanupScope {
+    pub(crate) fn new() -> Self {
+        Self {
+            cleanups: Vec::new(),
+        }
+    }
+
+    /// Register a cleanup for the current effect run.
+    pub fn on_cleanup(&mut self, cleanup: impl FnOnce(&mut App) + 'static) {
+        self.cleanups.push(Box::new(cleanup));
+    }
+
+    pub(crate) fn into_cleanups(self) -> Vec<EffectCleanup> {
+        self.cleanups
+    }
+}
+
 /// Handle to a registered reactive effect.
 ///
 /// Effects created with [`effect_in`] are also removed when their owner GPUI
@@ -25,9 +54,7 @@ impl Effect {
 
     /// Remove the effect and unsubscribe it from all signals.
     pub fn dispose(self, cx: &mut App) {
-        if let Some(runtime) = cx.try_global::<ReactiveRuntime>() {
-            runtime.remove_effect(self.id);
-        }
+        ReactiveRuntime::remove_effect(cx, self.id);
     }
 }
 
@@ -35,7 +62,19 @@ impl Effect {
 ///
 /// The effect runs immediately to discover dependencies. When any dependency
 /// changes, relay runs the effect again.
-pub fn effect(cx: &mut App, f: impl FnMut(&mut App) + 'static) -> Effect {
+pub fn effect(cx: &mut App, mut f: impl FnMut(&mut App) + 'static) -> Effect {
+    effect_with_cleanup(cx, move |cx, _cleanup| f(cx))
+}
+
+/// Create an app-scoped reactive effect with per-run cleanup.
+///
+/// Cleanups registered during a run execute before the next run and when the
+/// effect is disposed. Cleanup signal reads are untracked; cleanup writes still
+/// notify normally.
+pub fn effect_with_cleanup(
+    cx: &mut App,
+    f: impl FnMut(&mut App, &mut CleanupScope) + 'static,
+) -> Effect {
     init(cx);
     let callback = Rc::new(RefCell::new(f));
     let id = cx.global::<ReactiveRuntime>().insert_effect(callback);
@@ -44,13 +83,19 @@ pub fn effect(cx: &mut App, f: impl FnMut(&mut App) + 'static) -> Effect {
 }
 
 /// Create an effect scoped to the current GPUI entity.
-pub fn effect_in<T: 'static>(cx: &mut Context<T>, f: impl FnMut(&mut App) + 'static) -> Effect {
-    let effect = effect(cx, f);
+pub fn effect_in<T: 'static>(cx: &mut Context<T>, mut f: impl FnMut(&mut App) + 'static) -> Effect {
+    effect_in_with_cleanup(cx, move |cx, _cleanup| f(cx))
+}
+
+/// Create an entity-scoped reactive effect with per-run cleanup.
+pub fn effect_in_with_cleanup<T: 'static>(
+    cx: &mut Context<T>,
+    f: impl FnMut(&mut App, &mut CleanupScope) + 'static,
+) -> Effect {
+    let effect = effect_with_cleanup(cx, f);
     let effect_id = effect.id;
     let subscription = cx.on_release(move |_, cx| {
-        if let Some(runtime) = cx.try_global::<ReactiveRuntime>() {
-            runtime.remove_effect(effect_id);
-        }
+        ReactiveRuntime::remove_effect(cx, effect_id);
     });
     cx.global::<ReactiveRuntime>()
         .insert_effect_release_subscription(effect_id, subscription);
@@ -59,11 +104,14 @@ pub fn effect_in<T: 'static>(cx: &mut Context<T>, f: impl FnMut(&mut App) + 'sta
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::Cell, rc::Rc};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+    };
 
     use gpui::TestApp;
 
-    use crate::{Signal, effect, effect_in, init};
+    use crate::{Signal, effect, effect_in, effect_in_with_cleanup, effect_with_cleanup, init};
 
     #[test]
     fn effect_dispose_removes_callback() {
@@ -155,5 +203,130 @@ mod tests {
         let e2 = app.update(|cx| effect(cx, |_| {}));
 
         assert_ne!(e1.id(), e2.id(), "each effect should have a unique id");
+    }
+
+    #[test]
+    fn effect_cleanup_runs_before_rerun() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            Signal::new(cx, 0)
+        });
+        let events = Rc::new(RefCell::new(Vec::new()));
+
+        let _effect = app.update({
+            let signal = signal.clone();
+            let events = events.clone();
+            move |cx| {
+                effect_with_cleanup(cx, move |cx, cleanup| {
+                    let value = signal.get(cx);
+                    events.borrow_mut().push(format!("run {value}"));
+                    let events = events.clone();
+                    cleanup.on_cleanup(move |_cx| {
+                        events.borrow_mut().push(format!("cleanup {value}"));
+                    });
+                })
+            }
+        });
+
+        app.update(|cx| signal.set(cx, 1));
+
+        assert_eq!(
+            &*events.borrow(),
+            &["run 0", "cleanup 0", "run 1"],
+            "previous cleanup should run before the next effect body"
+        );
+    }
+
+    #[test]
+    fn effect_cleanup_runs_on_dispose() {
+        let mut app = TestApp::new();
+        let cleanup_count = Rc::new(Cell::new(0));
+
+        let effect_handle = app.update({
+            let cleanup_count = cleanup_count.clone();
+            move |cx| {
+                effect_with_cleanup(cx, move |_cx, cleanup| {
+                    let cleanup_count = cleanup_count.clone();
+                    cleanup.on_cleanup(move |_cx| {
+                        cleanup_count.set(cleanup_count.get() + 1);
+                    });
+                })
+            }
+        });
+
+        assert_eq!(cleanup_count.get(), 0);
+
+        app.update(|cx| effect_handle.dispose(cx));
+
+        assert_eq!(cleanup_count.get(), 1);
+    }
+
+    #[test]
+    fn cleanup_reads_are_untracked() {
+        let mut app = TestApp::new();
+        let (source, cleanup_only) = app.update(|cx| {
+            init(cx);
+            (Signal::new(cx, 0), Signal::new(cx, 0))
+        });
+        let runs = Rc::new(Cell::new(0));
+
+        let _effect = app.update({
+            let source = source.clone();
+            let cleanup_only = cleanup_only.clone();
+            let runs = runs.clone();
+            move |cx| {
+                effect_with_cleanup(cx, move |cx, cleanup| {
+                    let _ = source.get(cx);
+                    runs.set(runs.get() + 1);
+                    let cleanup_only = cleanup_only.clone();
+                    cleanup.on_cleanup(move |cx| {
+                        let _ = cleanup_only.get(cx);
+                    });
+                })
+            }
+        });
+
+        app.update(|cx| source.set(cx, 1));
+        assert_eq!(runs.get(), 2);
+
+        app.update(|cx| cleanup_only.set(cx, 1));
+        assert_eq!(runs.get(), 2);
+    }
+
+    #[test]
+    fn entity_scoped_effect_cleanup_runs_on_release() {
+        use gpui::{AppContext, Context};
+
+        struct CleanupHost {
+            _effect: crate::Effect,
+        }
+
+        impl CleanupHost {
+            fn new(cx: &mut Context<Self>, cleanup_count: Rc<Cell<i32>>) -> Self {
+                let effect = effect_in_with_cleanup(cx, move |_cx, cleanup| {
+                    let cleanup_count = cleanup_count.clone();
+                    cleanup.on_cleanup(move |_cx| {
+                        cleanup_count.set(cleanup_count.get() + 1);
+                    });
+                });
+                Self { _effect: effect }
+            }
+        }
+
+        let mut app = TestApp::new();
+        let cleanup_count = Rc::new(Cell::new(0));
+        let weak = app.update({
+            let cleanup_count = cleanup_count.clone();
+            move |cx| {
+                let entity = cx.new(|cx| CleanupHost::new(cx, cleanup_count));
+                let weak = entity.downgrade();
+                drop(entity);
+                weak
+            }
+        });
+
+        weak.assert_released();
+        assert_eq!(cleanup_count.get(), 1);
     }
 }

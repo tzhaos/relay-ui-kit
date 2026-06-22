@@ -69,6 +69,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`derived`** — semantic alias for `memo`, emphasizing "derived value". Register derived computation in `new()` with `cx.derived(|cx| ...)`, read via `derived.get(cx)` in render; recomputes only when dependencies change.
 - **`watch(cx, sources, react)`** — declarative side effects. `sources` reads dependencies; `react` runs in `untrack`, so side-effect reads do not become new sources.
 - **`watch_changes(cx, sources, react)`** — same source/react split, but skips the initial reaction. Use it when the initial visible state is already seeded and only later source changes should reload or sync.
+- **`effect_with_cleanup` / `effect_in_with_cleanup`** — per-run cleanup for source-dependent side effects. Register cleanup work with `CleanupScope::on_cleanup`; relay runs it before the effect re-runs and when the effect is disposed or the owning GPUI entity is released. Cleanup reads are untracked, while cleanup writes still notify normally.
 - **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource load. The first run records sources and starts `Resource::load`; later source changes call `Resource::reload` so the latest ready value remains visible while refreshing.
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource reload. `sources` declares dependencies, `build_load` snapshots current app state after a source change, and the resource reload keeps the latest ready value visible while async work runs.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification.
@@ -110,6 +111,17 @@ impl SettingsView {
             |cx| { let _ = count.get(cx); },
             move |cx| { /* e.g. update a label signal */ },
         );
+
+        // Source-dependent side effect: clean the previous handle before
+        // subscribing to the next source.
+        let channel = cx.signal("inbox");
+        let channel_for_effect = channel.clone();
+        let _ = cx.effect_in_with_cleanup(move |cx, cleanup| {
+            let name = channel_for_effect.get(cx);
+            cleanup.on_cleanup(move |_cx| {
+                // close listener/subscription for `name`
+            });
+        });
 
         // Form aggregation: register fields, derive is_dirty.
         let settings_dirty = scope
@@ -265,6 +277,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `binding` | `Binding` two-way binding |
 | `untrack` | `untrack`, `set_silent` / `update_silent` |
 | `effect` | `Effect`, `effect_in` entity-scoped effects |
+| `effect_cleanup` | `effect_in_with_cleanup` per-run side-effect cleanup |
 | `derived` | `derived` / `memo` derived values |
 | `watch` | `watch` / `watch_changes` declarative side effects |
 | `signal_vec` | `SignalVecExt` reactive list operations |

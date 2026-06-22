@@ -55,7 +55,8 @@ use gpui::{
 };
 
 use crate::{
-    effect, effect_in, Binding, Effect, Form, Memo, ReactiveAppExt, ReactiveContextExt, Resource,
+    Binding, CleanupScope, Effect, Form, Memo, ReactiveAppExt, ReactiveContextExt, Resource,
+    effect, effect_in, effect_in_with_cleanup,
 };
 
 // ---------------------------------------------------------------------------
@@ -95,6 +96,16 @@ impl StateScope {
         f: impl FnMut(&mut App) + 'static,
     ) {
         let e = effect_in(cx, f);
+        self.effects.push(e);
+    }
+
+    /// Register an entity-scoped effect with per-run cleanup.
+    pub fn effect_in_with_cleanup<T: 'static>(
+        &mut self,
+        cx: &mut Context<T>,
+        f: impl FnMut(&mut App, &mut CleanupScope) + 'static,
+    ) {
+        let e = effect_in_with_cleanup(cx, f);
         self.effects.push(e);
     }
 
@@ -363,9 +374,9 @@ pub fn reactive_render<T: ReactiveView>(
 mod tests {
     use std::{cell::Cell, rc::Rc, time::Duration};
 
-    use gpui::{div, Context, IntoElement, ParentElement, Render, Styled, TestApp, Window};
+    use gpui::{Context, IntoElement, ParentElement, Render, Styled, TestApp, Window, div};
 
-    use crate::{init, ReactiveAppExt, Resource, ResourceState, Signal};
+    use crate::{ReactiveAppExt, Resource, ResourceState, Signal, init};
 
     use super::*;
 

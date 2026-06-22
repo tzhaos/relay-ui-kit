@@ -6,6 +6,8 @@ use std::{
 
 use gpui::{App, Context, EntityId, Global, Subscription};
 
+use crate::effect::{CleanupScope, EffectCleanup};
+
 /// Stable identifier for a reactive signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SignalId(u64);
@@ -40,6 +42,7 @@ struct RuntimeState {
     entity_deps: HashMap<EntityId, HashSet<SignalId>>,
     effect_deps: HashMap<EffectId, HashSet<SignalId>>,
     effects: HashMap<EffectId, EffectCallback>,
+    effect_cleanups: HashMap<EffectId, Vec<EffectCleanup>>,
     entity_release_subscriptions: HashMap<EntityId, Subscription>,
     effect_release_subscriptions: HashMap<EffectId, Subscription>,
     batch_depth: usize,
@@ -55,7 +58,7 @@ struct TrackingScope {
     suppress: bool,
 }
 
-type EffectCallback = Rc<RefCell<dyn FnMut(&mut App)>>;
+type EffectCallback = Rc<RefCell<dyn FnMut(&mut App, &mut CleanupScope)>>;
 
 #[derive(Default, Debug)]
 pub(crate) struct SignalNotifications {
@@ -185,12 +188,32 @@ impl ReactiveRuntime {
             Some(callback) => callback,
             None => return,
         };
+        let cleanups = cx.global::<ReactiveRuntime>().prepare_effect_run(effect_id);
+        Self::run_cleanups(cx, cleanups);
+        if cx
+            .global::<ReactiveRuntime>()
+            .effect_callback(effect_id)
+            .is_none()
+        {
+            return;
+        }
 
+        let mut cleanup_scope = CleanupScope::new();
         cx.global::<ReactiveRuntime>().begin_tracking();
-        callback.borrow_mut()(cx);
+        callback.borrow_mut()(cx, &mut cleanup_scope);
         let deps = cx.global::<ReactiveRuntime>().end_tracking();
         cx.global::<ReactiveRuntime>()
             .replace_effect_dependencies(effect_id, deps);
+        cx.global::<ReactiveRuntime>()
+            .replace_effect_cleanups(effect_id, cleanup_scope.into_cleanups());
+    }
+
+    pub(crate) fn remove_effect(cx: &mut App, effect_id: EffectId) {
+        let cleanups = match cx.try_global::<ReactiveRuntime>() {
+            Some(runtime) => runtime.remove_effect_state(effect_id),
+            None => return,
+        };
+        Self::run_cleanups(cx, cleanups);
     }
 
     fn begin_tracking(&self) {
@@ -201,13 +224,10 @@ impl ReactiveRuntime {
     }
 
     fn begin_untracked_scope(&self) {
-        self.state
-            .borrow_mut()
-            .tracking_stack
-            .push(TrackingScope {
-                suppress: true,
-                ..Default::default()
-            });
+        self.state.borrow_mut().tracking_stack.push(TrackingScope {
+            suppress: true,
+            ..Default::default()
+        });
     }
 
     fn end_tracking(&self) -> HashSet<SignalId> {
@@ -233,6 +253,15 @@ impl ReactiveRuntime {
             deps,
             DependencyOwner::Effect(effect_id),
         );
+    }
+
+    fn replace_effect_cleanups(&self, effect_id: EffectId, cleanups: Vec<EffectCleanup>) {
+        let mut state = self.state.borrow_mut();
+        if cleanups.is_empty() {
+            state.effect_cleanups.remove(&effect_id);
+        } else {
+            state.effect_cleanups.insert(effect_id, cleanups);
+        }
     }
 
     fn replace_observer_dependencies(
@@ -333,8 +362,23 @@ impl ReactiveRuntime {
         state.entity_release_subscriptions.remove(&entity_id);
     }
 
-    pub(crate) fn remove_effect(&self, effect_id: EffectId) {
+    fn prepare_effect_run(&self, effect_id: EffectId) -> Vec<EffectCleanup> {
         let mut state = self.state.borrow_mut();
+        Self::clear_effect_dependencies(&mut state, effect_id);
+        state.pending_effects.remove(&effect_id);
+        state.effect_cleanups.remove(&effect_id).unwrap_or_default()
+    }
+
+    fn remove_effect_state(&self, effect_id: EffectId) -> Vec<EffectCleanup> {
+        let mut state = self.state.borrow_mut();
+        Self::clear_effect_dependencies(&mut state, effect_id);
+        state.effects.remove(&effect_id);
+        state.pending_effects.remove(&effect_id);
+        state.effect_release_subscriptions.remove(&effect_id);
+        state.effect_cleanups.remove(&effect_id).unwrap_or_default()
+    }
+
+    fn clear_effect_dependencies(state: &mut RuntimeState, effect_id: EffectId) {
         if let Some(deps) = state.effect_deps.remove(&effect_id) {
             for signal_id in deps {
                 if let Some(observers) = state.signal_observers.get_mut(&signal_id) {
@@ -345,9 +389,22 @@ impl ReactiveRuntime {
                 }
             }
         }
-        state.effects.remove(&effect_id);
-        state.pending_effects.remove(&effect_id);
-        state.effect_release_subscriptions.remove(&effect_id);
+    }
+
+    fn run_cleanups(cx: &mut App, cleanups: Vec<EffectCleanup>) {
+        if cleanups.is_empty() {
+            return;
+        }
+
+        cx.global::<ReactiveRuntime>().begin_untracked_scope();
+        for cleanup in cleanups {
+            cleanup(cx);
+        }
+        let dropped = cx.global::<ReactiveRuntime>().end_tracking();
+        debug_assert!(
+            dropped.is_empty(),
+            "effect cleanup scope should not collect dependencies"
+        );
     }
 
     fn effect_callback(&self, effect_id: EffectId) -> Option<EffectCallback> {
@@ -721,7 +778,8 @@ mod tests {
 
         let outer_notifications = runtime.exit_batch();
         assert_eq!(
-            outer_notifications.entities, vec![entity_id],
+            outer_notifications.entities,
+            vec![entity_id],
             "exiting outer batch should flush"
         );
     }

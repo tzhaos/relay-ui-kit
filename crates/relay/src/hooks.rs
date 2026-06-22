@@ -4,7 +4,10 @@ use std::{borrow::BorrowMut, cell::Cell, hash::Hash};
 
 use gpui::{App, Context};
 
-use crate::{Binding, Effect, Memo, Resource, Selector, Signal, effect_in, init, track, untrack};
+use crate::{
+    Binding, CleanupScope, Effect, Memo, Resource, Selector, Signal, effect_in,
+    effect_in_with_cleanup, init, track, untrack,
+};
 
 /// Convenience constructors for relay primitives on GPUI app contexts.
 pub trait ReactiveAppExt {
@@ -119,6 +122,12 @@ pub trait ReactiveContextExt<T: 'static> {
     /// read signals and react to them — it documents intent at the call site.
     fn effect_in(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect;
 
+    /// Create an entity-scoped effect with cleanup before re-run and release.
+    fn effect_in_with_cleanup(
+        &mut self,
+        f: impl FnMut(&mut App, &mut CleanupScope) + 'static,
+    ) -> Effect;
+
     /// Watch signals for changes and run a side effect.
     ///
     /// `sources` reads the dependencies (and is re-evaluated each run so
@@ -129,11 +138,7 @@ pub trait ReactiveContextExt<T: 'static> {
     ///
     /// Unlike [`ReactiveContextExt::effect_in`], this separates dependency
     /// declaration from the side effect, making "when X changes, do Y" explicit.
-    fn watch<S, R>(
-        &mut self,
-        sources: S,
-        react: R,
-    ) -> Effect
+    fn watch<S, R>(&mut self, sources: S, react: R) -> Effect
     where
         S: Fn(&App) + 'static,
         R: Fn(&mut App) + 'static;
@@ -143,11 +148,7 @@ pub trait ReactiveContextExt<T: 'static> {
     /// This is useful when the initial visible state is already seeded, but
     /// later source changes should trigger a reload, sync, or other side
     /// effect.
-    fn watch_changes<S, R>(
-        &mut self,
-        sources: S,
-        react: R,
-    ) -> Effect
+    fn watch_changes<S, R>(&mut self, sources: S, react: R) -> Effect
     where
         S: Fn(&App) + 'static,
         R: Fn(&mut App) + 'static;
@@ -164,6 +165,13 @@ impl<T: 'static> ReactiveContextExt<T> for Context<'_, T> {
 
     fn effect_in(&mut self, f: impl FnMut(&mut App) + 'static) -> Effect {
         effect_in(self, f)
+    }
+
+    fn effect_in_with_cleanup(
+        &mut self,
+        f: impl FnMut(&mut App, &mut CleanupScope) + 'static,
+    ) -> Effect {
+        effect_in_with_cleanup(self, f)
     }
 
     fn watch<S, R>(&mut self, sources: S, react: R) -> Effect
@@ -388,7 +396,9 @@ mod tests {
 
         impl Render for WatchView {
             fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-                track(cx, |cx| div().child((self.a.get(cx) + self.b.get(cx)).to_string()))
+                track(cx, |cx| {
+                    div().child((self.a.get(cx) + self.b.get(cx)).to_string())
+                })
             }
         }
 
@@ -493,7 +503,10 @@ mod tests {
                         fires.set(fires.get() + 1);
                     },
                 );
-                Self { watched, react_only }
+                Self {
+                    watched,
+                    react_only,
+                }
             }
         }
 
