@@ -18,6 +18,16 @@ pub trait SignalVecExt<T: 'static> {
     /// Push a value onto the end of the list and notify dependents.
     fn push(&self, cx: &mut App, value: T);
 
+    /// Push a value and select its stable key in one batch.
+    fn push_selected_by<K>(
+        &self,
+        cx: &mut App,
+        selector: &Selector<K>,
+        value: T,
+        key: impl FnOnce(&T) -> K,
+    ) where
+        K: Clone + Eq + Hash + PartialEq + 'static;
+
     /// Append multiple values to the end of the list and notify dependents
     /// once when at least one value was appended.
     fn extend(&self, cx: &mut App, values: impl IntoIterator<Item = T>);
@@ -58,6 +68,22 @@ impl<T: 'static> SignalVecExt<T> for Signal<Vec<T>> {
         self.update(cx, |list| {
             list.push(value);
             true
+        });
+    }
+
+    fn push_selected_by<K>(
+        &self,
+        cx: &mut App,
+        selector: &Selector<K>,
+        value: T,
+        key: impl FnOnce(&T) -> K,
+    ) where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        let selected = key(&value);
+        batch(cx, |cx| {
+            self.push(cx, value);
+            selector.select(cx, selected);
         });
     }
 
@@ -359,6 +385,56 @@ mod tests {
 
         app.update(|cx| {
             signal.remove_selected_by(cx, &selector, |item| *item);
+        });
+
+        assert_eq!(runs.get(), 2);
+    }
+
+    #[test]
+    fn push_selected_by_pushes_item_and_selects_its_key() {
+        let mut app = TestApp::new();
+        let (signal, selector) = app.update(|cx| {
+            init(cx);
+            let signal: Signal<Vec<i32>> = cx.signal(vec![1, 2]);
+            let selector = Selector::new(cx, Some(1));
+            (signal, selector)
+        });
+
+        app.update(|cx| {
+            signal.push_selected_by(cx, &selector, 3, |item| *item);
+        });
+
+        assert_eq!(signal.get_untracked(), vec![1, 2, 3]);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn push_selected_by_batches_list_and_selection_notifications() {
+        let mut app = TestApp::new();
+        let (signal, selector) = app.update(|cx| {
+            init(cx);
+            let signal: Signal<Vec<i32>> = cx.signal(vec![1, 2]);
+            let selector = Selector::new(cx, Some(1));
+            (signal, selector)
+        });
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let signal = signal.clone();
+            let selector = selector.clone();
+            let runs = runs.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = signal.get(cx).len();
+                    let _ = selector.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+
+        assert_eq!(runs.get(), 1);
+
+        app.update(|cx| {
+            signal.push_selected_by(cx, &selector, 3, |item| *item);
         });
 
         assert_eq!(runs.get(), 2);

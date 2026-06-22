@@ -10,7 +10,7 @@ their public control surfaces.
 | Requirement | Current evidence | Status |
 |---|---|---|
 | Reactive entity tracking uses GPUI invalidation | `runtime.rs` tracks signal reads to the current `EntityId`, `reactive_render` wraps `render_state` in `cx.tracked`, and tests cover dependency replacement, entity release cleanup, `untrack`, and batching. | Complete |
-| State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. `SignalVecExt::remove_selected_by` covers the repeated selector-backed removal shape without adding a collection store. | Complete |
+| State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. `SignalVecExt::push_selected_by` and `remove_selected_by` cover repeated selector-backed append-select and removal shapes without adding a collection store. | Complete |
 | Side effects have GPUI-scoped lifetime and cleanup | `effect_in`, `effect_in_with_cleanup`, `StateScope::effect_in_with_cleanup`, and cleanup tests cover rerun cleanup, dispose cleanup, entity release cleanup, StateScope-held entity cleanup, and untracked cleanup reads. The `effect_cleanup` example covers source-dependent subscription switching. | Complete |
 | Declarative source/react split is available | `watch` and `watch_changes` track only declared sources and run reactions untracked. `hooks.rs`, `view.rs`, and the `watch` example cover source-only dependencies and skipped initial reactions. | Complete |
 | Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_from_source`, `reload_resource_from_source`, and the lower-level `_on_changes` variants are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
@@ -116,13 +116,22 @@ collection write and selector reconciliation atomic:
 items.remove_selected_by(cx, &selection, |item| item.id);
 ```
 
+When a host creates and selects a new item, use the matching append-select
+helper:
+
+```rust
+items.push_selected_by(cx, &selection, item, |item| item.id);
+```
+
 Current migration checkpoint:
 
 - Workbench task/session lists and the gallery stress session list use
   `remove_selected_by` for selected-row deletion.
+- The Relay session surface and gallery retained-row hosts use
+  `push_selected_by` for append-and-select creation.
 - This replaces repeated host-side `get_untracked + Vec::remove +
-  reconcile_keys_by` code while preserving host ownership of item order and row
-  presentation.
+  reconcile_keys_by` and `push + select` code while preserving host ownership
+  of item order and row presentation.
 
 ### 4. Migrate Async Data
 
@@ -245,7 +254,8 @@ Current deferred ideas and their bar:
   lifetime and `watch` remains a simpler source/react split.
 - Command registry or selector-backed collection store: defer while
   `Selector`, `SelectedItemExt`, `sync_with_selector`, and
-  `SignalVecExt::remove_selected_by` keep command and row data host-owned.
+  `SignalVecExt::push_selected_by` / `remove_selected_by` keep command and row
+  data host-owned.
 - Frame-boundary automatic batching: defer without a GPUI `Window` lifecycle
   hook that clearly improves real app write bursts beyond explicit `batch` and
   collection helpers.

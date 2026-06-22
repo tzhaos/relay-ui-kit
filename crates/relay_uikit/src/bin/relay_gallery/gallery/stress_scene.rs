@@ -198,16 +198,17 @@ impl StressSessionList {
     fn add_session(&mut self, cx: &mut App) {
         let id = self.next_id;
         self.next_id += 1;
-        self.sessions.update(cx, |sessions| {
-            sessions.push(StressSession::new(
+        self.sessions.push_selected_by(
+            cx,
+            &self.selection,
+            StressSession::new(
                 id,
                 format!("Generated session {id:02}"),
                 "relay-ui-kit / generated",
                 Tone::Secondary,
-            ));
-            true
-        });
-        self.selection.select(cx, id);
+            ),
+            |session| session.id,
+        );
     }
 
     fn activate_next(&self, cx: &mut App) {

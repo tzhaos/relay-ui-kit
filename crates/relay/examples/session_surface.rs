@@ -100,8 +100,8 @@ impl SessionSurface {
         let session = Session::new(id, format!("Session {id}"), "codex", "scratch");
 
         cx.batch(|cx| {
-            self.sessions.push(cx, session);
-            self.selection.select(cx, id);
+            self.sessions
+                .push_selected_by(cx, &self.selection, session, |session| session.id);
             self.last_action.set(cx, format!("created session {id}"));
         });
     }

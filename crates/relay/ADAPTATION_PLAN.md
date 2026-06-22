@@ -40,6 +40,8 @@ For the current completion audit and migration checklist, see
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.
+- `SignalVecExt::push_selected_by` covers the repeated retained-row creation
+  shape: append the host-owned item and select its stable key in one batch.
 - `SignalVecExt::remove_selected_by` covers the repeated selector-backed
   removal shape in retained row hosts. It removes the currently selected item
   from a `Signal<Vec<T>>` and reconciles the `Selector<K>` inside one batch,
@@ -219,9 +221,10 @@ runtime adapters only where they simplify real app state:
   part of SolidJS-style source resources while keeping the resource itself
   UI-agnostic and scoped to the owning GPUI entity.
 - Use `batch` or single-operation collection helpers such as
-  `SignalVecExt::extend` and `SignalVecExt::remove_selected_by` for write
-  bursts that should notify once. Avoid assuming a global frame-boundary batch
-  when code does not have a `Window` lifecycle hook.
+  `SignalVecExt::extend`, `SignalVecExt::push_selected_by`, and
+  `SignalVecExt::remove_selected_by` for write bursts that should notify once.
+  Avoid assuming a global frame-boundary batch when code does not have a
+  `Window` lifecycle hook.
 - Use `effect_in_with_cleanup` when a source-dependent effect owns a temporary
   external handle. Keep the source reads inside the effect body, register the
   handle release with `CleanupScope::on_cleanup`, and let GPUI entity release
@@ -247,9 +250,10 @@ runtime adapters only where they simplify real app state:
 4. Do not add a Relay command registry or selector-backed collection store yet.
    `SelectedItemExt` covers the repeated selected-item projection without
    taking ownership of command data, item ordering, row rendering, or UIKit
-   presentation. `SignalVecExt::remove_selected_by` is deliberately narrower:
-   it only batches selected-item removal plus selector reconciliation for
-   host-owned vectors.
+   presentation. `SignalVecExt::push_selected_by` and
+   `SignalVecExt::remove_selected_by` are deliberately narrower: they only
+   batch append-select and selected-item removal/reconciliation for host-owned
+   vectors.
 5. Keep expanding compiled app-shaped surfaces before adding broader Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in

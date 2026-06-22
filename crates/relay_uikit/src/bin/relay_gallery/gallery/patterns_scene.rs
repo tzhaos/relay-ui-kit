@@ -3,7 +3,8 @@ use gpui::{
     Styled, Window, div, px,
 };
 use relay::{
-    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, view::reactive_render,
+    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, SignalVecExt,
+    view::reactive_render,
 };
 use relay_uikit::patterns::{
     PaneToolbar, TopToolbar, WorkspaceBreadcrumb,
@@ -402,17 +403,18 @@ impl PatternProjectPicker {
     fn add_project(&mut self, cx: &mut App) {
         let id = self.next_id;
         self.next_id += 1;
-        self.projects.update(cx, |projects| {
-            projects.push(PatternProject::new(
+        self.projects.push_selected_by(
+            cx,
+            &self.selection,
+            PatternProject::new(
                 id,
                 format!("generated-{id:02}"),
                 "workspace / generated",
                 Tone::Secondary,
                 "NEW",
-            ));
-            true
-        });
-        self.selection.select(cx, id);
+            ),
+            |project| project.id,
+        );
     }
 }
 

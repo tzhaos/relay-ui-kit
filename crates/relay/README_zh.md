@@ -77,7 +77,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`StateScope::reload_resource_from_source(cx, resource, source, build_load)`** — 适合已有 ready seed 的 source snapshot 版本。初始运行只记录 source，后续变化再用 tracked source snapshot 触发 reload。
 - **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource load。首次运行记录 source 并触发 `Resource::load`；后续 source 变化触发 `Resource::reload`，刷新时保留最新 ready 值。
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource reload。`sources` 声明依赖，`build_load` 在 source 变化后读取当前 app 快照，resource reload 时保留上一份 ready 值继续可见。
-- **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `extend` / `insert` / `remove` / `remove_first` / `remove_selected_by` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`；selector-backed list 删除当前选中项并同步清理 stale selection 时，用 `remove_selected_by`。
+- **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `push_selected_by` / `extend` / `insert` / `remove` / `remove_first` / `remove_selected_by` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`；创建 row 时要追加新项并在同一个 batch 中选中它的稳定 key，用 `push_selected_by`；selector-backed list 删除当前选中项并同步清理 stale selection 时，用 `remove_selected_by`。
 - **`Selector<K>`** — keyed 选择状态。行视图用 `selector.is_selected(cx, key)` 只追踪自己的 key；选择项变化时只通知上一个和下一个选中 key，而不是整张列表。列表变化时，host 可以调用 `selector.reconcile_keys(cx, keys)` 丢弃失效行信号，并在当前选中 key 已不存在时清空选择；有序列表导航可以用 `select_next` / `select_previous` / `select_first` / `select_last`。当 host 手里是 item struct 列表时，用 `_by` 变体直接把 item 映射到稳定 key，避免先克隆整张列表。command/picker 一类 surface 通常可以保持为 host 自己拥有 item 顺序，再配 `Selector<K>`，不需要上升成 Relay 级 command registry。
 - **`SelectedItemExt`** — selector-backed collection 的选中项投影。对 `Signal<Vec<T>>` 或 `Memo<Vec<T>>` 调用 `items.selected_by(cx, selector, |item| item.id)` 可以得到 `Memo<Option<T>>`；需要在 selector 为空或 key 缺失时回退到第一项时，用 `selected_by_or_first`。
 - **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
@@ -299,6 +299,12 @@ let selected_command = visible_commands.selected_by(cx, command_selector, |comma
 
 ```rust
 tasks.remove_selected_by(cx, &selected, |task| task.id);
+```
+
+当宿主创建并选中新 retained row 时，用对应 helper 追加并选中：
+
+```rust
+tasks.push_selected_by(cx, &selected, task, |task| task.id);
 ```
 
 ## 示例
