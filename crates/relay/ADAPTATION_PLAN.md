@@ -17,6 +17,11 @@ For the current completion audit and migration checklist, see
   dispose/entity release; cleanup reads are untracked while cleanup writes still
   notify normally. This gives the useful SolidJS-style cleanup behavior without
   introducing a separate owner tree outside GPUI's entity lifecycle.
+- `StateScope` is the view-field lifetime holder for entity-scoped effects,
+  source-driven resource watchers, and dirty-check forms. It keeps handles
+  reachable with the owning GPUI entity; entity-scoped cleanup still comes from
+  GPUI `on_release`, while app-scoped effects should use explicit `Effect`
+  handles when manual disposal is needed.
 - `watch` now tracks only the declared `sources`; its `react` closure runs in
   `untrack` so side-effect reads do not expand the source set. `watch_changes`
   covers the common "seed initial state, react only to later source changes"
@@ -105,6 +110,10 @@ For the current completion audit and migration checklist, see
   side-effect lifetime outside UIKit. It switches a channel subscription from a
   signal source and verifies the old cleanup runs before the new subscription
   is installed.
+- `StateScope::effect_in_with_cleanup` is covered by a focused release test:
+  storing only the `StateScope` field is enough for the entity-scoped effect to
+  clean up on GPUI entity release, because the cleanup path is registered with
+  `cx.on_release`.
 - The compiled `command_picker` Relay example promotes command/picker-shaped
   host state outside UIKit. It combines host-owned command data, query
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
@@ -227,9 +236,10 @@ runtime adapters only where they simplify real app state:
 3. Do not add `watch_with_cleanup` yet. The lower-level
    `effect_in_with_cleanup` covers the real subscription/listener lifetime
    case, while existing `watch` remains the simpler source/react split for
-   ordinary side effects. Add a watch-specific cleanup helper only after
-   repeated app code shows the source/react split plus cleanup is common enough
-   to justify another API.
+   ordinary side effects. Keep `StateScope` usage entity-scoped; app-scoped
+   effects should keep explicit `Effect` handles. Add a watch-specific cleanup
+   helper only after repeated app code shows the source/react split plus cleanup
+   is common enough to justify another API.
 4. Do not add a Relay command registry or selector-backed collection store yet.
    `SelectedItemExt` covers the repeated selected-item projection without
    taking ownership of command data, item ordering, row rendering, or UIKit

@@ -72,6 +72,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`watch(cx, sources, react)`** — 声明式副作用。`sources` 读取依赖，`react` 在 `untrack` 中执行，因此副作用里的读取不会变成新的 source。
 - **`watch_changes(cx, sources, react)`** — 同样分离 source/react，但跳过初始 reaction。适合初始可见状态已经 seed 好、只希望后续 source 变化触发 reload 或同步的场景。
 - **`effect_with_cleanup` / `effect_in_with_cleanup`** — source-dependent 副作用的每轮 cleanup。通过 `CleanupScope::on_cleanup` 注册清理逻辑；relay 会在 effect 下次重跑前、effect dispose 时、或所属 GPUI entity release 时执行它。cleanup 中的读取不建立依赖，写入仍按正常路径通知。
+- **`StateScope`** — entity 拥有的句柄容器，用来保存 scoped effect、source-driven resource watcher 和仅做 dirty-check 的 form。把它存成 view 字段；entity-scoped effect 的释放仍走 GPUI `on_release`，app-scoped effect 如果需要手动 dispose，应保留显式 `Effect` 句柄。
 - **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource load。首次运行记录 source 并触发 `Resource::load`；后续 source 变化触发 `Resource::reload`，刷新时保留最新 ready 值。
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource reload。`sources` 声明依赖，`build_load` 在 source 变化后读取当前 app 快照，resource reload 时保留上一份 ready 值继续可见。
 - **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `extend` / `insert` / `remove` / `remove_first` / `remove_selected_by` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`；selector-backed list 删除当前选中项并同步清理 stale selection 时，用 `remove_selected_by`。

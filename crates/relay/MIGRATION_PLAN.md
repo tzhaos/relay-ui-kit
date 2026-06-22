@@ -11,7 +11,7 @@ their public control surfaces.
 |---|---|---|
 | Reactive entity tracking uses GPUI invalidation | `runtime.rs` tracks signal reads to the current `EntityId`, `reactive_render` wraps `render_state` in `cx.tracked`, and tests cover dependency replacement, entity release cleanup, `untrack`, and batching. | Complete |
 | State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. `SignalVecExt::remove_selected_by` covers the repeated selector-backed removal shape without adding a collection store. | Complete |
-| Side effects have GPUI-scoped lifetime and cleanup | `effect_in`, `effect_in_with_cleanup`, `StateScope::effect_in_with_cleanup`, and cleanup tests cover rerun cleanup, dispose cleanup, entity release cleanup, and untracked cleanup reads. The `effect_cleanup` example covers source-dependent subscription switching. | Complete |
+| Side effects have GPUI-scoped lifetime and cleanup | `effect_in`, `effect_in_with_cleanup`, `StateScope::effect_in_with_cleanup`, and cleanup tests cover rerun cleanup, dispose cleanup, entity release cleanup, StateScope-held entity cleanup, and untracked cleanup reads. The `effect_cleanup` example covers source-dependent subscription switching. | Complete |
 | Declarative source/react split is available | `watch` and `watch_changes` track only declared sources and run reactions untracked. `hooks.rs`, `view.rs`, and the `watch` example cover source-only dependencies and skipped initial reactions. | Complete |
 | Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_on_changes` and `reload_resource_on_changes` are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
 | Entity-grained UI retention follows GPUI cache boundaries | `SubView`, `KeyedSubViews`, and `KeyedSubViews::sync_with_selector` keep stateful regions and rows as GPUI entities. Tests cover cached sibling reuse, retained branches, row reuse, row-local state survival, and stale selection reconciliation. | Complete |
@@ -165,11 +165,43 @@ the next source subscription or on entity release.
 Register those handles with `CleanupScope::on_cleanup`; cleanup reads are
 untracked and cleanup writes still notify through the normal signal path.
 
+Current migration checkpoint:
+
+- The `effect_cleanup` example verifies source changes clean up the old
+  subscription before installing the next one.
+- `effect.rs` tests verify cleanup before re-run, cleanup on manual dispose,
+  cleanup on entity release, and untracked cleanup reads.
+- `view.rs` tests verify `StateScope::effect_in_with_cleanup` still cleans up
+  on entity release when the view stores only a `StateScope` field. The
+  lifetime path is GPUI `cx.on_release`, not `StateScope::drop`.
+- `StateScope::effect` is not the preferred view-lifetime path for new code:
+  app-scoped effects should keep an explicit `Effect` handle for disposal, and
+  view-owned effects should use `effect_in` / `effect_in_with_cleanup`.
+- No `watch_with_cleanup` helper is currently justified. Existing real surfaces
+  either need source/react splitting without handles (`watch` /
+  `watch_changes`) or handle cleanup tied to GPUI entity lifetime
+  (`effect_in_with_cleanup`).
+
 ### 6. Migrate Branches and Panels
 
 For persistent tabs, panes, and view modes that own state, store each branch as
 a `SubView<T>` field and render only the active branch through `cached(...)`.
 Use `hidden()` for presentation only, not as a branch lifetime primitive.
+
+Current migration checkpoint:
+
+- The `branch_subviews` example keeps each branch as a host-owned `SubView`,
+  renders only the active branch through GPUI's cached view path, and tests
+  inactive branch render suppression plus state survival across switching.
+- GPUI's `AnyView::cached` reuses previous prepaint/paint work when the view
+  entity is clean and the cache key still matches; `SubView` and
+  `KeyedSubViews` align Relay's UI granularity with that entity cache boundary.
+- GPUI `hidden()` sets `Display::None` and skipped children do not prepaint or
+  paint, so it remains a presentation tool instead of a persistent branch
+  lifecycle primitive.
+- No Show/Switch helper is currently justified. A helper should wait until
+  repeated app surfaces show a common typed branch shape beyond ordinary
+  host-owned `SubView` fields.
 
 ### 7. Verification Gates
 

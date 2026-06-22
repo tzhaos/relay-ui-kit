@@ -3,9 +3,9 @@
 //! This module provides two key abstractions that eliminate boilerplate in
 //! GPUI views:
 //!
-//! - [`StateScope`] — holds effect handles and forms so they live as long as
-//!   the view Entity, replacing `std::mem::forget(form)` and `_effect: Effect`
-//!   field patterns.
+//! - [`StateScope`] — holds entity-scoped effect handles and forms in the view
+//!   struct, replacing `std::mem::forget(form)` and `_effect: Effect` field
+//!   patterns.
 //! - [`ReactiveView`] — a trait that, combined with the [`reactive_render`]
 //!   helper, eliminates manual `cx.tracked(|cx| ...)` from every view.
 //!
@@ -63,11 +63,12 @@ use crate::{
 // StateScope
 // ---------------------------------------------------------------------------
 
-/// Holds the lifetimes of effects and forms created during view initialization.
+/// Holds entity-owned effects and forms created during view initialization.
 ///
-/// Store a `StateScope` as a field in your view struct. When the view Entity
-/// is released, the `StateScope` is dropped, which disposes all held effects
-/// — replacing `std::mem::forget(form)` and `_effect: Effect` field patterns.
+/// Store a `StateScope` as a field in your view struct when effects, resource
+/// source watchers, or dirty-check-only forms should live with that GPUI
+/// entity. Entity-scoped effect helpers register GPUI release cleanup; the
+/// scope keeps their handles reachable for the same lifetime.
 pub struct StateScope {
     effects: Vec<Effect>,
     #[allow(dead_code)]
@@ -83,7 +84,14 @@ impl StateScope {
         }
     }
 
-    /// Register an app-scoped effect. The scope holds its handle.
+    /// Register an app-scoped effect and retain its handle.
+    ///
+    /// Prefer [`effect`] plus an explicit [`Effect`] handle for app lifetime
+    /// work, or [`StateScope::effect_in`] for view-owned work. App-scoped
+    /// effects are not disposed by GPUI entity release.
+    #[deprecated(
+        note = "StateScope cannot dispose app-scoped effects on drop; use effect(...) with an explicit Effect handle, or use StateScope::effect_in for entity-scoped lifetime"
+    )]
     pub fn effect(&mut self, cx: &mut App, f: impl FnMut(&mut App) + 'static) {
         let e = effect(cx, f);
         self.effects.push(e);
@@ -374,7 +382,9 @@ pub fn reactive_render<T: ReactiveView>(
 mod tests {
     use std::{cell::Cell, rc::Rc, time::Duration};
 
-    use gpui::{Context, IntoElement, ParentElement, Render, Styled, TestApp, Window, div};
+    use gpui::{
+        AppContext, Context, IntoElement, ParentElement, Render, Styled, TestApp, Window, div,
+    };
 
     use crate::{ReactiveAppExt, Resource, ResourceState, Signal, init};
 
@@ -726,6 +736,42 @@ mod tests {
         });
 
         assert_eq!(fired.get(), 1);
+    }
+
+    #[test]
+    fn state_scope_effect_in_with_cleanup_runs_cleanup_on_entity_release() {
+        struct ScopedCleanupView {
+            _scope: StateScope,
+        }
+
+        impl ScopedCleanupView {
+            fn new(cx: &mut Context<Self>, cleanup_count: Rc<Cell<i32>>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                scope.effect_in_with_cleanup(cx, move |_cx, cleanup| {
+                    let cleanup_count = cleanup_count.clone();
+                    cleanup.on_cleanup(move |_cx| {
+                        cleanup_count.set(cleanup_count.get() + 1);
+                    });
+                });
+                Self { _scope: scope }
+            }
+        }
+
+        let mut app = TestApp::new();
+        let cleanup_count = Rc::new(Cell::new(0));
+        let weak = app.update({
+            let cleanup_count = cleanup_count.clone();
+            move |cx| {
+                let entity = cx.new(|cx| ScopedCleanupView::new(cx, cleanup_count));
+                let weak = entity.downgrade();
+                drop(entity);
+                weak
+            }
+        });
+
+        weak.assert_released();
+        assert_eq!(cleanup_count.get(), 1);
     }
 
     #[test]
