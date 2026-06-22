@@ -40,6 +40,10 @@ window lifecycles as the source of truth.
   first/last navigation for list and command surfaces. Its `_by` helpers let
   hosts navigate or reconcile item collections by stable key without cloning
   the collection just to build key iterators.
+- `SelectedItemExt` covers the repeated selector-backed projection from
+  `Signal<Vec<T>>` or `Memo<Vec<T>>` to `Memo<Option<T>>`. Use
+  `selected_by` for exact selected-key projection and `selected_by_or_first`
+  when the app wants first-item fallback without mutating the selector.
 - `#[derive(Reactive)]` supports nested reactive state wrappers for field-level
   app state.
 - `relay_uikit` has begun consuming `Selector<K>` for task/session/tab
@@ -93,9 +97,9 @@ window lifecycles as the source of truth.
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
   without introducing a Relay command registry.
 - The same `command_picker` example now derives `selected_command` with an
-  ordinary `Memo<Option<CommandItem>>` from filtered commands plus `Selector`.
-  This repeats the Workbench selected task/session projection shape without
-  adding a selector-item helper.
+  ordinary `SelectedItemExt` projection from filtered commands plus
+  `Selector`. This keeps command/picker data host-owned while removing the
+  repeated selected-item memo closure.
 - The gallery workbench page is now a compiled app-like surface. It wires
   task/session state through stable-id `Selector<u64>` values, renders the task
   rail and session context list as `KeyedSubViews`, and keeps center/status
@@ -103,9 +107,10 @@ window lifecycles as the source of truth.
   entity reuse while selection changes and session selection cleanup when the
   active session is removed.
 - The workbench selected task/session projections are derived with `Memo` from
-  `Signal<Vec<T>>` plus `Selector<u64>`. Render code reads the selected item
-  memo instead of cloning whole lists in each pane, showing that existing Relay
-  derived state covers this app pattern without a selector-specific item helper.
+  `Signal<Vec<T>>` plus `Selector<u64>` through `SelectedItemExt`. Render code
+  reads the selected item memo instead of cloning whole lists in each pane, and
+  the projection helper now lives in Relay because this exact shape repeated
+  across Workbench and command/picker surfaces.
 - `relay_uikit` command and picker rows now accept selector-backed selection
   where the component key model is already static: `CommandRow::selected_by`
   reuses `SelectionBinding`, while `ItemPicker::selected_by` reads and writes a
@@ -170,6 +175,8 @@ runtime adapters only where they simplify real app state:
 - Use `Binding<T>` for ordinary two-way form controls.
 - Use `Selector<K>` for mutually exclusive row, tab, picker, and command
   selection.
+- Use `SelectedItemExt` when a host needs the selected item memo from a
+  selector-backed `Signal<Vec<T>>` or filtered `Memo<Vec<T>>`.
 - Use `KeyedSubViews` in host entities for stateful or heavy repeated rows.
 - Keep `ForEach` focused on lightweight element lists; row entity caching lives
   in host entities through `KeyedSubViews`.
@@ -207,13 +214,14 @@ runtime adapters only where they simplify real app state:
    ordinary side effects. Add a watch-specific cleanup helper only after
    repeated app code shows the source/react split plus cleanup is common enough
    to justify another API.
-4. Keep expanding compiled app-shaped surfaces before adding new Relay
+4. Do not add a Relay command registry or selector-backed collection store yet.
+   `SelectedItemExt` covers the repeated selected-item projection without
+   taking ownership of command data, item ordering, row rendering, or UIKit
+   presentation.
+5. Keep expanding compiled app-shaped surfaces before adding broader Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
    `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.
-   Workbench and `command_picker` selected-item projections both stayed inside
-   ordinary `Memo`; defer a selector-item helper until the repeated code becomes
-   harder than the helper's API surface.
 
 ## Verification Gates
 

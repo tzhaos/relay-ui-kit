@@ -12,7 +12,7 @@ use gpui::{
     AnyElement, AppContext, AsyncApp, Context, Entity, FocusHandle, IntoElement, Render, Window,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, Resource, Selector, Signal,
+    Binding, Memo, ReactiveAppExt, Resource, SelectedItemExt, Selector, Signal,
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{
@@ -80,24 +80,9 @@ impl WorkbenchState {
         let active_session = cx.selector(Some(11));
         let terminal_output = cx.ready_resource(initial_terminal_output);
         let review_report = cx.ready_resource(initial_review_report());
-        let selected_task = cx.derived({
-            let tasks = tasks.clone();
-            let active_task = active_task.clone();
-            move |cx| {
-                let selected = active_task.get(cx);
-                tasks.read(cx, |tasks| resolve_selected_task(tasks, selected).cloned())
-            }
-        });
-        let selected_session = cx.derived({
-            let sessions = sessions.clone();
-            let active_session = active_session.clone();
-            move |cx| {
-                let selected = active_session.get(cx);
-                sessions.read(cx, |sessions| {
-                    resolve_selected_session(sessions, selected).cloned()
-                })
-            }
-        });
+        let selected_task = tasks.selected_by_or_first(cx, active_task.clone(), |task| task.id);
+        let selected_session =
+            sessions.selected_by_or_first(cx, active_session.clone(), |session| session.id);
         let task_list = cx.new({
             let tasks = tasks.clone();
             let active_task = active_task.clone();

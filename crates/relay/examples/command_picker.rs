@@ -9,13 +9,14 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
 use gpui::{
-    div, prelude::*, px, rgb, size, AnyElement, App, Bounds, Context, Div, InteractiveElement,
-    IntoElement, KeyDownEvent, ParentElement, Render, Stateful, Styled, Window, WindowBounds,
-    WindowOptions,
+    AnyElement, App, Bounds, Context, Div, InteractiveElement, IntoElement, KeyDownEvent,
+    ParentElement, Render, Stateful, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
+    px, rgb, size,
 };
 use gpui_platform::application;
 use relay::{
-    init, view::reactive_render, Binding, Memo, ReactiveAppExt, ReactiveView, Selector, Signal,
+    Binding, Memo, ReactiveAppExt, ReactiveView, SelectedItemExt, Selector, Signal, init,
+    view::reactive_render,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,19 +65,8 @@ impl CommandPickerSurface {
             let query = query_for_visible.get(cx);
             commands_for_visible.read(cx, |commands| visible_commands(commands, &query))
         });
-        let visible_for_selected = visible_commands.clone();
-        let selection_for_selected = selection.clone();
-        let selected_command = cx.derived(move |cx| {
-            let selected = selection_for_selected.get(cx);
-            visible_for_selected.read(cx, |commands| {
-                selected.and_then(|selected| {
-                    commands
-                        .iter()
-                        .find(|command| command.id == selected)
-                        .cloned()
-                })
-            })
-        });
+        let selected_command =
+            visible_commands.selected_by(cx, selection.clone(), |command| command.id);
 
         Self {
             commands,

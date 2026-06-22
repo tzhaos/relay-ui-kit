@@ -36,6 +36,7 @@ mod keyed;
 mod memo;
 mod resource;
 mod runtime;
+mod selected_item;
 mod selector;
 mod signal;
 mod signal_vec;
@@ -54,6 +55,7 @@ pub use memo::Memo;
 pub use relay_macros::Reactive;
 pub use resource::{Resource, ResourceState};
 pub use runtime::{EffectId, ReactiveRuntime, SignalId, batch, init, is_installed, track, untrack};
+pub use selected_item::SelectedItemExt;
 pub use selector::Selector;
 pub use signal::{ReadSignal, Signal, WriteSignal};
 pub use signal_vec::SignalVecExt;
@@ -66,8 +68,8 @@ pub mod prelude {
     pub use crate::{
         Binding, CleanupScope, ContextHandle, Effect, Form, FormBuilder, KeyedSubView,
         KeyedSubViews, Memo, Reactive, ReactiveAppExt, ReactiveContextExt, ReactiveView, Resource,
-        ResourceState, Selector, Signal, SignalVecExt, StateScope, SubView, WindowSignalExt, batch,
-        effect, effect_in, effect_in_with_cleanup, effect_with_cleanup, init, install,
-        provide_context, track, untrack, use_context,
+        ResourceState, SelectedItemExt, Selector, Signal, SignalVecExt, StateScope, SubView,
+        WindowSignalExt, batch, effect, effect_in, effect_in_with_cleanup, effect_with_cleanup,
+        init, install, provide_context, track, untrack, use_context,
     };
 }

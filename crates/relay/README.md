@@ -74,6 +74,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource reload. `sources` declares dependencies, `build_load` snapshots current app state after a source change, and the resource reload keeps the latest ready value visible while async work runs.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification.
 - **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first. Command/picker-like surfaces can usually stay as host-owned item order plus `Selector<K>` instead of a Relay-level command registry.
+- **`SelectedItemExt`** — selected item projection for selector-backed collections. Call `items.selected_by(cx, selector, |item| item.id)` on `Signal<Vec<T>>` or `Memo<Vec<T>>` to derive `Memo<Option<T>>`; use `selected_by_or_first` when the app wants first-item fallback without mutating the selector.
 - **`SubView`** — stable GPUI child entity wrapper. Use it to split stateful or heavy regions into their own `Entity` and render them with GPUI's `AnyView::cached` path.
 - **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache.
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
@@ -265,6 +266,14 @@ selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 // For item collections, use the `_by` variants to keep key extraction local.
 selected.select_next_by(cx, &tasks, |task| task.id);
 selected.reconcile_keys_by(cx, &tasks, |task| task.id);
+```
+
+When a view also needs the selected item, derive it from the same collection
+and selector:
+
+```rust
+let selected_task = tasks.selected_by_or_first(cx, selected.clone(), |task| task.id);
+let selected_command = visible_commands.selected_by(cx, command_selector, |command| command.id);
 ```
 
 ## Examples
