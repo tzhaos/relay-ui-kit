@@ -59,6 +59,10 @@ For the current completion audit and migration checklist, see
   first/last navigation for list and command surfaces. Its `_by` helpers let
   hosts navigate or reconcile item collections by stable key without cloning
   the collection just to build key iterators.
+- `Selector::reconcile_or_select_first` covers filtered command/picker
+  surfaces that should keep keyboard focus and row styling on a concrete
+  available item after filtering. This is deliberately selector-scoped: item
+  ownership, filtering, and command execution stay in the host.
 - `SelectedItemExt` covers the repeated selector-backed projection from
   `Signal<Vec<T>>` or `Memo<Vec<T>>` to `Memo<Option<T>>`. Use
   `selected_by` for exact selected-key projection and `selected_by_or_first`
@@ -120,7 +124,9 @@ For the current completion audit and migration checklist, see
 - The compiled `command_picker` Relay example promotes command/picker-shaped
   host state outside UIKit. It combines host-owned command data, query
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
-  without introducing a Relay command registry.
+  without introducing a Relay command registry. It uses
+  `Selector::reconcile_or_select_first` so query changes keep selection on the
+  first visible command when the previous key disappears.
 - The same `command_picker` example now derives `selected_command` with an
   ordinary `SelectedItemExt` projection from filtered commands plus
   `Selector`. This keeps command/picker data host-owned while removing the

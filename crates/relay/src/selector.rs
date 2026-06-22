@@ -220,6 +220,48 @@ where
         self.reconcile_keys(cx, items.into_iter().map(key))
     }
 
+    /// Reconcile this selector with the currently available keys, selecting
+    /// the first key when the previous selection is missing.
+    ///
+    /// When `keys` is empty, this clears the selection. Returns whether the
+    /// selected key changed.
+    pub fn reconcile_or_select_first(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+    ) -> bool {
+        let keys = keys.into_iter().collect::<Vec<_>>();
+        let previous = self.selected.get_untracked();
+        let selected = match previous
+            .as_ref()
+            .filter(|selected| keys.iter().any(|key| key == *selected))
+        {
+            Some(selected) => Some((*selected).clone()),
+            None => keys.first().cloned(),
+        };
+        let changed = previous != selected;
+
+        batch(cx, |cx| {
+            self.set(cx, selected);
+            self.retain_keys(keys);
+        });
+
+        changed
+    }
+
+    /// Reconcile this selector with the currently available item keys,
+    /// selecting the first item key when the previous selection is missing.
+    ///
+    /// `key` maps each item to its stable selection key.
+    pub fn reconcile_or_select_first_by<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+    ) -> bool {
+        self.reconcile_or_select_first(cx, items.into_iter().map(key))
+    }
+
     /// Drop all per-key signals. The selected key itself is unchanged.
     pub fn clear_keyed_signals(&self) {
         self.keyed.borrow_mut().clear();
@@ -644,5 +686,63 @@ mod tests {
 
         assert!(changed);
         assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn selector_reconcile_or_select_first_keeps_available_selection() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(2_u64))
+        });
+
+        let changed = app.update(|cx| selector.reconcile_or_select_first(cx, [1_u64, 2, 3]));
+
+        assert!(!changed);
+        assert_eq!(selector.get_untracked(), Some(2));
+    }
+
+    #[test]
+    fn selector_reconcile_or_select_first_selects_first_when_missing() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+
+        let changed = app.update(|cx| selector.reconcile_or_select_first(cx, [1_u64, 2, 3]));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(1));
+    }
+
+    #[test]
+    fn selector_reconcile_or_select_first_clears_empty_key_set() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+
+        let changed = app.update(|cx| selector.reconcile_or_select_first(cx, []));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn selector_reconcile_or_select_first_by_uses_item_keys() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(7_u64))
+        });
+        let items = [Item { id: 1 }, Item { id: 2 }];
+
+        let changed =
+            app.update(|cx| selector.reconcile_or_select_first_by(cx, &items, |item| item.id));
+
+        assert!(changed);
+        assert_eq!(selector.get_untracked(), Some(1));
     }
 }

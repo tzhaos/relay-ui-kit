@@ -15,7 +15,7 @@ their public control surfaces.
 | Declarative source/react split is available | `watch` and `watch_changes` track only declared sources and run reactions untracked. `hooks.rs`, `view.rs`, and the `watch` example cover source-only dependencies and skipped initial reactions. | Complete |
 | Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_from_source`, `reload_resource_from_source`, and the lower-level `_on_changes` variants are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
 | Entity-grained UI retention follows GPUI cache boundaries | `SubView`, `KeyedSubViews`, and `KeyedSubViews::sync_with_selector` keep stateful regions and rows as GPUI entities. Tests cover cached sibling reuse, retained branches, row reuse, row-local state survival, and stale selection reconciliation. | Complete |
-| Selection-heavy lists avoid whole-list invalidation | `Selector<K>` provides per-key selected signals, ordered navigation, key reconciliation, and `_by` helpers. `SelectedItemExt` covers selected-item projection from `Signal<Vec<T>>` and `Memo<Vec<T>>`; examples and gallery/workbench call sites use it. | Complete |
+| Selection-heavy lists avoid whole-list invalidation | `Selector<K>` provides per-key selected signals, ordered navigation, key reconciliation, filtered-list first fallback, and `_by` helpers. `SelectedItemExt` covers selected-item projection from `Signal<Vec<T>>` and `Memo<Vec<T>>`; examples and gallery/workbench call sites use it. | Complete |
 | Field-level state wrappers are available | `#[derive(Reactive)]` supports nested reactive state wrappers; `tests/reactive_derive.rs` covers nested field tracking and snapshots. | Complete |
 | Form and context patterns are scoped | `Form`, `StateScope::form`, `provide_context`, and `use_context` are exported and covered by unit tests plus README usage. | Complete |
 | UIKit adaptation path is narrow and value-first | `relay_uikit` consumes `Binding`, `Selector`, `Resource::fold_latest`, `SelectedItemExt`, `KeyedSubViews`, and `sync_with_selector` in compiled gallery/workbench surfaces without moving command registries, resource UI boundaries, or row presentation into relay. | Complete |
@@ -109,6 +109,13 @@ let selected_item = items.selected_by_or_first(cx, selection.clone(), |item| ite
 When there are no retained row entities, keep using `Selector::reconcile_keys`
 or `reconcile_keys_by` directly after collection changes.
 
+For filtered command/picker lists that should keep a concrete selection after a
+query change, use `Selector::reconcile_or_select_first`:
+
+```rust
+selection.reconcile_or_select_first_by(cx, &visible_items, |item| item.id);
+```
+
 When a host removes the currently selected item, use `SignalVecExt` to keep the
 collection write and selector reconciliation atomic:
 
@@ -129,9 +136,12 @@ Current migration checkpoint:
   `remove_selected_by` for selected-row deletion.
 - The Relay session surface and gallery retained-row hosts use
   `push_selected_by` for append-and-select creation.
+- The Relay command picker uses `reconcile_or_select_first` for filtered
+  command selection without moving command data or execution into Relay.
 - This replaces repeated host-side `get_untracked + Vec::remove +
-  reconcile_keys_by` and `push + select` code while preserving host ownership
-  of item order and row presentation.
+  reconcile_keys_by`, `push + select`, and
+  `reconcile_keys + select first` code while preserving host ownership of item
+  order and row presentation.
 
 ### 4. Migrate Async Data
 

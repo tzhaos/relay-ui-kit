@@ -128,13 +128,8 @@ impl CommandPickerSurface {
 
     fn reconcile_selection(&self, cx: &mut App) {
         let ids = self.visible_command_ids();
-        self.selection.reconcile_keys(cx, ids.iter().copied());
-
-        if self.selection.get_untracked().is_none() {
-            if let Some(first) = ids.first().copied() {
-                self.selection.select(cx, first);
-            }
-        }
+        self.selection
+            .reconcile_or_select_first(cx, ids.iter().copied());
     }
 
     fn visible_command_ids(&self) -> Vec<&'static str> {
@@ -153,13 +148,7 @@ impl ReactiveView for CommandPickerSurface {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let commands = self.visible_commands.get(cx);
         self.selection
-            .reconcile_keys_by(cx, &commands, |command| command.id);
-
-        if self.selection.get_untracked().is_none() {
-            if let Some(command) = commands.first() {
-                self.selection.select(cx, command.id);
-            }
-        }
+            .reconcile_or_select_first_by(cx, &commands, |command| command.id);
 
         let selected = self.selection.get(cx);
         let query = self.query.get(cx);
