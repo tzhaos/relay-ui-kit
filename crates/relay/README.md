@@ -76,6 +76,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache.
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
 - **`Form`** — form aggregation model. Register multiple `Binding<T>` fields; provides `is_dirty()` (returns `Memo<bool>`), `reset(cx)`, and `commit(cx)`. Suited for settings panels, edit forms, and other dirty-check/reset/submit scenarios.
+- **`StateScope::form()`** — entity-scoped form builder. Use it for dirty-check-only forms so the owning view keeps the form lifetime without `std::mem::forget`. Store `Form` directly when the view needs `reset(cx)` or `commit(cx)`.
 - **`WindowSignalExt::use_signal` / `use_binding`** — component-internal hooks for `RenderOnce` components. Calls `window.use_keyed_state` to persist state across renders keyed by `ElementId`. The React `useState` / Solid `createSignal` equivalent for GPUI.
 - **`#[derive(Reactive)]`** (relay_macros) — field-level reactivity. Transforms a plain struct into a generated `ReactiveFoo` wrapper with `Signal<T>` fields, `from(cx, value)`, `snapshot(cx)`, `set(cx, value)`, and generated field accessors. Mark nested struct fields with `#[reactive(nested)]` to keep their own field-level tracking.
 
@@ -83,7 +84,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 
 ```rust
 use relay::{
-    Binding, Form, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt, StateScope,
     provide_context, use_context,
 };
 
@@ -92,11 +93,13 @@ struct SettingsView {
     count: Signal<i32>,
     todos: Signal<Vec<String>>,
     settings_dirty: Memo<bool>,
+    scope: StateScope,
 }
 
 impl SettingsView {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
+        let mut scope = StateScope::new();
         let enabled = cx.binding(false);
         let count = cx.signal(0);
         let todos: Signal<Vec<String>> = cx.signal(Vec::new());
@@ -108,15 +111,15 @@ impl SettingsView {
         );
 
         // Form aggregation: register fields, derive is_dirty.
-        let mut form = Form::new();
-        form.field("enabled", enabled.clone(), cx);
-        let settings_dirty = form.build_is_dirty(cx);
-        std::mem::forget(form);
+        let settings_dirty = scope
+            .form()
+            .field("enabled", enabled.clone(), cx)
+            .build_is_dirty(cx);
 
         // Provide a reactive context for cross-layer sharing.
         let _ = provide_context(cx, "default-theme".to_string());
 
-        Self { enabled, count, todos, settings_dirty }
+        Self { enabled, count, todos, settings_dirty, scope }
     }
 
     fn add_todo(&self, text: String, cx: &mut App) {

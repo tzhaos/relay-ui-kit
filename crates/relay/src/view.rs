@@ -3,7 +3,7 @@
 //! This module provides two key abstractions that eliminate boilerplate in
 //! GPUI views:
 //!
-//! - [`StateScope`] — holds effect/form/memo handles so they live as long as
+//! - [`StateScope`] — holds effect handles and forms so they live as long as
 //!   the view Entity, replacing `std::mem::forget(form)` and `_effect: Effect`
 //!   field patterns.
 //! - [`ReactiveView`] — a trait that, combined with the [`reactive_render`]
@@ -62,8 +62,7 @@ use crate::{
 // StateScope
 // ---------------------------------------------------------------------------
 
-/// Holds the lifetimes of effects, forms, and derived values created during
-/// view initialization.
+/// Holds the lifetimes of effects and forms created during view initialization.
 ///
 /// Store a `StateScope` as a field in your view struct. When the view Entity
 /// is released, the `StateScope` is dropped, which disposes all held effects
@@ -148,7 +147,10 @@ impl StateScope {
         });
     }
 
-    /// Create a derived value (memo). The scope tracks it for future disposal.
+    /// Create a derived value (memo).
+    ///
+    /// The returned [`Memo`] owns its effect handle. Store it in the view if it
+    /// should live for the view's lifetime.
     pub fn derived<T: PartialEq + 'static>(
         &mut self,
         cx: &mut App,
@@ -507,27 +509,59 @@ mod tests {
     }
 
     #[test]
-    fn form_builder_eliminates_mem_forget() {
+    fn form_builder_keeps_form_in_view_scope() {
+        struct FormView {
+            binding: Binding<i32>,
+            dirty: Memo<bool>,
+            _scope: StateScope,
+        }
+
+        impl FormView {
+            fn new(cx: &mut Context<Self>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                let binding: Binding<i32> = cx.binding(42);
+                let dirty = scope
+                    .form()
+                    .field("count", binding.clone(), cx)
+                    .build_is_dirty(cx);
+
+                Self {
+                    binding,
+                    dirty,
+                    _scope: scope,
+                }
+            }
+        }
+
+        impl ReactiveView for FormView {
+            fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+                div()
+                    .child(self.dirty.get(cx).to_string())
+                    .into_any_element()
+            }
+        }
+
+        impl Render for FormView {
+            fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                reactive_render(self, window, cx)
+            }
+        }
+
         let mut app = TestApp::new();
-        let (binding, dirty) = app.update(|cx| {
-            init(cx);
-            let mut scope = StateScope::new();
-            let binding: Binding<i32> = cx.binding(42);
-            let dirty = scope
-                .form()
-                .field("count", binding.clone(), cx)
-                .build_is_dirty(cx);
-            // Leak scope to keep form alive (in real code, scope is a struct field).
-            std::mem::forget(scope);
-            (binding, dirty)
+        let mut window = app.open_window(|_, cx| FormView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let initial = app.update_entity(&root, |view, cx| view.dirty.get(cx));
+        assert!(!initial);
+
+        app.update_entity(&root, |view, cx| {
+            view.binding.set(cx, 99);
         });
 
-        // Not dirty initially.
-        app.read(|cx| assert!(!dirty.get(cx)));
-
-        // Change value — dirty becomes true.
-        app.update(|cx| binding.set(cx, 99));
-        app.read(|cx| assert!(dirty.get(cx)));
+        let dirty = app.update_entity(&root, |view, cx| view.dirty.get(cx));
+        assert!(dirty);
     }
 
     #[test]

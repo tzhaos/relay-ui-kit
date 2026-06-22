@@ -17,6 +17,9 @@ window lifecycles as the source of truth.
   `watch_changes + Resource::reload` pattern for entity-scoped source-driven
   resources. The resource stays UI-agnostic; the owning GPUI entity owns the
   source tracking lifecycle.
+- `StateScope::form()` packages dirty-check-only form lifetime into the owning
+  GPUI entity. Views that need reset or commit keep a `Form` field directly;
+  views that only need `is_dirty` can avoid `std::mem::forget(form)`.
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.

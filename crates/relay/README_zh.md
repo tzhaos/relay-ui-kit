@@ -78,6 +78,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`KeyedSubViews`** — 面向列表形态 view 的 keyed row/entity 保持器。按稳定 key 对齐 item 顺序，复用已有 row entity，丢弃移除的 row，并让未变化的兄弟 row 继续复用 GPUI view cache。
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
 - **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
+- **`StateScope::form()`** — entity 作用域的表单 builder。仅需要 dirty-check 的表单用它持有生命周期，避免 `std::mem::forget`；如果 view 需要 `reset(cx)` 或 `commit(cx)`，则直接把 `Form` 存成字段。
 - **`WindowSignalExt::use_signal` / `use_binding`** — 组件内 hooks，供 `RenderOnce` 组件使用。通过 `window.use_keyed_state` 按 `ElementId` 持久化跨渲染状态。对标 React `useState` / Solid `createSignal`。
 - **`#[derive(Reactive)]`** (relay_macros) — 字段级响应。将普通结构体转换为生成的 `ReactiveFoo` 包装，字段默认包装为 `Signal<T>`，并提供 `from(cx, value)`、`snapshot(cx)`、`set(cx, value)` 和字段访问器。嵌套结构字段可用 `#[reactive(nested)]` 标记，保留嵌套字段级追踪。
 
@@ -85,7 +86,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 
 ```rust
 use relay::{
-    Binding, Form, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt,
+    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Signal, SignalVecExt, StateScope,
     provide_context, use_context,
 };
 
@@ -94,11 +95,13 @@ struct SettingsView {
     count: Signal<i32>,
     todos: Signal<Vec<String>>,
     settings_dirty: Memo<bool>,
+    scope: StateScope,
 }
 
 impl SettingsView {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
+        let mut scope = StateScope::new();
         let enabled = cx.binding(false);
         let count = cx.signal(0);
         let todos: Signal<Vec<String>> = cx.signal(Vec::new());
@@ -110,15 +113,15 @@ impl SettingsView {
         );
 
         // 表单聚合：注册字段，派生 is_dirty
-        let mut form = Form::new();
-        form.field("enabled", enabled.clone(), cx);
-        let settings_dirty = form.build_is_dirty(cx);
-        std::mem::forget(form);
+        let settings_dirty = scope
+            .form()
+            .field("enabled", enabled.clone(), cx)
+            .build_is_dirty(cx);
 
         // 提供响应式 context 供跨层共享
         let _ = provide_context(cx, "default-theme".to_string());
 
-        Self { enabled, count, todos, settings_dirty }
+        Self { enabled, count, todos, settings_dirty, scope }
     }
 
     fn add_todo(&self, text: String, cx: &mut App) {

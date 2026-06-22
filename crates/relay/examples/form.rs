@@ -10,8 +10,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{Binding, Form, Memo, ReactiveAppExt, ReactiveContextExt, init};
@@ -21,7 +21,7 @@ struct FormDemo {
     enabled: Binding<bool>,
     count: Binding<i32>,
     is_dirty: Memo<bool>,
-    _form: std::mem::ManuallyDrop<Form>,
+    form: Form,
 }
 
 impl FormDemo {
@@ -42,7 +42,7 @@ impl FormDemo {
             enabled,
             count,
             is_dirty,
-            _form: std::mem::ManuallyDrop::new(form),
+            form,
         }
     }
 }
@@ -66,7 +66,9 @@ impl Render for FormDemo {
                 .child(div().text_lg().child("Form demo"))
                 .child(
                     div()
-                        .px_3().py_2().rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .rounded(px(6.0))
                         .bg(if dirty { rgb(0xf59e0b) } else { rgb(0x27272a) })
                         .text_color(if dirty { rgb(0x202124) } else { rgb(0xa1a1aa) })
                         .text_sm()
@@ -80,50 +82,71 @@ impl Render for FormDemo {
                 .child(div().text_sm().child(format!("Enabled: {enabled}")))
                 .child(div().text_sm().child(format!("Count: {count}")))
                 .child(
-                    div().flex().gap_2().flex_wrap()
+                    div()
+                        .flex()
+                        .gap_2()
+                        .flex_wrap()
                         .child(
                             div()
                                 .id("inc-count")
-                                .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x3b82f6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
                                 .child("Count + 1")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.count.update(cx, |v| { *v += 1; true });
+                                    this.count.update(cx, |v| {
+                                        *v += 1;
+                                        true
+                                    });
                                 })),
                         )
                         .child(
                             div()
                                 .id("toggle-enabled")
-                                .px_3().py_2().bg(rgb(0x8b5cf6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x8b5cf6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x7c3aed)))
                                 .child("Toggle enabled")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.enabled.update(cx, |v| { *v = !*v; true });
+                                    this.enabled.update(cx, |v| {
+                                        *v = !*v;
+                                        true
+                                    });
                                 })),
                         )
                         .child(
                             div()
                                 .id("reset")
-                                .px_3().py_2().bg(rgb(0xef4444)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0xef4444))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0xdc2626)))
                                 .child("Reset (restore initial)")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this._form.reset(cx);
+                                    this.form.reset(cx);
                                 })),
                         )
                         .child(
                             div()
                                 .id("commit")
-                                .px_3().py_2().bg(rgb(0x4ade80)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x4ade80))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x22c55e)))
                                 .text_color(rgb(0x202124))
                                 .child("Commit (save baseline)")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this._form.commit(cx);
+                                    this.form.commit(cx);
                                 })),
                         ),
                 )

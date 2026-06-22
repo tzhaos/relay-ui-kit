@@ -17,14 +17,13 @@
 //! # Example
 //!
 //! ```ignore
-//! let mut form = Form::new(cx);
-//! form.field("name", name_binding);
-//! form.field("enabled", enabled_binding);
-//! let dirty = form.is_dirty();
+//! let mut form = Form::new();
+//! form.field("name", name_binding, cx);
+//! form.field("enabled", enabled_binding, cx);
+//! let dirty = form.build_is_dirty(cx);
 //! ```
 
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use gpui::App;
 
@@ -68,7 +67,7 @@ impl<T: PartialEq + Clone + 'static> Field for TypedField<T> {
 
 /// An aggregate of bound fields with derived dirty/validate/reset helpers.
 pub struct Form {
-    fields: HashMap<&'static str, FieldEntry>,
+    fields: Rc<RefCell<HashMap<&'static str, FieldEntry>>>,
     dirty_memo: Option<Memo<bool>>,
 }
 
@@ -76,7 +75,7 @@ impl Form {
     /// Create an empty form.
     pub fn new() -> Self {
         Self {
-            fields: HashMap::new(),
+            fields: Rc::default(),
             dirty_memo: None,
         }
     }
@@ -91,13 +90,9 @@ impl Form {
         cx: &App,
     ) {
         let initial = binding.get(cx);
-        self.fields.insert(
-            key,
-            Rc::new(TypedField {
-                binding,
-                initial,
-            }),
-        );
+        self.fields
+            .borrow_mut()
+            .insert(key, Rc::new(TypedField { binding, initial }));
     }
 
     /// Build and return a `Memo<bool>` that is `true` when any field differs
@@ -106,8 +101,8 @@ impl Form {
     /// Call this once after registering all fields. The returned memo updates
     /// automatically when any field's binding changes.
     pub fn build_is_dirty(&mut self, cx: &mut App) -> Memo<bool> {
-        let fields: Vec<FieldEntry> = self.fields.values().cloned().collect();
-        let memo = cx.memo(move |cx| fields.iter().any(|field| field.is_changed(cx)));
+        let fields = self.fields.clone();
+        let memo = cx.memo(move |cx| fields.borrow().values().any(|field| field.is_changed(cx)));
         self.dirty_memo = Some(memo.clone());
         memo
     }
@@ -123,7 +118,7 @@ impl Form {
 
     /// Reset all fields to their initial values.
     pub fn reset(&self, cx: &mut App) {
-        for field in self.fields.values() {
+        for field in self.fields.borrow().values() {
             field.reset(cx);
         }
     }
@@ -133,20 +128,22 @@ impl Form {
     /// After calling this, `is_dirty` returns `false` until a field changes
     /// again. The dirty memo is notified so consumers refresh immediately.
     pub fn commit(&mut self, cx: &mut App) {
-        let old_fields = std::mem::take(&mut self.fields);
-        for (key, field) in old_fields {
-            self.fields.insert(key, field.snapshot(cx));
+        let old_fields = std::mem::take(&mut *self.fields.borrow_mut());
+        {
+            let mut fields = self.fields.borrow_mut();
+            for (key, field) in old_fields {
+                fields.insert(key, field.snapshot(cx));
+            }
         }
 
-        // Force the dirty memo to recompute by touching each binding. The
-        // memo's effect tracks the bindings, so a no-op update triggers
-        // re-evaluation with the new initial values.
+        // Force the dirty memo to publish the freshly computed baseline value.
         if let Some(dirty) = &self.dirty_memo {
             let signal = dirty.signal().clone();
-            // Re-run the memo's compute by setting the signal to the freshly
-            // computed value.
-            let fields: Vec<FieldEntry> = self.fields.values().cloned().collect();
-            let new_value = fields.iter().any(|field| field.is_changed(cx));
+            let new_value = self
+                .fields
+                .borrow()
+                .values()
+                .any(|field| field.is_changed(cx));
             signal.set(cx, new_value);
         }
     }
@@ -174,8 +171,6 @@ mod tests {
             let binding: Binding<bool> = cx.binding(false);
             form.field("enabled", binding.clone(), cx);
             let dirty = form.build_is_dirty(cx);
-            // Leak the form so the effect stays alive for the dirty memo.
-            std::mem::forget(form);
             (binding, dirty)
         });
 
@@ -202,7 +197,6 @@ mod tests {
             binding.set(cx, 100);
             // Reset should restore 42.
             form.reset(cx);
-            std::mem::forget(form);
             binding
         });
 
@@ -226,13 +220,38 @@ mod tests {
             assert!(dirty.get(cx));
             // Commit the new value as the baseline.
             form.commit(cx);
-            std::mem::forget(form);
             (binding, dirty)
         });
 
         // After commit, dirty should be false (current == new baseline).
         app.read(|cx| {
             assert!(!dirty.get(cx));
+        });
+    }
+
+    #[test]
+    fn form_commit_updates_dirty_baseline_for_future_changes() {
+        let mut app = TestApp::new();
+        let (binding, dirty) = app.update(|cx| {
+            init(cx);
+            let mut form = Form::new();
+            let binding: Binding<String> = cx.binding("initial".into());
+            form.field("name", binding.clone(), cx);
+            let dirty = form.build_is_dirty(cx);
+            binding.set(cx, "saved".into());
+            form.commit(cx);
+            (binding, dirty)
+        });
+
+        app.read(|cx| assert!(!dirty.get(cx)));
+
+        app.update(|cx| binding.set(cx, "initial".into()));
+
+        app.read(|cx| {
+            assert!(
+                dirty.get(cx),
+                "the old initial value should be dirty after commit changes the baseline"
+            );
         });
     }
 
@@ -247,7 +266,6 @@ mod tests {
             form.field("a", a.clone(), cx);
             form.field("b", b.clone(), cx);
             let dirty = form.build_is_dirty(cx);
-            std::mem::forget(form);
             (a, b, dirty)
         });
 
@@ -270,29 +288,24 @@ mod tests {
     #[test]
     fn form_reset_makes_dirty_false() {
         let mut app = TestApp::new();
-        let (binding, dirty) = app.update(|cx| {
+        let (binding, dirty, reset_dirty) = app.update(|cx| {
             init(cx);
             let mut form = Form::new();
             let binding: Binding<i32> = cx.binding(10);
             form.field("count", binding.clone(), cx);
             let dirty = form.build_is_dirty(cx);
-            std::mem::forget(form);
-            (binding, dirty)
+            binding.set(cx, 99);
+            assert!(dirty.get(cx));
+            form.reset(cx);
+            let reset_dirty = dirty.get(cx);
+            (binding, dirty, reset_dirty)
         });
 
-        // Change the value — dirty becomes true.
-        app.update(|cx| binding.set(cx, 99));
-        app.read(|cx| assert!(dirty.get(cx)));
-
-        // Reset — dirty should become false.
-        app.update(|cx| {
-            init(cx);
+        app.read(|cx| {
+            assert_eq!(binding.get(cx), 10);
+            assert!(!dirty.get(cx));
         });
-        // We can't call form.reset here because form was forgotten.
-        // But we can verify dirty is still true (no reset happened).
-        app.read(|cx| assert!(dirty.get(cx)));
-
-        let _ = dirty;
+        assert!(!reset_dirty);
     }
 
     #[test]
@@ -302,7 +315,6 @@ mod tests {
             init(cx);
             let mut form = Form::new();
             let dirty = form.build_is_dirty(cx);
-            std::mem::forget(form);
             dirty
         });
 
@@ -318,7 +330,6 @@ mod tests {
             let binding: Binding<String> = cx.binding("first".into());
             form.field("name", binding.clone(), cx);
             let dirty = form.build_is_dirty(cx);
-            std::mem::forget(form);
             (binding, dirty)
         });
 
