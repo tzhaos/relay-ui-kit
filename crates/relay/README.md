@@ -241,6 +241,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `watch` | `watch` / `watch_changes` declarative side effects |
 | `signal_vec` | `SignalVecExt` reactive list operations |
 | `resource` | `Resource` async pending/reloading/ready/error and latest value |
+| `source_resource` | `StateScope::reload_resource_on_changes` source-driven resource reload |
 | `context` | `provide_context` / `use_context` cross-layer sharing |
 | `form` | `Form` aggregation, `is_dirty`, `reset`, `commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — component-internal state |

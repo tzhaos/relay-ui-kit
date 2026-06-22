@@ -242,6 +242,7 @@ selected.reconcile_keys_by(cx, &tasks, |task| task.id);
 | `watch` | `watch` / `watch_changes` 声明式副作用 |
 | `signal_vec` | `SignalVecExt` 响应式列表操作 |
 | `resource` | `Resource` 异步 pending/reloading/ready/error 和 latest 值 |
+| `source_resource` | `StateScope::reload_resource_on_changes` source-driven resource reload |
 | `context` | `provide_context` / `use_context` 跨层共享 |
 | `form` | `Form` 聚合、`is_dirty`、`reset`、`commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |

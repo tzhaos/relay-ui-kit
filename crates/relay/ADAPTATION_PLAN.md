@@ -64,6 +64,10 @@ window lifecycles as the source of truth.
   Home/End/arrow navigation, Enter activation, and Delete removal. Its tests
   verify row entity reuse, row-local state survival across reorder, and command
   keyboard behavior.
+- The compiled `source_resource` Relay example promotes source-driven resource
+  reloads outside gallery/workbench. It keeps `Resource` UI-agnostic, scopes
+  source tracking to the owning GPUI entity, and tests that source changes enter
+  `Reloading` while retaining the last ready value.
 - The gallery workbench page is now a compiled app-like surface. It wires
   task/session state through stable-id `Selector<u64>` values, renders the task
   rail and session context list as `KeyedSubViews`, and keeps center/status
@@ -166,6 +170,7 @@ runtime adapters only where they simplify real app state:
 ## Verification Gates
 
 - `cargo test -p relay`
+- `cargo test -p relay --examples`
 - `cargo check -p relay --examples`
 - `cargo test -p relay_uikit`
 - `cargo check -p relay_uikit --bin relay_gallery`
