@@ -9,7 +9,7 @@ use gpui::App;
 use gpui::{AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
 use relay::{
     view::{reactive_render, ReactiveView, StateScope},
-    Binding, Memo, ReactiveAppExt, Selector, Signal,
+    Binding, Memo, ReactiveAppExt, Resource, Selector, Signal,
 };
 use relay_uikit::patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
 use relay_uikit::{icon::IconName, theme::space, ActiveTheme, TextInputState, Tone};
@@ -17,8 +17,9 @@ use relay_uikit::{icon::IconName, theme::space, ActiveTheme, TextInputState, Ton
 use center::center_pane;
 use context::right_context;
 use data::{
-    initial_sessions, initial_tasks, selected_session as resolve_selected_session,
-    selected_task as resolve_selected_task, WorkbenchSession, WorkbenchTask,
+    initial_review_report, initial_sessions, initial_tasks, review_report_for_task,
+    selected_session as resolve_selected_session, selected_task as resolve_selected_task,
+    WorkbenchReviewReport, WorkbenchSession, WorkbenchTask,
 };
 use rail::left_rail;
 
@@ -46,6 +47,7 @@ pub struct WorkbenchState {
     active_session: Selector<u64>,
     selected_task: Memo<Option<WorkbenchTask>>,
     selected_session: Memo<Option<WorkbenchSession>>,
+    review_report: Resource<WorkbenchReviewReport, String>,
     task_list: Entity<rail::TaskListView>,
     session_list: Entity<context::SessionListView>,
     pub context_tab: Binding<&'static str>,
@@ -62,6 +64,7 @@ impl WorkbenchState {
         let sessions = cx.signal(initial_sessions());
         let active_task = cx.selector(Some(1));
         let active_session = cx.selector(Some(11));
+        let review_report = cx.ready_resource(initial_review_report());
         let selected_task = cx.derived({
             let tasks = tasks.clone();
             let active_task = active_task.clone();
@@ -98,6 +101,7 @@ impl WorkbenchState {
             active_session,
             selected_task,
             selected_session,
+            review_report,
             task_list,
             session_list,
             context_tab: cx.binding("files"),
@@ -107,6 +111,16 @@ impl WorkbenchState {
             left_split: cx.new(|_| SplitPaneState::new(space::RAIL_WIDTH)),
             terminal_split: cx.new(|_| SplitPaneState::new(760.0)),
         }
+    }
+
+    fn refresh_review_report(&self, cx: &mut App) {
+        let task = self.selected_task.get(cx);
+        self.review_report.reload(cx, move |cx| async move {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(650))
+                .await;
+            Ok(review_report_for_task(task.as_ref()))
+        });
     }
 }
 
@@ -211,5 +225,40 @@ mod tests {
             updated.as_ref().map(|task| task.title.as_str()),
             Some("Updated GPUI boundary audit")
         );
+    }
+
+    #[test]
+    fn review_report_reload_retains_latest_report_while_refreshing() {
+        let mut app = TestApp::new();
+        let window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            WorkbenchApp::new(cx)
+        });
+        let root = window.root();
+
+        let initial = app.update_entity(&root, |app, cx| {
+            app.state.review_report.fold_latest(
+                cx,
+                || ("pending".to_string(), true),
+                |report, loading| (report.headline.clone(), loading),
+                |error| (error.clone(), false),
+            )
+        });
+        assert_eq!(initial, ("Review summary ready".to_string(), false));
+
+        app.update_entity(&root, |app, cx| {
+            app.state.active_task.select(cx, 2);
+            app.state.refresh_review_report(cx);
+        });
+
+        let refreshing = app.update_entity(&root, |app, cx| {
+            app.state.review_report.fold_latest(
+                cx,
+                || ("pending".to_string(), true),
+                |report, loading| (report.headline.clone(), loading),
+                |error| (error.clone(), false),
+            )
+        });
+        assert_eq!(refreshing, ("Review summary ready".to_string(), true));
     }
 }

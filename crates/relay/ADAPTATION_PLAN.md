@@ -75,6 +75,11 @@ window lifecycles as the source of truth.
   picker adapters in a compiled app-shaped path. Command rows and the branch
   picker share host-owned `Selector<&'static str>` state, with tests covering
   the selected command/branch labels after selector changes.
+- The workbench Review panel now owns a `Resource<WorkbenchReviewReport, String>`
+  and renders it through `fold_latest`, so refreshes keep the last ready report
+  visible while the new report is loading. This gives a second compiled app
+  surface for `Resource::reload` / latest-value semantics without adding a UI
+  boundary yet.
 
 ## List Boundary
 
@@ -117,10 +122,12 @@ runtime adapters only where they simplify real app state:
    app-shaped surface needs shared command registry or picker host behavior.
    Current evidence supports `Selector<K>` plus host-owned key order, not a
    broader Relay command/picker primitive.
-2. Add a shared async UI boundary only after at least two real app surfaces
-   repeat the same `fold_latest` render shape. Current evidence is still one
-   gallery output surface plus examples, so `Resource` remains a UI-agnostic
-   state primitive.
+2. Compare the two real `fold_latest` surfaces before adding a shared async UI
+   boundary. The gallery output surface maps a resource into output lines and
+   toolbar status, while the workbench review surface maps one report into
+   metadata rows. If the next surface repeats one of those shapes, extract the
+   smallest view helper there; until then `Resource` remains a UI-agnostic state
+   primitive.
 3. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 4. Keep expanding compiled app-shaped surfaces before adding new Relay

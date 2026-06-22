@@ -118,8 +118,37 @@ fn review_panel(
     cx: &mut Context<WorkbenchApp>,
 ) -> impl IntoElement + use<> {
     let task = state.selected_task.get(cx);
-    let review = task.as_ref().map_or(0, |task| task.review);
     let changed = task.as_ref().map_or(0, |task| task.changed);
+    let (headline, detail, notes, loading, tone) = state.review_report.fold_latest(
+        cx,
+        || {
+            (
+                "Review pending".to_string(),
+                "Start a review refresh to collect diagnostics.".to_string(),
+                0,
+                true,
+                Tone::Muted,
+            )
+        },
+        |report, loading| {
+            (
+                report.headline.clone(),
+                report.detail.clone(),
+                report.notes,
+                loading,
+                report.tone,
+            )
+        },
+        |error| {
+            (
+                "Review refresh failed".to_string(),
+                error.clone(),
+                0,
+                false,
+                Tone::Danger,
+            )
+        },
+    );
 
     div()
         .rounded(px(8.0))
@@ -130,13 +159,53 @@ fn review_panel(
         .flex()
         .flex_col()
         .gap_2()
-        .child(KeyValue::new("Review notes", review.to_string()).icon(IconName::MessageSquareText))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_2()
+                .child(
+                    div()
+                        .min_w_0()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            div()
+                                .truncate()
+                                .text_sm()
+                                .text_color(tone.fg(&theme))
+                                .child(headline),
+                        )
+                        .child(
+                            div()
+                                .truncate()
+                                .text_xs()
+                                .text_color(theme.text_muted)
+                                .child(detail),
+                        ),
+                )
+                .child(
+                    Button::new(
+                        "workbench-review-refresh",
+                        if loading { "Refreshing" } else { "Refresh" },
+                    )
+                    .ghost()
+                    .icon(IconName::RefreshCw)
+                    .disabled(loading)
+                    .on_click(cx.listener(|this, _event, _window, cx| {
+                        this.state.refresh_review_report(cx);
+                    })),
+                ),
+        )
+        .child(KeyValue::new("Review notes", notes.to_string()).icon(IconName::MessageSquareText))
         .child(KeyValue::new("Changed files", changed.to_string()).icon(IconName::FileDiff))
         .child(
             div()
                 .text_xs()
                 .text_color(theme.text_muted)
-                .child("Review counters update from the selected task without row-local coupling."),
+                .child("Review diagnostics keep the last ready report visible while refreshing."),
         )
 }
 

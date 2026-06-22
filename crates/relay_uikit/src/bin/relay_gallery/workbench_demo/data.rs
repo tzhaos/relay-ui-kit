@@ -77,6 +77,30 @@ impl WorkbenchSession {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct WorkbenchReviewReport {
+    pub headline: String,
+    pub detail: String,
+    pub notes: usize,
+    pub tone: Tone,
+}
+
+impl WorkbenchReviewReport {
+    fn new(
+        headline: impl Into<String>,
+        detail: impl Into<String>,
+        notes: usize,
+        tone: Tone,
+    ) -> Self {
+        Self {
+            headline: headline.into(),
+            detail: detail.into(),
+            notes,
+            tone,
+        }
+    }
+}
+
 pub(super) fn initial_tasks() -> Vec<WorkbenchTask> {
     vec![
         WorkbenchTask::new(
@@ -136,6 +160,34 @@ pub(super) fn initial_sessions() -> Vec<WorkbenchSession> {
             false,
         ),
     ]
+}
+
+pub(super) fn initial_review_report() -> WorkbenchReviewReport {
+    WorkbenchReviewReport::new(
+        "Review summary ready",
+        "Static starter report for the active task.",
+        2,
+        Tone::Info,
+    )
+}
+
+pub(super) fn review_report_for_task(task: Option<&WorkbenchTask>) -> WorkbenchReviewReport {
+    let Some(task) = task else {
+        return WorkbenchReviewReport::new(
+            "No task selected",
+            "Select a task before refreshing review diagnostics.",
+            0,
+            Tone::Muted,
+        );
+    };
+
+    let notes = task.review.max(1);
+    WorkbenchReviewReport::new(
+        format!("{} review diagnostics", task.status_label),
+        format!("{} files changed on {}", task.changed, task.branch),
+        notes,
+        task.tone,
+    )
 }
 
 pub(super) fn selected_task(
