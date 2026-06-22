@@ -11,7 +11,8 @@ use relay_uikit::patterns::{
     layout::ListSection,
     navigation::{Tab, Tabs},
     overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
-    OutputLine, OutputLineStyle, OutputLog, OutputSurface, QuickAction, SessionRow, SourceView,
+    CommandPalette, CommandRow, ItemPicker, KeybindingShortcut, OutputLine, OutputLineStyle,
+    OutputLog, OutputSurface, PickerAction, PickerOption, QuickAction, SessionRow, SourceView,
     TabStrip, TaskRow, TaskRowData,
 };
 use relay_uikit::{
@@ -57,6 +58,7 @@ pub(super) fn render(
     let composer_body = composer_sample(cx);
     let output_body = output_patterns(state, host, theme, cx);
     let qa_body = quick_action_sample(state);
+    let command_picker_body = command_picker_patterns(state, theme, cx);
     let picker_body = picker_sample(state);
     let viewer_body = viewer_patterns(theme);
 
@@ -66,6 +68,7 @@ pub(super) fn render(
         .child(section(cx, "Input Composer", composer_body))
         .child(section(cx, "Output Surface & Log", output_body))
         .child(section(cx, "Quick Actions", qa_body))
+        .child(section(cx, "Command Palette & Picker", command_picker_body))
         .child(section(cx, "Item Picker", picker_body))
         .child(section(cx, "Source Viewer", viewer_body));
 
@@ -177,6 +180,134 @@ fn quick_action_sample(state: &GalleryState) -> impl IntoElement {
         .child(QuickAction::new("qa-build", "Build", "cargo build").on_click({
             move |_, _, cx: &mut App| { log.set(cx, "QuickAction: Build".into()); }
         }))
+}
+
+fn command_picker_patterns(
+    state: &GalleryState,
+    theme: Theme,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let selected_command = pattern_command_label(state.pattern_command_selection.get(cx));
+    let selected_branch = pattern_branch_label(state.pattern_branch_selection.get(cx));
+
+    div().grid().grid_cols(2).gap_4()
+        .child(
+            div().flex().flex_col().gap_2()
+                .child(command_palette_sample(state))
+                .child(KeyValue::new("Selected command", selected_command)),
+        )
+        .child(
+            div()
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(theme.border)
+                .bg(theme.panel)
+                .p_3()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div().w(px(320.0)).child(
+                        ItemPicker::new(
+                            "patterns-branch-selector",
+                            "main",
+                            pattern_branch_options(),
+                        )
+                        .selected_by(state.pattern_branch_selection.clone())
+                        .open_bound(state.command_popover_open.clone())
+                        .actions(pattern_branch_actions())
+                        .on_select({
+                            let open = state.command_popover_open.clone();
+                            let log = state.overlay_event.clone();
+                            move |key, _window, cx| {
+                                open.set(cx, false);
+                                log.set(cx, format!("Branch selected: {key}"));
+                            }
+                        })
+                        .on_action({
+                            let log = state.overlay_event.clone();
+                            move |key, _window, cx| {
+                                log.set(cx, format!("Branch action: {key}"));
+                            }
+                        }),
+                    ),
+                )
+                .child(KeyValue::new("Selected branch", selected_branch)),
+        )
+}
+
+fn command_palette_sample(state: &GalleryState) -> impl IntoElement + use<> {
+    let selection = state.pattern_command_selection.clone();
+
+    CommandPalette::new("Command router")
+        .row(
+            CommandRow::new("patterns-command-terminal", "terminal:new", "New terminal")
+                .detail("Open a shell in the selected branch")
+                .icon(IconName::Terminal)
+                .shortcut(KeybindingShortcut::new(["Ctrl", "`"]))
+                .selected_by(selection.clone())
+                .on_select(pattern_command_event(state)),
+        )
+        .row(
+            CommandRow::new("patterns-command-agent", "agent:launch", "Launch agent")
+                .detail("Start a Codex session for the workspace")
+                .icon(IconName::Bot)
+                .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
+                .selected_by(selection.clone())
+                .on_select(pattern_command_event(state)),
+        )
+        .row(
+            CommandRow::new("patterns-command-review", "review:open", "Open review")
+                .detail("Focus the review panel")
+                .icon(IconName::MessageSquareText)
+                .shortcut(KeybindingShortcut::new(["Ctrl", "R"]))
+                .selected_by(selection)
+                .on_select(pattern_command_event(state)),
+        )
+}
+
+fn pattern_command_event(
+    state: &GalleryState,
+) -> impl Fn(&'static str, &mut Window, &mut App) + 'static {
+    let log = state.overlay_event.clone();
+    move |key, _window, cx| {
+        log.set(cx, format!("Command selected: {key}"));
+    }
+}
+
+fn pattern_branch_options() -> Vec<PickerOption> {
+    vec![
+        PickerOption::new("main", "main").detail("default workspace"),
+        PickerOption::new("relay/runtime", "relay/runtime").detail("crates/relay"),
+        PickerOption::new("gallery/patterns", "gallery/patterns").detail("relay gallery"),
+    ]
+}
+
+fn pattern_branch_actions() -> Vec<PickerAction> {
+    vec![
+        PickerAction::new("branch:create", "Create branch", IconName::Plus),
+        PickerAction::new("branch:sync", "Sync branches", IconName::RefreshCw),
+    ]
+}
+
+fn pattern_command_label(key: Option<&'static str>) -> &'static str {
+    match key {
+        Some("terminal:new") => "New terminal",
+        Some("agent:launch") => "Launch agent",
+        Some("review:open") => "Open review",
+        Some(key) => key,
+        None => "None",
+    }
+}
+
+fn pattern_branch_label(key: Option<&'static str>) -> &'static str {
+    match key {
+        Some("main") => "main",
+        Some("relay/runtime") => "relay/runtime",
+        Some("gallery/patterns") => "gallery/patterns",
+        Some(key) => key,
+        None => "None",
+    }
 }
 
 fn picker_sample(state: &GalleryState) -> AnyElement {
@@ -734,6 +865,7 @@ fn close_dialog(
 mod tests {
     use gpui::{EntityId, TestApp};
 
+    use super::super::GallerySurface;
     use super::*;
 
     fn row_ids(rows: &KeyedSubViews<u64, PatternProjectRow>) -> Vec<(u64, EntityId)> {
@@ -785,5 +917,45 @@ mod tests {
 
         let updated = app.update_entity(&root, |picker, _cx| row_ids(&picker.rows));
         assert_eq!(updated, initial);
+    }
+
+    #[test]
+    fn command_picker_selectors_drive_gallery_labels() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            GalleryScenesApp::new(cx)
+        });
+        let root = window.root();
+
+        app.update_entity(&root, |gallery, cx| {
+            gallery.set_surface(GallerySurface::Patterns);
+            cx.notify();
+        });
+        window.draw();
+
+        let initial = app.update_entity(&root, |gallery, cx| {
+            (
+                pattern_command_label(gallery.state.pattern_command_selection.get(cx)),
+                pattern_branch_label(gallery.state.pattern_branch_selection.get(cx)),
+            )
+        });
+        assert_eq!(initial, ("New terminal", "main"));
+
+        app.update_entity(&root, |gallery, cx| {
+            gallery.state.pattern_command_selection.select(cx, "review:open");
+            gallery
+                .state
+                .pattern_branch_selection
+                .select(cx, "gallery/patterns");
+        });
+
+        let selected = app.update_entity(&root, |gallery, cx| {
+            (
+                pattern_command_label(gallery.state.pattern_command_selection.get(cx)),
+                pattern_branch_label(gallery.state.pattern_branch_selection.get(cx)),
+            )
+        });
+        assert_eq!(selected, ("Open review", "gallery/patterns"));
     }
 }

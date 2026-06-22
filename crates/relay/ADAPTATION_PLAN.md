@@ -71,6 +71,10 @@ window lifecycles as the source of truth.
   reuses `SelectionBinding`, while `ItemPicker::selected_by` reads and writes a
   `Selector<&'static str>`. This keeps component APIs value-first while removing
   repeated host glue for command/picker selection.
+- The gallery Patterns surface now exercises those selector-backed command and
+  picker adapters in a compiled app-shaped path. Command rows and the branch
+  picker share host-owned `Selector<&'static str>` state, with tests covering
+  the selected command/branch labels after selector changes.
 
 ## List Boundary
 
@@ -109,9 +113,10 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Exercise the new command/picker selector adapters in a second app-shaped
-   surface before adding broader picker host abstractions. The Relay primitive
-   should remain `Selector<K>` plus host-owned key order.
+1. Keep command/picker adapters at the component boundary until another
+   app-shaped surface needs shared command registry or picker host behavior.
+   Current evidence supports `Selector<K>` plus host-owned key order, not a
+   broader Relay command/picker primitive.
 2. Add a shared async UI boundary only after at least two real app surfaces
    repeat the same `fold_latest` render shape. Current evidence is still one
    gallery output surface plus examples, so `Resource` remains a UI-agnostic
