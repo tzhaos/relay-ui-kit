@@ -8,22 +8,25 @@ mod data;
 mod rail;
 
 use gpui::App;
-use gpui::{AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
+use gpui::{
+    AnyElement, AppContext, AsyncApp, Context, Entity, FocusHandle, IntoElement, Render, Window,
+};
 use relay::{
-    view::{reactive_render, ReactiveView, StateScope},
     Binding, Memo, ReactiveAppExt, Resource, Selector, Signal,
+    view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{
     AppShell, OutputLine, SplitPane, SplitPaneState, StatusBar, StatusItem,
 };
-use relay_uikit::{icon::IconName, theme::space, ActiveTheme, TextInputState, Tone};
+use relay_uikit::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
 
 use center::center_pane;
 use context::right_context;
 use data::{
-    initial_review_report, initial_sessions, initial_tasks, review_report_for_task,
+    WorkbenchReviewReport, WorkbenchSession, WorkbenchTask, initial_review_report,
+    initial_sessions, initial_tasks, review_report_for_task,
     selected_session as resolve_selected_session, selected_task as resolve_selected_task,
-    terminal_lines, WorkbenchReviewReport, WorkbenchSession, WorkbenchTask,
+    terminal_lines,
 };
 use rail::left_rail;
 
@@ -38,6 +41,7 @@ impl WorkbenchApp {
         let mut scope = StateScope::new();
         let state = WorkbenchState::new(cx);
         state.watch_terminal_output_sources(cx, &mut scope);
+        state.watch_review_report_sources(cx, &mut scope);
         Self { state, scope }
     }
 }
@@ -127,12 +131,7 @@ impl WorkbenchState {
 
     fn refresh_review_report(&self, cx: &mut App) {
         let task = self.selected_task.get(cx);
-        self.review_report.reload(cx, move |cx| async move {
-            cx.background_executor()
-                .timer(Duration::from_millis(650))
-                .await;
-            Ok(review_report_for_task(task.as_ref()))
-        });
+        reload_review_report(self.review_report.clone(), task, cx);
     }
 
     fn refresh_terminal_output(&self, cx: &mut App) {
@@ -148,23 +147,39 @@ impl WorkbenchState {
     ) {
         let task_source = self.selected_task.clone();
         let session_source = self.selected_session.clone();
+        let terminal_output = self.terminal_output.clone();
         let task_for_reload = self.selected_task.clone();
         let session_for_reload = self.selected_session.clone();
-        let terminal_output = self.terminal_output.clone();
 
-        scope.watch_changes(
+        scope.reload_resource_on_changes(
             cx,
+            terminal_output,
             move |cx| {
                 let _ = task_source.get(cx);
                 let _ = session_source.get(cx);
             },
             move |cx| {
-                reload_terminal_output(
-                    terminal_output.clone(),
-                    task_for_reload.get(cx),
-                    session_for_reload.get(cx),
-                    cx,
-                );
+                let task = task_for_reload.get(cx);
+                let session = session_for_reload.get(cx);
+                move |cx| load_terminal_output(cx, task, session)
+            },
+        );
+    }
+
+    fn watch_review_report_sources(&self, cx: &mut Context<WorkbenchApp>, scope: &mut StateScope) {
+        let task_source = self.selected_task.clone();
+        let review_report = self.review_report.clone();
+        let task_for_reload = self.selected_task.clone();
+
+        scope.reload_resource_on_changes(
+            cx,
+            review_report,
+            move |cx| {
+                let _ = task_source.get(cx);
+            },
+            move |cx| {
+                let task = task_for_reload.get(cx);
+                move |cx| load_review_report(cx, task)
             },
         );
     }
@@ -176,12 +191,36 @@ fn reload_terminal_output(
     session: Option<WorkbenchSession>,
     cx: &mut App,
 ) {
-    terminal_output.reload(cx, move |cx| async move {
-        cx.background_executor()
-            .timer(Duration::from_millis(500))
-            .await;
-        Ok(terminal_lines(task.as_ref(), session.as_ref()))
-    });
+    terminal_output.reload(cx, move |cx| load_terminal_output(cx, task, session));
+}
+
+async fn load_terminal_output(
+    cx: AsyncApp,
+    task: Option<WorkbenchTask>,
+    session: Option<WorkbenchSession>,
+) -> Result<Vec<OutputLine>, String> {
+    cx.background_executor()
+        .timer(Duration::from_millis(500))
+        .await;
+    Ok(terminal_lines(task.as_ref(), session.as_ref()))
+}
+
+fn reload_review_report(
+    review_report: Resource<WorkbenchReviewReport, String>,
+    task: Option<WorkbenchTask>,
+    cx: &mut App,
+) {
+    review_report.reload(cx, move |cx| load_review_report(cx, task));
+}
+
+async fn load_review_report(
+    cx: AsyncApp,
+    task: Option<WorkbenchTask>,
+) -> Result<WorkbenchReviewReport, String> {
+    cx.background_executor()
+        .timer(Duration::from_millis(650))
+        .await;
+    Ok(review_report_for_task(task.as_ref()))
 }
 
 impl ReactiveView for WorkbenchApp {
@@ -288,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn review_report_reload_retains_latest_report_while_refreshing() {
+    fn review_report_reloads_when_task_source_changes() {
         let mut app = TestApp::new();
         let window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);
@@ -308,7 +347,6 @@ mod tests {
 
         app.update_entity(&root, |app, cx| {
             app.state.active_task.select(cx, 2);
-            app.state.refresh_review_report(cx);
         });
 
         let refreshing = app.update_entity(&root, |app, cx| {
@@ -339,7 +377,10 @@ mod tests {
                 |_error| (None, false),
             )
         });
-        assert_eq!(initial, (Some("$ codex work relay/workbench".to_string()), false));
+        assert_eq!(
+            initial,
+            (Some("$ codex work relay/workbench".to_string()), false)
+        );
 
         app.update_entity(&root, |app, cx| {
             app.state.active_task.select(cx, 2);

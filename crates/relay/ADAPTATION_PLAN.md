@@ -13,6 +13,10 @@ window lifecycles as the source of truth.
   `untrack` so side-effect reads do not expand the source set. `watch_changes`
   covers the common "seed initial state, react only to later source changes"
   case.
+- `StateScope::reload_resource_on_changes` packages the repeated
+  `watch_changes + Resource::reload` pattern for entity-scoped source-driven
+  resources. The resource stays UI-agnostic; the owning GPUI entity owns the
+  source tracking lifecycle.
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.
@@ -80,16 +84,15 @@ window lifecycles as the source of truth.
   picker share host-owned `Selector<&'static str>` state, with tests covering
   the selected command/branch labels after selector changes.
 - The workbench Review panel now owns a `Resource<WorkbenchReviewReport, String>`
-  and renders it through `fold_latest`, so refreshes keep the last ready report
-  visible while the new report is loading. This gives a second compiled app
-  surface for `Resource::reload` / latest-value semantics without adding a UI
-  boundary yet.
+  and renders it through `fold_latest`. It is source-driven from the selected
+  task, so task changes automatically refresh diagnostics while the last ready
+  report remains visible.
 - The workbench center transcript now owns a
   `Resource<Vec<OutputLine>, String>`. Its refresh action snapshots the
   currently selected task/session, enters `Reloading`, and keeps the previous
   terminal output visible until the new transcript resolves.
 - The workbench transcript is now source-driven: selected task/session memos
-  are watched with `StateScope::watch_changes`, so task or session changes
+  feed `StateScope::reload_resource_on_changes`, so task or session changes
   automatically reload the transcript while retaining the last ready output.
 - `relay_uikit` now exposes `output_resource_snapshot` for the repeated
   output-log resource shape. This is deliberately narrower than a generic async
@@ -127,7 +130,7 @@ runtime adapters only where they simplify real app state:
   resources, use `output_resource_snapshot`; for other data shapes, keep local
   `fold_latest` render branches until repeated real app surfaces justify a
   similarly narrow helper.
-- Use `watch_changes` plus `Resource::reload` for source-driven resources when
+- Use `StateScope::reload_resource_on_changes` for source-driven resources when
   the initial value is already ready. This gives the useful part of
   SolidJS-style source resources while keeping the resource itself UI-agnostic
   and scoped to the owning GPUI entity.
@@ -146,10 +149,10 @@ runtime adapters only where they simplify real app state:
    Patterns output surface and Workbench transcript now share that exact shape;
    the Workbench review surface still maps a report into metadata rows, so
    Relay should not grow a generic async UI boundary from this evidence alone.
-3. Watch for one more source-driven resource surface before adding a
-   `Resource::from_source` / `create_resource`-style helper. The Workbench
-   transcript proves `watch_changes + Resource::reload` is enough for one real
-   surface.
+3. Do not add a `Resource::from_source` / `create_resource` constructor yet.
+   The Workbench transcript and review report both fit the smaller
+   `StateScope::reload_resource_on_changes` helper, which matches GPUI entity
+   lifetime better and keeps `Resource` independent from source tracking.
 4. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 5. Keep expanding compiled app-shaped surfaces before adding new Relay

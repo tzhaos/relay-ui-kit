@@ -71,6 +71,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`derived`** — `memo` 的语义别名，强调"派生值"。在 view 的 `new()` 里用 `cx.derived(|cx| ...)` 注册派生计算，渲染时 `derived.get(cx)` 读取，依赖变化才重算。
 - **`watch(cx, sources, react)`** — 声明式副作用。`sources` 读取依赖，`react` 在 `untrack` 中执行，因此副作用里的读取不会变成新的 source。
 - **`watch_changes(cx, sources, react)`** — 同样分离 source/react，但跳过初始 reaction。适合初始可见状态已经 seed 好、只希望后续 source 变化触发 reload 或同步的场景。
+- **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource reload。`sources` 声明依赖，`build_load` 在 source 变化后读取当前 app 快照，resource reload 时保留上一份 ready 值继续可见。
 - **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`。
 - **`Selector<K>`** — keyed 选择状态。行视图用 `selector.is_selected(cx, key)` 只追踪自己的 key；选择项变化时只通知上一个和下一个选中 key，而不是整张列表。列表变化时，host 可以调用 `selector.reconcile_keys(cx, keys)` 丢弃失效行信号，并在当前选中 key 已不存在时清空选择；有序列表导航可以用 `select_next` / `select_previous` / `select_first` / `select_last`。当 host 手里是 item struct 列表时，用 `_by` 变体直接把 item 映射到稳定 key，避免先克隆整张列表。
 - **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
@@ -140,19 +141,20 @@ fn child_render(cx: &App) {
 `Resource::load` 会重置为 `Pending` 并开始加载。`Resource::reload` 会把上一份 ready 值保留为 `Reloading(value)`，让 view 可以继续展示最新可用数据，同时表达刷新进度。UI 需要“最后一份可用值”语义时，用 `state.latest()` 或 `resource.latest(cx)`。状态读取可以用 `is_loading(cx)`、`has_latest(cx)`、`read_error(cx, ...)` 和 `error_value(cx)`，避免为了 loading/error 这类状态匹配整份 state。当 view 只需要处理 pending、latest-value 和 error 三类分支时，用 `fold_latest` 避免重复匹配 `Ready` / `Reloading`。
 
 source-driven resource 不需要把 UI 边界塞进 `Resource` 本身；在 entity
-作用域里用 watch 把 source 接到 reload 即可。如果初始 ready 值已经存在，
-使用 `watch_changes`：
+作用域里把 source 接到 reload 即可。如果初始 ready 值已经存在，使用
+`reload_resource_on_changes`：
 
 ```rust
-scope.watch_changes(
+scope.reload_resource_on_changes(
     cx,
+    output.clone(),
     move |cx| { let _ = selected_task.get(cx); },
     move |cx| {
         let task = selected_task_for_reload.get(cx);
-        output.reload(cx, move |cx| async move {
+        move |cx| async move {
             let value = fetch_output(cx, task).await?;
             Ok(value)
-        });
+        }
     },
 );
 ```
