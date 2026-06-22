@@ -11,7 +11,7 @@
 - **UI 线程优先**：默认使用单线程状态模型，适配 GPUI 渲染和前台任务。
 - **可被上层组件适配**：组件层可以把 `Binding` / `Resource` 接到具体控件，运行时本身只负责状态和调度。
 
-当前 UIKit 迁移路径与 Relay 的应用层落地顺序见 [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md)。
+当前 UIKit 迁移路径与 Relay 的应用层落地顺序见 [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md)，核心完成度审计和迁移清单见 [MIGRATION_PLAN.md](MIGRATION_PLAN.md)。
 
 ## 最小用法
 

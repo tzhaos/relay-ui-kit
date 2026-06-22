@@ -10,8 +10,8 @@ use gpui::{
     Render, Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, ReactiveContextExt, Resource, Selector, Signal, SignalVecExt,
-    view::StateScope,
+    Binding, Memo, ReactiveAppExt, Resource, Selector, Signal, SignalVecExt,
+    view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
 use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
@@ -48,8 +48,11 @@ impl GalleryScenesApp {
         }
     }
 
-    pub fn set_surface(&mut self, surface: GallerySurface) {
-        self.surface = surface;
+    pub fn set_surface(&mut self, surface: GallerySurface, cx: &mut Context<Self>) {
+        if self.surface != surface {
+            self.surface = surface;
+            cx.notify();
+        }
     }
 }
 
@@ -282,12 +285,16 @@ impl GalleryScenesApp {
 
 impl Render for GalleryScenesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        cx.tracked(|cx| {
-            let surface = self.surface;
-            let state = &self.state;
-            let host = cx.entity();
-            render_surface(surface, state, &host, window, cx)
-        })
+        reactive_render(self, window, cx)
+    }
+}
+
+impl ReactiveView for GalleryScenesApp {
+    fn render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let surface = self.surface;
+        let state = &self.state;
+        let host = cx.entity();
+        render_surface(surface, state, &host, window, cx)
     }
 }
 

@@ -9,7 +9,7 @@
 - **UI-thread-first**: single-threaded state model by default, suited to GPUI rendering and foreground tasks.
 - **Adaptable by upper layers**: component crates can wire `Binding` / `Resource` to concrete controls; the runtime itself only handles state and scheduling.
 
-See [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md) for the current UIKit migration path and Relay's app-facing landing sequence.
+See [ADAPTATION_PLAN.md](ADAPTATION_PLAN.md) for the current UIKit migration path and Relay's app-facing landing sequence, and [MIGRATION_PLAN.md](MIGRATION_PLAN.md) for the completion audit plus migration checklist.
 
 ## Minimal usage
 

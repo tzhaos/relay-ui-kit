@@ -17,11 +17,14 @@ mod gallery;
 mod workbench_demo;
 
 use gpui::{
-    AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render, Styled, Window,
-    WindowBounds, WindowDecorations, WindowOptions, div, px, size,
+    AnyElement, AnyView, App, AppContext, Bounds, Context, IntoElement, ParentElement, Render,
+    Styled, Window, WindowBounds, WindowDecorations, WindowOptions, div, px, size,
 };
 use gpui_platform::application;
-use relay::{ReactiveAppExt, ReactiveContextExt, Signal, view::StateScope};
+use relay::{
+    ReactiveAppExt, Signal,
+    view::{ReactiveView, StateScope, reactive_render},
+};
 use relay_uikit::patterns::{TitleBar, WorkspaceBreadcrumb};
 use relay_uikit::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
 
@@ -55,8 +58,8 @@ impl GalleryApp {
     fn set_page(&self, page: Page, cx: &mut App) {
         self.page.set(cx, page);
         if let Some(surface) = page.gallery_surface() {
-            self.gallery.update(cx, |gallery, _cx| {
-                gallery.set_surface(surface);
+            self.gallery.update(cx, |gallery, cx| {
+                gallery.set_surface(surface, cx);
             });
         }
     }
@@ -176,33 +179,38 @@ impl GalleryApp {
     }
 }
 
-impl Render for GalleryApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        cx.tracked(|cx| {
-            let theme = *cx.theme();
-            let page = self.page.get(cx);
-            let body = match page {
-                Page::Workbench => cached_scene(self.workbench.clone()),
-                Page::Core | Page::Patterns | Page::Stress => cached_scene(self.gallery.clone()),
-            };
+impl ReactiveView for GalleryApp {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let theme = *cx.theme();
+        let page = self.page.get(cx);
+        let body = match page {
+            Page::Workbench => cached_scene(self.workbench.clone()),
+            Page::Core | Page::Patterns | Page::Stress => cached_scene(self.gallery.clone()),
+        };
 
-            div()
-                .size_full()
-                .bg(theme.app_bg)
-                .text_color(theme.text)
-                .font_family(theme::ui_family())
-                .flex()
-                .flex_col()
-                .child(self.top_bar(cx))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_h_0()
-                        .flex()
-                        .child(self.catalog(cx))
-                        .child(div().flex_1().min_w_0().min_h_0().child(body)),
-                )
-        })
+        div()
+            .size_full()
+            .bg(theme.app_bg)
+            .text_color(theme.text)
+            .font_family(theme::ui_family())
+            .flex()
+            .flex_col()
+            .child(self.top_bar(cx))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .child(self.catalog(cx))
+                    .child(div().flex_1().min_w_0().min_h_0().child(body)),
+            )
+            .into_any_element()
+    }
+}
+
+impl Render for GalleryApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
     }
 }
 
@@ -217,7 +225,7 @@ impl Page {
     }
 }
 
-fn cached_scene(scene: impl Into<AnyView>) -> gpui::AnyElement {
+fn cached_scene(scene: impl Into<AnyView>) -> AnyElement {
     scene
         .into()
         .cached(gpui::StyleRefinement::default().size_full())

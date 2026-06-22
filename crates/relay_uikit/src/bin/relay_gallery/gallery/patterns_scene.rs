@@ -923,8 +923,7 @@ mod tests {
         let root = window.root();
 
         app.update_entity(&root, |gallery, cx| {
-            gallery.set_surface(GallerySurface::Patterns);
-            cx.notify();
+            gallery.set_surface(GallerySurface::Patterns, cx);
         });
         window.draw();
 

@@ -4,6 +4,9 @@ Relay is GPUI's reactive state/runtime layer. Its app-facing API should make
 SolidJS-like state flow convenient while keeping GPUI's entity, element, and
 window lifecycles as the source of truth.
 
+For the current completion audit and migration checklist, see
+[MIGRATION_PLAN.md](MIGRATION_PLAN.md).
+
 ## Current Landed Surface
 
 - `Signal`, `Binding`, `Memo` / `derived`, `Effect`, `watch`, `untrack`, and
