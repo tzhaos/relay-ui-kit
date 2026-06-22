@@ -175,7 +175,9 @@ impl<T, E> Resource<T, E> {
     /// Read the state and fold it into pending, latest-value, and error branches.
     ///
     /// This tracks the resource once and is useful for views that keep rendering
-    /// the previous value while a reload is in progress.
+    /// the previous value while a reload is in progress. The returned shape is
+    /// chosen by the caller, so component crates can build domain-specific view
+    /// models without making `Resource` depend on a UI boundary.
     pub fn fold_latest<R>(
         &self,
         cx: &App,
@@ -500,6 +502,31 @@ mod tests {
         });
 
         assert_eq!(result, 7);
+    }
+
+    #[test]
+    fn resource_fold_latest_borrows_non_clone_latest_value() {
+        struct NonCloneValue(&'static str);
+
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            init(cx);
+            Resource::<NonCloneValue, &'static str>::ready(cx, NonCloneValue("ready"))
+        });
+
+        let result = app.read(|cx| {
+            resource.fold_latest(
+                cx,
+                || "pending",
+                |value, loading| {
+                    assert!(!loading);
+                    value.0
+                },
+                |_| "error",
+            )
+        });
+
+        assert_eq!(result, "ready");
     }
 
     #[test]

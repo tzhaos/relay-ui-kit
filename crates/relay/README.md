@@ -71,7 +71,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`watch_changes(cx, sources, react)`** — same source/react split, but skips the initial reaction. Use it when the initial visible state is already seeded and only later source changes should reload or sync.
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource reload. `sources` declares dependencies, `build_load` snapshots current app state after a source change, and the resource reload keeps the latest ready value visible while async work runs.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification.
-- **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first.
+- **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first. Command/picker-like surfaces can usually stay as host-owned item order plus `Selector<K>` instead of a Relay-level command registry.
 - **`SubView`** — stable GPUI child entity wrapper. Use it to split stateful or heavy regions into their own `Entity` and render them with GPUI's `AnyView::cached` path.
 - **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache.
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
@@ -140,6 +140,8 @@ fn child_render(cx: &App) {
 ## Async resources
 
 `Resource::load` starts a reset load and enters `Pending`. `Resource::reload` keeps a previous ready value available as `Reloading(value)`, so views can keep rendering the latest data while showing refresh progress. Use `state.latest()` or `resource.latest(cx)` when the UI wants "last usable value" semantics. Use `is_loading(cx)`, `has_latest(cx)`, `read_error(cx, ...)`, and `error_value(cx)` for signal-backed status reads without matching the whole state. Use `fold_latest` when a view wants to handle pending, latest-value, and error branches without repeating the `Ready` / `Reloading` match.
+
+Relay intentionally stops at resource state and folding semantics. When two concrete surfaces share the same render-ready shape, put that adapter in the component crate; when a surface needs its own metadata or rows, fold the resource locally.
 
 For source-driven resources, keep the resource UI-agnostic and wire the source
 through an entity-scoped scope. `reload_resource_on_changes` is the right fit
@@ -251,6 +253,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `reactive_struct` | `#[derive(Reactive)]` — field-level reactivity |
 | `subview` | `SubView` cached child entity splitting |
 | `keyed_subviews` | `KeyedSubViews` retained row entities with `Selector` navigation |
+| `command_picker` | Command/picker-style host state with `Binding`, `Memo`, and `Selector` |
 | `session_surface` | GPUI session surface with retained rows and host-level keyboard navigation |
 
 ```sh

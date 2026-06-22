@@ -71,6 +71,10 @@ window lifecycles as the source of truth.
   reloads outside gallery/workbench. It keeps `Resource` UI-agnostic, scopes
   source tracking to the owning GPUI entity, and tests that source changes enter
   `Reloading` while retaining the last ready value.
+- The compiled `command_picker` Relay example promotes command/picker-shaped
+  host state outside UIKit. It combines host-owned command data, query
+  `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
+  without introducing a Relay command registry.
 - The gallery workbench page is now a compiled app-like surface. It wires
   task/session state through stable-id `Selector<u64>` values, renders the task
   rail and session context list as `KeyedSubViews`, and keeps center/status
@@ -105,6 +109,9 @@ window lifecycles as the source of truth.
   output-log resource shape. This is deliberately narrower than a generic async
   boundary: it only folds `Resource<Vec<OutputLine>, E>` into
   lines/loading/status for `OutputSurface` + `OutputLog` call sites.
+- `Resource::fold_latest` docs and tests cover borrowed, non-`Clone` latest
+  values, reinforcing that Relay provides resource state semantics while
+  component crates own any render-ready adapter shape.
 
 ## List Boundary
 
@@ -148,21 +155,13 @@ runtime adapters only where they simplify real app state:
 
 ## Next Landing Steps
 
-1. Keep command/picker adapters at the component boundary until another
-   app-shaped surface needs shared command registry or picker host behavior.
-   Current evidence supports `Selector<K>` plus host-owned key order, not a
-   broader Relay command/picker primitive.
-2. Keep `output_resource_snapshot` specific to output logs. The gallery
-   Patterns output surface and Workbench transcript now share that exact shape;
-   the Workbench review surface still maps a report into metadata rows, so
-   Relay should not grow a generic async UI boundary from this evidence alone.
-3. Do not add a `Resource::from_source` / `create_resource` constructor yet.
+1. Do not add a `Resource::from_source` / `create_resource` constructor yet.
    The Workbench transcript and review report both fit the smaller
    `StateScope::reload_resource_on_changes` helper, which matches GPUI entity
    lifetime better and keeps `Resource` independent from source tracking.
-4. Revisit show/switch style helpers only after there is repeated app code that
+2. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
-5. Keep expanding compiled app-shaped surfaces before adding new Relay
+3. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
    `Selector<K>` and row retention lived in host-owned `KeyedSubViews`. Its
