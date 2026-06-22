@@ -419,12 +419,11 @@ impl PatternProjectPicker {
 impl ReactiveView for PatternProjectPicker {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let projects = self.projects.get(cx);
-        self.selection
-            .reconcile_keys_by(cx, &projects, |project| project.id);
 
         let selection = self.selection.clone();
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             projects,
             |project| project.id,
             move |project, _cx| PatternProjectRow::new(project, selection.clone()),

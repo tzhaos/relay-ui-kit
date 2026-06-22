@@ -12,9 +12,9 @@ use std::{
     hash::Hash,
 };
 
-use gpui::{AnyElement, AppContext, Context, Render, StyleRefinement};
+use gpui::{AnyElement, App, AppContext, Context, Render, StyleRefinement};
 
-use crate::SubView;
+use crate::{Selector, SubView};
 
 /// One retained keyed row in a [`KeyedSubViews`] collection.
 pub struct KeyedSubView<K, V: 'static> {
@@ -157,6 +157,30 @@ where
         self.entries = next_entries;
         self.indices = next_indices;
     }
+
+    /// Reconcile `selector` with the current item keys, then sync retained rows.
+    ///
+    /// This is the selected-list shape used by task rails, session lists, and
+    /// picker rows: the host owns item order, [`Selector`] owns row selection,
+    /// and `KeyedSubViews` owns one cached row entity per stable key. Returns
+    /// whether the selector had to clear a missing selected key.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `items` contains duplicate keys.
+    pub fn sync_with_selector<T>(
+        &mut self,
+        cx: &mut App,
+        selector: &Selector<K>,
+        items: Vec<T>,
+        mut key: impl FnMut(&T) -> K,
+        build: impl FnMut(&T, &mut Context<V>) -> V,
+        update: impl FnMut(&T, &mut V, &mut Context<V>) -> bool,
+    ) -> bool {
+        let cleared_selection = selector.reconcile_keys_by(cx, &items, |item| key(item));
+        self.sync(cx, items, key, build, update);
+        cleared_selection
+    }
 }
 
 impl<K, V> KeyedSubViews<K, V>
@@ -199,7 +223,7 @@ mod tests {
         div,
     };
 
-    use crate::{ReactiveAppExt, ReactiveView, Signal, init, view::reactive_render};
+    use crate::{ReactiveAppExt, ReactiveView, Selector, Signal, init, view::reactive_render};
 
     use super::*;
 
@@ -257,6 +281,7 @@ mod tests {
     struct ListHost {
         items: Signal<Vec<Item>>,
         rows: KeyedSubViews<u64, RowView>,
+        selection: Selector<u64>,
         row_renders: Rc<Cell<usize>>,
         renders: Rc<Cell<usize>>,
     }
@@ -275,6 +300,7 @@ mod tests {
                     Item::new(3, "three"),
                 ]),
                 rows: KeyedSubViews::new(),
+                selection: cx.selector(Some(2)),
                 row_renders,
                 renders,
             }
@@ -287,8 +313,9 @@ mod tests {
             let items = self.items.get(cx);
             let row_renders = self.row_renders.clone();
 
-            self.rows.sync(
+            self.rows.sync_with_selector(
                 cx,
+                &self.selection,
                 items,
                 |item| item.id,
                 move |item, _cx| RowView::new(item, row_renders.clone()),
@@ -355,6 +382,61 @@ mod tests {
             }
         });
 
+        assert_eq!(
+            row_ids(&rows),
+            vec![(3, first_ids[2].1), (1, first_ids[0].1)]
+        );
+    }
+
+    #[test]
+    fn sync_with_selector_reconciles_selection_and_reuses_entities() {
+        let renders = Rc::new(Cell::new(0));
+        let mut app = TestApp::new();
+
+        let (mut rows, selector) = app.update({
+            let renders = renders.clone();
+            move |cx| {
+                init(cx);
+                let selector = Selector::new(cx, Some(2_u64));
+                let mut rows = KeyedSubViews::<u64, RowView>::new();
+                let cleared = rows.sync_with_selector(
+                    cx,
+                    &selector,
+                    vec![
+                        Item::new(1, "one"),
+                        Item::new(2, "two"),
+                        Item::new(3, "three"),
+                    ],
+                    |item| item.id,
+                    |item, _cx| RowView::new(item, renders.clone()),
+                    |item, row, _cx| row.update_item(item),
+                );
+                assert!(!cleared);
+                (rows, selector)
+            }
+        });
+
+        let first_ids = row_ids(&rows);
+
+        let (next_rows, cleared) = app.update({
+            let renders = renders.clone();
+            let selector = selector.clone();
+            move |cx| {
+                let cleared = rows.sync_with_selector(
+                    cx,
+                    &selector,
+                    vec![Item::new(3, "three"), Item::new(1, "one")],
+                    |item| item.id,
+                    |item, _cx| RowView::new(item, renders.clone()),
+                    |item, row, _cx| row.update_item(item),
+                );
+                (rows, cleared)
+            }
+        });
+        rows = next_rows;
+
+        assert!(cleared);
+        assert_eq!(selector.get_untracked(), None);
         assert_eq!(
             row_ids(&rows),
             vec![(3, first_ids[2].1), (1, first_ids[0].1)]

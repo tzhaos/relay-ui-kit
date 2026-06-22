@@ -247,12 +247,11 @@ impl StressSessionList {
 impl ReactiveView for StressSessionList {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sessions = self.sessions.get(cx);
-        self.selection
-            .reconcile_keys_by(cx, &sessions, |session| session.id);
 
         let selection = self.selection.clone();
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             sessions,
             |session| session.id,
             move |session, _cx| StressSessionRow::new(session, selection.clone()),

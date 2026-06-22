@@ -78,7 +78,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`Selector<K>`** — keyed 选择状态。行视图用 `selector.is_selected(cx, key)` 只追踪自己的 key；选择项变化时只通知上一个和下一个选中 key，而不是整张列表。列表变化时，host 可以调用 `selector.reconcile_keys(cx, keys)` 丢弃失效行信号，并在当前选中 key 已不存在时清空选择；有序列表导航可以用 `select_next` / `select_previous` / `select_first` / `select_last`。当 host 手里是 item struct 列表时，用 `_by` 变体直接把 item 映射到稳定 key，避免先克隆整张列表。command/picker 一类 surface 通常可以保持为 host 自己拥有 item 顺序，再配 `Selector<K>`，不需要上升成 Relay 级 command registry。
 - **`SelectedItemExt`** — selector-backed collection 的选中项投影。对 `Signal<Vec<T>>` 或 `Memo<Vec<T>>` 调用 `items.selected_by(cx, selector, |item| item.id)` 可以得到 `Memo<Option<T>>`；需要在 selector 为空或 key 缺失时回退到第一项时，用 `selected_by_or_first`。
 - **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
-- **`KeyedSubViews`** — 面向列表形态 view 的 keyed row/entity 保持器。按稳定 key 对齐 item 顺序，复用已有 row entity，丢弃移除的 row，并让未变化的兄弟 row 继续复用 GPUI view cache。
+- **`KeyedSubViews`** — 面向列表形态 view 的 keyed row/entity 保持器。按稳定 key 对齐 item 顺序，复用已有 row entity，丢弃移除的 row，并让未变化的兄弟 row 继续复用 GPUI view cache。当 retained row list 同时由 `Selector<K>` 驱动时，用 `sync_with_selector` 在同步 row entity 前先清理失效 selection。
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
 - **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
 - **`StateScope::form()`** — entity 作用域的表单 builder。仅需要 dirty-check 的表单用它持有生命周期，避免 `std::mem::forget`；如果 view 需要 `reset(cx)` 或 `commit(cx)`，则直接把 `Form` 存成字段。
@@ -266,6 +266,20 @@ selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 // item 集合可以用 `_by` 变体，把 key 提取留在调用点。
 selected.select_next_by(cx, &tasks, |task| task.id);
 selected.reconcile_keys_by(cx, &tasks, |task| task.id);
+```
+
+当 retained row list 由 selector 驱动时，用同一个 key 函数同步 selector
+和 row entity：
+
+```rust
+rows.sync_with_selector(
+    cx,
+    &selected,
+    tasks,
+    |task| task.id,
+    |task, _cx| TaskRow::new(task, selected.clone()),
+    |task, row, _cx| row.update_task(task),
+);
 ```
 
 当 view 还需要选中项本身时，从同一个 collection 和 selector 派生：

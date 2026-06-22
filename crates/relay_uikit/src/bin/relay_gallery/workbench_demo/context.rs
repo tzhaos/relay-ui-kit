@@ -1,16 +1,16 @@
 use gpui::{
-    div, px, AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled,
-    Window,
+    AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
+    div, px,
 };
-use relay::{view::reactive_render, KeyedSubViews, ReactiveView, Selector, Signal};
+use relay::{KeyedSubViews, ReactiveView, Selector, Signal, view::reactive_render};
 use relay_uikit::patterns::{
+    Pane, PaneToolbar, SessionRow, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
     navigation::{Tab, Tabs},
-    Pane, PaneToolbar, SessionRow, TopToolbar, WorkspaceBreadcrumb,
 };
 use relay_uikit::{Button, IconButton, IconName, Theme, Tone};
 
-use super::{data::WorkbenchSession, WorkbenchApp, WorkbenchState};
+use super::{WorkbenchApp, WorkbenchState, data::WorkbenchSession};
 
 pub(super) fn right_context(
     state: &WorkbenchState,
@@ -259,12 +259,11 @@ impl SessionListView {
 impl ReactiveView for SessionListView {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sessions = self.sessions.get(cx);
-        self.selection
-            .reconcile_keys_by(cx, &sessions, |session| session.id);
 
         let selection = self.selection.clone();
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             sessions,
             |session| session.id,
             move |session, _cx| SessionRowView::new(session, selection.clone()),

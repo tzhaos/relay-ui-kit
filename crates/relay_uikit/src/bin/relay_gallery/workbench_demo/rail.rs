@@ -149,11 +149,11 @@ impl TaskListView {
 impl ReactiveView for TaskListView {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let tasks = self.tasks.get(cx);
-        self.selection.reconcile_keys_by(cx, &tasks, |task| task.id);
 
         let selection = self.selection.clone();
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             tasks,
             |task| task.id,
             move |task, _cx| TaskRowView::new(task, selection.clone()),

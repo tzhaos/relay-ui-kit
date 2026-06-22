@@ -35,6 +35,10 @@ window lifecycles as the source of truth.
   `read_error`, and `fold_latest` cover async pending, reloading, ready, and
   error states without baking in a UI boundary.
 - `SubView` and `KeyedSubViews` expose GPUI entity-grained UI retention.
+  `KeyedSubViews::sync_with_selector` covers the repeated selected-retained-row
+  shape: the host owns item order, `Selector<K>` owns selection, and row entity
+  retention stays in `KeyedSubViews` while stale selected keys are reconciled
+  before sync.
 - `Selector<K>` gives selection-heavy lists per-key tracking, can reconcile
   selection against the current item keys, and owns ordered next/previous plus
   first/last navigation for list and command surfaces. Its `_by` helpers let
@@ -72,13 +76,15 @@ window lifecycles as the source of truth.
 - The compiled `keyed_subviews` Relay example now pairs `KeyedSubViews` with
   `Selector<u64>` and host-level arrow-key handling. Its tests verify row
   entity reuse while selection moves, previous-selection wraparound, and Enter
-  acting on the selected row.
+  acting on the selected row. It now uses `sync_with_selector` so selection
+  reconciliation and row entity sync share one key projection.
 - The compiled `session_surface` Relay example promotes that shape outside
   gallery into a GPUI session surface. It combines dynamic `Signal<Vec<T>>`
   sessions, retained row entities, per-row local state, host-level
   Home/End/arrow navigation, Enter activation, and Delete removal. Its tests
   verify row entity reuse, row-local state survival across reorder, and command
-  keyboard behavior.
+  keyboard behavior, with selected row sync going through
+  `KeyedSubViews::sync_with_selector`.
 - The compiled `branch_subviews` Relay example promotes persistent branch state
   outside UIKit. It keeps each branch as a host-owned `SubView`, renders only
   the active branch, and tests that inactive branches do not render while their
@@ -103,9 +109,10 @@ window lifecycles as the source of truth.
 - The gallery workbench page is now a compiled app-like surface. It wires
   task/session state through stable-id `Selector<u64>` values, renders the task
   rail and session context list as `KeyedSubViews`, and keeps center/status
-  projections reading from the same runtime state. Its tests cover task row
-  entity reuse while selection changes and session selection cleanup when the
-  active session is removed.
+  projections reading from the same runtime state. Its selected retained-row
+  hosts use `sync_with_selector`; tests cover task row entity reuse while
+  selection changes and session selection cleanup when the active session is
+  removed.
 - The workbench selected task/session projections are derived with `Memo` from
   `Signal<Vec<T>>` plus `Selector<u64>` through `SelectedItemExt`. Render code
   reads the selected item memo instead of cloning whole lists in each pane, and
@@ -177,7 +184,9 @@ runtime adapters only where they simplify real app state:
   selection.
 - Use `SelectedItemExt` when a host needs the selected item memo from a
   selector-backed `Signal<Vec<T>>` or filtered `Memo<Vec<T>>`.
-- Use `KeyedSubViews` in host entities for stateful or heavy repeated rows.
+- Use `KeyedSubViews` in host entities for stateful or heavy repeated rows. Use
+  `sync_with_selector` when those retained rows are backed by a `Selector<K>`,
+  so selector reconciliation and row entity sync cannot drift apart.
 - Keep `ForEach` focused on lightweight element lists; row entity caching lives
   in host entities through `KeyedSubViews`.
 - Use `Resource::reload` / `latest` for async data surfaces that should keep

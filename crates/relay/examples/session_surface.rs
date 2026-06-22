@@ -248,11 +248,10 @@ impl ReactiveView for SessionSurface {
             .iter()
             .filter(|session| session.status == SessionStatus::Running)
             .count();
-        self.selection
-            .reconcile_keys_by(cx, &sessions, |session| session.id);
 
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             sessions,
             |session| session.id,
             |session, cx| SessionRow::new(session, self.selection.clone(), cx),

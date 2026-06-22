@@ -117,10 +117,10 @@ impl TaskList {
 impl ReactiveView for TaskList {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let tasks = self.tasks.get(cx);
-        self.selection.reconcile_keys_by(cx, &tasks, |task| task.id);
 
-        self.rows.sync(
+        self.rows.sync_with_selector(
             cx,
+            &self.selection,
             tasks,
             |task| task.id,
             |task, _cx| TaskRow::new(task, self.selection.clone()),

@@ -76,7 +76,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first. Command/picker-like surfaces can usually stay as host-owned item order plus `Selector<K>` instead of a Relay-level command registry.
 - **`SelectedItemExt`** — selected item projection for selector-backed collections. Call `items.selected_by(cx, selector, |item| item.id)` on `Signal<Vec<T>>` or `Memo<Vec<T>>` to derive `Memo<Option<T>>`; use `selected_by_or_first` when the app wants first-item fallback without mutating the selector.
 - **`SubView`** — stable GPUI child entity wrapper. Use it to split stateful or heavy regions into their own `Entity` and render them with GPUI's `AnyView::cached` path.
-- **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache.
+- **`KeyedSubViews`** — keyed row/entity retention for list-shaped views. Reconciles item order by stable key, reuses existing row entities, drops removed rows, and lets clean sibling rows reuse GPUI view cache. Use `sync_with_selector` when a retained row list is also driven by a `Selector<K>`; it reconciles stale selection before syncing row entities.
 - **`provide_context` / `use_context`** — reactive provide/inject. Based on GPUI global + SignalId; shares reactive state across layers (theme, locale, active entity). Value changes notify all `use_context` consumers automatically.
 - **`Form`** — form aggregation model. Register multiple `Binding<T>` fields; provides `is_dirty()` (returns `Memo<bool>`), `reset(cx)`, and `commit(cx)`. Suited for settings panels, edit forms, and other dirty-check/reset/submit scenarios.
 - **`StateScope::form()`** — entity-scoped form builder. Use it for dirty-check-only forms so the owning view keeps the form lifetime without `std::mem::forget`. Store `Form` directly when the view needs `reset(cx)` or `commit(cx)`.
@@ -266,6 +266,20 @@ selected.reconcile_keys(cx, tasks.iter().map(|task| task.id));
 // For item collections, use the `_by` variants to keep key extraction local.
 selected.select_next_by(cx, &tasks, |task| task.id);
 selected.reconcile_keys_by(cx, &tasks, |task| task.id);
+```
+
+When a retained row list is selector-backed, sync the selector and row entities
+through the same key function:
+
+```rust
+rows.sync_with_selector(
+    cx,
+    &selected,
+    tasks,
+    |task| task.id,
+    |task, _cx| TaskRow::new(task, selected.clone()),
+    |task, row, _cx| row.update_task(task),
+);
 ```
 
 When a view also needs the selected item, derive it from the same collection
