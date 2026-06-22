@@ -1,19 +1,16 @@
 use gpui::{
-    AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
-    div, px,
+    div, px, AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled,
+    Window,
 };
-use relay::{KeyedSubViews, ReactiveView, Selector, Signal, view::reactive_render};
+use relay::{view::reactive_render, KeyedSubViews, ReactiveView, Selector, Signal};
 use relay_uikit::patterns::{
-    Pane, PaneToolbar, SessionRow, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
     navigation::{Tab, Tabs},
+    Pane, PaneToolbar, SessionRow, TopToolbar, WorkspaceBreadcrumb,
 };
 use relay_uikit::{Button, IconButton, IconName, Theme, Tone};
 
-use super::{
-    WorkbenchApp, WorkbenchState,
-    data::{WorkbenchSession, selected_task},
-};
+use super::{data::WorkbenchSession, WorkbenchApp, WorkbenchState};
 
 pub(super) fn right_context(
     state: &WorkbenchState,
@@ -75,8 +72,7 @@ fn files_panel(
     theme: Theme,
     cx: &mut Context<WorkbenchApp>,
 ) -> impl IntoElement + use<> {
-    let tasks = state.tasks.get(cx);
-    let task = selected_task(&tasks, state.active_task.get(cx));
+    let task = state.selected_task.get(cx);
 
     div()
         .flex()
@@ -94,15 +90,18 @@ fn files_panel(
                 .gap_1()
                 .child(KeyValue::new(
                     "Task",
-                    task.map_or("None", |task| task.title.as_str()),
+                    task.as_ref().map_or("None", |task| task.title.as_str()),
                 ))
                 .child(
-                    KeyValue::new("Branch", task.map_or("None", |task| task.branch))
+                    KeyValue::new("Branch", task.as_ref().map_or("None", |task| task.branch))
                         .icon(IconName::GitBranch),
                 )
                 .child(
-                    KeyValue::new("Worktree", task.map_or("None", |task| task.worktree))
-                        .icon(IconName::Folder),
+                    KeyValue::new(
+                        "Worktree",
+                        task.as_ref().map_or("None", |task| task.worktree),
+                    )
+                    .icon(IconName::Folder),
                 ),
         )
         .child(
@@ -118,10 +117,9 @@ fn review_panel(
     theme: Theme,
     cx: &mut Context<WorkbenchApp>,
 ) -> impl IntoElement + use<> {
-    let tasks = state.tasks.get(cx);
-    let task = selected_task(&tasks, state.active_task.get(cx));
-    let review = task.map_or(0, |task| task.review);
-    let changed = task.map_or(0, |task| task.changed);
+    let task = state.selected_task.get(cx);
+    let review = task.as_ref().map_or(0, |task| task.review);
+    let changed = task.as_ref().map_or(0, |task| task.changed);
 
     div()
         .rounded(px(8.0))

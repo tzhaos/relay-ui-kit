@@ -8,17 +8,17 @@ mod rail;
 use gpui::App;
 use gpui::{AnyElement, AppContext, Context, Entity, FocusHandle, IntoElement, Render, Window};
 use relay::{
-    Binding, ReactiveAppExt, Selector, Signal,
-    view::{ReactiveView, StateScope, reactive_render},
+    view::{reactive_render, ReactiveView, StateScope},
+    Binding, Memo, ReactiveAppExt, Selector, Signal,
 };
 use relay_uikit::patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
-use relay_uikit::{ActiveTheme, TextInputState, Tone, icon::IconName, theme::space};
+use relay_uikit::{icon::IconName, theme::space, ActiveTheme, TextInputState, Tone};
 
 use center::center_pane;
 use context::right_context;
 use data::{
-    WorkbenchSession, WorkbenchTask, initial_sessions, initial_tasks, selected_session,
-    selected_task,
+    initial_sessions, initial_tasks, selected_session as resolve_selected_session,
+    selected_task as resolve_selected_task, WorkbenchSession, WorkbenchTask,
 };
 use rail::left_rail;
 
@@ -44,6 +44,8 @@ pub struct WorkbenchState {
     sessions: Signal<Vec<WorkbenchSession>>,
     active_task: Selector<u64>,
     active_session: Selector<u64>,
+    selected_task: Memo<Option<WorkbenchTask>>,
+    selected_session: Memo<Option<WorkbenchSession>>,
     task_list: Entity<rail::TaskListView>,
     session_list: Entity<context::SessionListView>,
     pub context_tab: Binding<&'static str>,
@@ -60,6 +62,24 @@ impl WorkbenchState {
         let sessions = cx.signal(initial_sessions());
         let active_task = cx.selector(Some(1));
         let active_session = cx.selector(Some(11));
+        let selected_task = cx.derived({
+            let tasks = tasks.clone();
+            let active_task = active_task.clone();
+            move |cx| {
+                let selected = active_task.get(cx);
+                tasks.read(cx, |tasks| resolve_selected_task(tasks, selected).cloned())
+            }
+        });
+        let selected_session = cx.derived({
+            let sessions = sessions.clone();
+            let active_session = active_session.clone();
+            move |cx| {
+                let selected = active_session.get(cx);
+                sessions.read(cx, |sessions| {
+                    resolve_selected_session(sessions, selected).cloned()
+                })
+            }
+        });
         let task_list = cx.new({
             let tasks = tasks.clone();
             let active_task = active_task.clone();
@@ -76,6 +96,8 @@ impl WorkbenchState {
             sessions,
             active_task,
             active_session,
+            selected_task,
+            selected_session,
             task_list,
             session_list,
             context_tab: cx.binding("files"),
@@ -118,16 +140,21 @@ impl Render for WorkbenchApp {
 }
 
 fn status_bar(state: &WorkbenchState, cx: &App) -> impl IntoElement {
-    let tasks = state.tasks.get(cx);
-    let sessions = state.sessions.get(cx);
-    let task = selected_task(&tasks, state.active_task.get(cx));
-    let session = selected_session(&sessions, state.active_session.get(cx));
-    let worktree = task.map_or("No task", |task| task.worktree);
-    let task_tone = task.map_or(Tone::Muted, |task| task.tone);
-    let session_label = session.map_or("No session", |session| session.label.as_str());
-    let session_tone = session.map_or(Tone::Muted, |session| session.tone);
-    let changed = task.map_or(0, |task| task.changed);
-    let review = task.map_or(0, |task| task.review);
+    let task = state.selected_task.get(cx);
+    let session = state.selected_session.get(cx);
+    let worktree = task.as_ref().map_or("No task", |task| task.worktree);
+    let task_tone = task.as_ref().map_or(Tone::Muted, |task| task.tone);
+    let session_label = session
+        .as_ref()
+        .map_or("No session", |session| session.label.as_str());
+    let session_tone = session.as_ref().map_or(Tone::Muted, |session| session.tone);
+    let changed = task.as_ref().map_or(0, |task| task.changed);
+    let review = task.as_ref().map_or(0, |task| task.review);
+    let task_count = state.tasks.read(cx, |tasks| tasks.len());
+    let task_position = state
+        .active_task
+        .get(cx)
+        .map_or_else(|| "-".to_string(), |id| id.to_string());
 
     StatusBar::new()
         .left(
@@ -136,8 +163,53 @@ fn status_bar(state: &WorkbenchState, cx: &App) -> impl IntoElement {
                 .tone(Tone::Info),
         )
         .left(StatusItem::new("Focus", state.route.get(cx)).tone(Tone::Secondary))
+        .left(StatusItem::new(
+            "Task",
+            format!("{task_position}/{task_count}"),
+        ))
         .left(StatusItem::new("Worktree", worktree).tone(task_tone))
         .right(StatusItem::new("Session", session_label).tone(session_tone))
         .right(StatusItem::new("Changes", changed.to_string()).tone(Tone::Secondary))
         .right(StatusItem::new("Review", review.to_string()).tone(Tone::Warning))
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+
+    use super::*;
+
+    #[test]
+    fn selected_task_memo_tracks_selector_and_list_updates() {
+        let mut app = TestApp::new();
+        let window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            WorkbenchApp::new(cx)
+        });
+        let root = window.root();
+
+        let initial = app.update_entity(&root, |app, cx| app.state.selected_task.get(cx));
+        assert_eq!(initial.as_ref().map(|task| task.id), Some(1));
+
+        app.update_entity(&root, |app, cx| {
+            app.state.active_task.select(cx, 2);
+        });
+        let selected = app.update_entity(&root, |app, cx| app.state.selected_task.get(cx));
+        assert_eq!(selected.as_ref().map(|task| task.id), Some(2));
+
+        app.update_entity(&root, |app, cx| {
+            app.state.tasks.update(cx, |tasks| {
+                let Some(task) = tasks.iter_mut().find(|task| task.id == 2) else {
+                    return false;
+                };
+                task.title = "Updated GPUI boundary audit".into();
+                true
+            });
+        });
+        let updated = app.update_entity(&root, |app, cx| app.state.selected_task.get(cx));
+        assert_eq!(
+            updated.as_ref().map(|task| task.title.as_str()),
+            Some("Updated GPUI boundary audit")
+        );
+    }
 }

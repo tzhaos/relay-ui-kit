@@ -62,6 +62,10 @@ window lifecycles as the source of truth.
   projections reading from the same runtime state. Its tests cover task row
   entity reuse while selection changes and session selection cleanup when the
   active session is removed.
+- The workbench selected task/session projections are derived with `Memo` from
+  `Signal<Vec<T>>` plus `Selector<u64>`. Render code reads the selected item
+  memo instead of cloning whole lists in each pane, showing that existing Relay
+  derived state covers this app pattern without a selector-specific item helper.
 
 ## List Boundary
 
@@ -111,7 +115,10 @@ runtime adapters only where they simplify real app state:
 4. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
-   `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.
+   `Selector<K>` and row retention lived in host-owned `KeyedSubViews`. Its
+   selected-item projections also stayed inside ordinary `Memo`, so defer a
+   selector-item helper until at least one more surface repeats the same shape
+   with enough boilerplate to justify it.
 
 ## Verification Gates
 

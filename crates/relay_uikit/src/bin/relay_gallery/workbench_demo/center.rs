@@ -1,26 +1,24 @@
-use gpui::{Context, IntoElement, ParentElement, Styled, div, px};
+use gpui::{div, px, Context, IntoElement, ParentElement, Styled};
 use relay_uikit::patterns::{
     OutputLog, OutputSurface, Pane, PaneToolbar, TabStrip, TopToolbar, WorkspaceBreadcrumb,
 };
 use relay_uikit::{IconButton, IconName, Theme};
 
-use super::{
-    WorkbenchApp, WorkbenchState,
-    data::{selected_session, selected_task, terminal_lines},
-};
+use super::{data::terminal_lines, WorkbenchApp, WorkbenchState};
 
 pub(super) fn center_pane(
     state: &WorkbenchState,
     theme: Theme,
     cx: &mut Context<WorkbenchApp>,
 ) -> impl IntoElement + use<> {
-    let tasks = state.tasks.get(cx);
-    let sessions = state.sessions.get(cx);
-    let task = selected_task(&tasks, state.active_task.get(cx));
-    let session = selected_session(&sessions, state.active_session.get(cx));
-    let connected = session.is_some_and(|session| session.connected);
-    let lines = terminal_lines(task, session);
-    let active_task_title = task.map_or("No task", |task| task.title.as_str());
+    let task = state.selected_task.get(cx);
+    let session = state.selected_session.get(cx);
+    let connected = session.as_ref().is_some_and(|session| session.connected);
+    let lines = terminal_lines(task.as_ref(), session.as_ref());
+    let active_task_title = task.as_ref().map_or("No task", |task| task.title.as_str());
+    let tabs = state
+        .sessions
+        .read(cx, |sessions| session_tabs(state, sessions));
 
     Pane::center(
         div()
@@ -28,7 +26,7 @@ pub(super) fn center_pane(
             .min_h_0()
             .flex()
             .flex_col()
-            .child(session_tabs(state, &sessions))
+            .child(tabs)
             .child(
                 div().flex_1().min_h_0().child(
                     OutputSurface::new("workbench-output", OutputLog::new(lines).prompt("> "))
