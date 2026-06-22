@@ -83,7 +83,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
 - **`KeyedSubViews`** — 面向列表形态 view 的 keyed row/entity 保持器。按稳定 key 对齐 item 顺序，复用已有 row entity，丢弃移除的 row，并让未变化的兄弟 row 继续复用 GPUI view cache。当 retained row list 同时由 `Selector<K>` 驱动时，用 `sync_with_selector` 在同步 row entity 前先清理失效 selection。
 - **`provide_context` / `use_context`** — 响应式 provide/inject。基于 GPUI global + SignalId，跨层共享响应式状态（主题、locale、active entity 等），值变化自动通知所有 `use_context` 消费者。
-- **`Form`** — 表单聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等需要脏检查/重置/提交的场景。
+- **`Form`** — 已提交字段的聚合模型。注册多个 `Binding<T>` 字段，提供 `is_dirty()`（返回 `Memo<bool>`）、`reset(cx)`、`commit(cx)` 等派生能力。适合设置面板、编辑表单等 dirty 状态来自已保存领域值的场景。光标/选择区、解析、焦点、行内校验展示等临时编辑状态留在组件 crate 或宿主 surface。
 - **`StateScope::form()`** — entity 作用域的表单 builder。仅需要 dirty-check 的表单用它持有生命周期，避免 `std::mem::forget`；如果 view 需要 `reset(cx)` 或 `commit(cx)`，则直接把 `Form` 存成字段。
 - **`WindowSignalExt::use_signal` / `use_binding`** — 组件内 hooks，供 `RenderOnce` 组件使用。通过 `window.use_keyed_state` 按 `ElementId` 持久化跨渲染状态。对标 React `useState` / Solid `createSignal`。
 - **`#[derive(Reactive)]`** (relay_macros) — 字段级响应。将普通结构体转换为生成的 `ReactiveFoo` 包装，字段默认包装为 `Signal<T>`，并提供 `from(cx, value)`、`snapshot(cx)`、`set(cx, value)` 和字段访问器。嵌套结构字段可用 `#[reactive(nested)]` 标记，保留嵌套字段级追踪。

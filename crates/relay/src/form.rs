@@ -1,16 +1,14 @@
 //! Form aggregation model.
 //!
 //! [`Form`] collects multiple [`Binding`]s into a single aggregate, providing
-//! derived helpers for dirty-checking, validation, submit, and reset. The
-//! model keeps a snapshot of initial values so `is_dirty` can be computed
-//! declaratively via a [`Memo`].
+//! derived helpers for dirty-checking, reset, and commit. The model keeps a
+//! snapshot of initial values so `is_dirty` can be computed declaratively via
+//! a [`Memo`].
 //!
 //! Fields are registered with a key and a binding. The form exposes:
 //!
 //! - `is_dirty()` — a `Memo<bool>` that is `true` when any field differs from
 //!   its initial value.
-//! - `validate(cx)` — runs all registered validators, returning the first
-//!   error (or `Ok(())`).
 //! - `reset(cx)` — restores all fields to their initial values.
 //! - `commit(cx)` — snapshots the current values as the new "clean" baseline.
 //!
@@ -32,7 +30,7 @@ use crate::{Binding, Memo, ReactiveAppExt};
 /// A type-erased field entry in a [`Form`].
 type FieldEntry = Rc<dyn Field>;
 
-/// Trait implemented by field entries to enable type-erased reset/validate.
+/// Trait implemented by field entries to enable type-erased reset and snapshot.
 trait Field {
     /// Reset this field to its initial value.
     fn reset(&self, cx: &mut App);
@@ -65,7 +63,7 @@ impl<T: PartialEq + Clone + 'static> Field for TypedField<T> {
     }
 }
 
-/// An aggregate of bound fields with derived dirty/validate/reset helpers.
+/// An aggregate of bound fields with derived dirty/reset/commit helpers.
 pub struct Form {
     fields: Rc<RefCell<HashMap<&'static str, FieldEntry>>>,
     dirty_memo: Option<Memo<bool>>,

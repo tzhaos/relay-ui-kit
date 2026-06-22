@@ -17,7 +17,7 @@ their public control surfaces.
 | Entity-grained UI retention follows GPUI cache boundaries | `SubView`, `KeyedSubViews`, and `KeyedSubViews::sync_with_selector` keep stateful regions and rows as GPUI entities. Tests cover cached sibling reuse, retained branches, row reuse, row-local state survival, and stale selection reconciliation. | Complete |
 | Selection-heavy lists avoid whole-list invalidation | `Selector<K>` provides per-key selected signals, ordered navigation, key reconciliation, filtered-list first fallback, and `_by` helpers. `SelectedItemExt` covers selected-item projection from `Signal<Vec<T>>` and `Memo<Vec<T>>`; examples and gallery/workbench call sites use it. | Complete |
 | Field-level state wrappers are available | `#[derive(Reactive)]` supports nested reactive state wrappers; `tests/reactive_derive.rs` covers nested field tracking and snapshots. | Complete |
-| Form and context patterns are scoped | `Form`, `StateScope::form`, `provide_context`, and `use_context` are exported and covered by unit tests plus README usage. | Complete |
+| Form and context patterns are scoped | `Form`, `StateScope::form`, `provide_context`, and `use_context` are exported and covered by unit tests plus README usage. Gallery settings uses `Form` only for committed settings fields, while transient UIKit text editing state stays outside the form. | Complete |
 | UIKit adaptation path is narrow and value-first | `relay_uikit` consumes `Binding`, `Selector`, `Resource::fold_latest`, `SelectedItemExt`, `KeyedSubViews`, and `sync_with_selector` in compiled gallery/workbench surfaces without moving command registries, resource UI boundaries, or row presentation into relay. | Complete |
 
 ## Migration Plan
@@ -48,6 +48,19 @@ Current inventory checkpoint:
 | `WorkbenchApp` | `Signal<Vec<_>>` collections, selected task/session `Selector<u64>`, selected-item `Memo`s, `Resource` values for transcript/review, and a `StateScope` for source-driven reloads. | Rail/context rows use `KeyedSubViews`; output surfaces consume folded resource values. |
 | Retained gallery/workbench rows | Row-local state is stored inside row `Entity`s and synchronized by `KeyedSubViews::sync_with_selector`. | Row presentation stays in `relay_uikit` patterns or gallery host modules. |
 | Small relay examples | Simple state demos use direct `cx.tracked` where the example is about a primitive; app-shaped examples use `ReactiveView`. | No UIKit dependency. |
+
+Form and input checkpoint:
+
+- `Form` is the committed-field aggregate for dirty/reset/commit. The gallery
+  settings form registers `notifications`, `auto_archive`, `ui_font_size`, and
+  `theme_choice`, matching the fields that represent saved settings.
+- Text editing state such as `TextInputState`, focus handles, cursor/selection,
+  integer key handling, range clamping, and inline validation display remains in
+  UIKit or the host surface. Relay only sees the relevant `Binding<T>` values.
+- The current `NumberInput` value-binding plus text-edit-binding bridge is a
+  single UIKit component protocol, not a repeated Relay runtime pattern. Do not
+  add a Relay form store, input controller, or parser abstraction until the same
+  value/editing-state coordination repeats across compiled app-shaped surfaces.
 
 ### 2. Move Renders to Reactive Tracking
 
@@ -266,6 +279,9 @@ Current deferred ideas and their bar:
   `Selector`, `SelectedItemExt`, `sync_with_selector`, and
   `SignalVecExt::push_selected_by` / `remove_selected_by` keep command and row
   data host-owned.
+- Form store or input controller: defer while `Binding<T>` covers control
+  values, `Form` covers committed-field dirty/reset/commit, and text editing or
+  numeric parsing behavior remains a UIKit/host concern.
 - Frame-boundary automatic batching: defer without a GPUI `Window` lifecycle
   hook that clearly improves real app write bursts beyond explicit `batch` and
   collection helpers.

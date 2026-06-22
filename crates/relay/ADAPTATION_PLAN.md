@@ -37,6 +37,10 @@ For the current completion audit and migration checklist, see
 - `StateScope::form()` packages dirty-check-only form lifetime into the owning
   GPUI entity. Views that need reset or commit keep a `Form` field directly;
   views that only need `is_dirty` can avoid `std::mem::forget(form)`.
+- Form/input usage is split by ownership: `Binding<T>` is the control boundary
+  for two-way values, while `Form` aggregates committed domain fields for
+  dirty/reset/commit. UIKit text editing state, parsing, focus, and
+  validation-display contracts stay in the component crate or host surface.
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.
@@ -200,12 +204,37 @@ prepaint, and paint, so it should not be treated as a branch lifecycle
 primitive. Add a Relay branch helper only after repeated app code shows a
 common typed shape beyond ordinary host-owned `SubView` fields.
 
+## Form/Input Boundary
+
+Use `Binding<T>` as the narrow state bridge between Relay and controls. Text
+controls can own or receive a `Binding<TextInputState>` in UIKit; numeric and
+choice controls can receive `Binding<i32>`, `Binding<bool>`,
+`Binding<&'static str>`, or another value binding. Keep cursor position,
+selection ranges, key contracts, parsing rules, and inline error presentation
+with the component crate or host surface.
+
+Use `Form` for the fields that represent a committed form snapshot. The gallery
+settings surface registers `notifications`, `auto_archive`, `ui_font_size`, and
+`theme_choice` because those are saved settings. It deliberately leaves
+`name_input`, `search_input`, and `ui_font_size_input` outside the form when
+they are editing affordances rather than committed fields.
+
+The current `NumberInput` shape uses both a value binding and an editable text
+binding so the component can preserve text editing behavior while committing a
+parsed value. That bridge is UIKit-specific today: it appears in one compiled
+component path, depends on `TextInputState`, and has range/parsing rules owned
+by the control. Add a Relay-level form/input helper only if multiple compiled
+surfaces repeat the same runtime-level pattern with host-owned value fields.
+
 ## UIKit Adaptation
 
 Keep presentation components value-first and `Binding`-friendly. Add Relay
 runtime adapters only where they simplify real app state:
 
 - Use `Binding<T>` for ordinary two-way form controls.
+- Register committed domain fields in `Form`; keep transient editing state,
+  focus state, parsing rules, and validation presentation in UIKit or the host
+  surface unless they repeat as a runtime-level pattern.
 - Use `Selector<K>` for mutually exclusive row, tab, picker, and command
   selection.
 - Use `SelectedItemExt` when a host needs the selected item memo from a
@@ -264,6 +293,11 @@ runtime adapters only where they simplify real app state:
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
    `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.
+6. Do not add a Relay form store, input controller, or typed parser helper yet.
+   Current compiled surfaces are covered by `Binding<T>`, `Form`, and
+   UIKit-owned input state. Revisit only after at least two app-shaped surfaces
+   repeat the same host-owned value/editing-state coordination outside a single
+   UIKit component.
 
 ## Verification Gates
 
