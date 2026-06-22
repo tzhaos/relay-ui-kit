@@ -17,6 +17,9 @@ window lifecycles as the source of truth.
   `watch_changes + Resource::reload` pattern for entity-scoped source-driven
   resources. The resource stays UI-agnostic; the owning GPUI entity owns the
   source tracking lifecycle.
+- `StateScope::load_resource_on_changes` covers the same source-driven shape
+  when the initial value is not ready yet: first run uses `Resource::load`, and
+  later source changes use `Resource::reload` to retain the last ready value.
 - `StateScope::form()` packages dirty-check-only form lifetime into the owning
   GPUI entity. Views that need reset or commit keep a `Form` field directly;
   views that only need `is_dirty` can avoid `std::mem::forget(form)`.
@@ -68,9 +71,10 @@ window lifecycles as the source of truth.
   verify row entity reuse, row-local state survival across reorder, and command
   keyboard behavior.
 - The compiled `source_resource` Relay example promotes source-driven resource
-  reloads outside gallery/workbench. It keeps `Resource` UI-agnostic, scopes
-  source tracking to the owning GPUI entity, and tests that source changes enter
-  `Reloading` while retaining the last ready value.
+  loading outside gallery/workbench. It keeps `Resource` UI-agnostic, scopes
+  source tracking to the owning GPUI entity, starts from `Pending`, and tests
+  that source changes later enter `Reloading` while retaining the last ready
+  value.
 - The compiled `command_picker` Relay example promotes command/picker-shaped
   host state outside UIKit. It combines host-owned command data, query
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
@@ -148,10 +152,11 @@ runtime adapters only where they simplify real app state:
   resources, use `output_resource_snapshot`; for other data shapes, keep local
   `fold_latest` render branches until repeated real app surfaces justify a
   similarly narrow helper.
-- Use `StateScope::reload_resource_on_changes` for source-driven resources when
-  the initial value is already ready. This gives the useful part of
-  SolidJS-style source resources while keeping the resource itself UI-agnostic
-  and scoped to the owning GPUI entity.
+- Use `StateScope::load_resource_on_changes` for source-driven resources that
+  start pending, and `StateScope::reload_resource_on_changes` when the initial
+  value is already ready. This gives the useful part of SolidJS-style source
+  resources while keeping the resource itself UI-agnostic and scoped to the
+  owning GPUI entity.
 - Use `batch` or single-operation collection helpers such as
   `SignalVecExt::extend` for write bursts that should notify once. Avoid
   assuming a global frame-boundary batch when code does not have a `Window`
@@ -160,9 +165,9 @@ runtime adapters only where they simplify real app state:
 ## Next Landing Steps
 
 1. Do not add a `Resource::from_source` / `create_resource` constructor yet.
-   The Workbench transcript and review report both fit the smaller
-   `StateScope::reload_resource_on_changes` helper, which matches GPUI entity
-   lifetime better and keeps `Resource` independent from source tracking.
+   The Workbench transcript/review report and Relay `source_resource` example
+   fit the smaller `StateScope` helpers, which match GPUI entity lifetime
+   better and keep `Resource` independent from source tracking.
 2. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 3. Keep expanding compiled app-shaped surfaces before adding new Relay

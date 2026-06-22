@@ -71,6 +71,7 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`derived`** — `memo` 的语义别名，强调"派生值"。在 view 的 `new()` 里用 `cx.derived(|cx| ...)` 注册派生计算，渲染时 `derived.get(cx)` 读取，依赖变化才重算。
 - **`watch(cx, sources, react)`** — 声明式副作用。`sources` 读取依赖，`react` 在 `untrack` 中执行，因此副作用里的读取不会变成新的 source。
 - **`watch_changes(cx, sources, react)`** — 同样分离 source/react，但跳过初始 reaction。适合初始可见状态已经 seed 好、只希望后续 source 变化触发 reload 或同步的场景。
+- **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource load。首次运行记录 source 并触发 `Resource::load`；后续 source 变化触发 `Resource::reload`，刷新时保留最新 ready 值。
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity 作用域的 source-driven resource reload。`sources` 声明依赖，`build_load` 在 source 变化后读取当前 app 快照，resource reload 时保留上一份 ready 值继续可见。
 - **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`。
 - **`Selector<K>`** — keyed 选择状态。行视图用 `selector.is_selected(cx, key)` 只追踪自己的 key；选择项变化时只通知上一个和下一个选中 key，而不是整张列表。列表变化时，host 可以调用 `selector.reconcile_keys(cx, keys)` 丢弃失效行信号，并在当前选中 key 已不存在时清空选择；有序列表导航可以用 `select_next` / `select_previous` / `select_first` / `select_last`。当 host 手里是 item struct 列表时，用 `_by` 变体直接把 item 映射到稳定 key，避免先克隆整张列表。command/picker 一类 surface 通常可以保持为 host 自己拥有 item 顺序，再配 `Selector<K>`，不需要上升成 Relay 级 command registry。
@@ -146,8 +147,24 @@ fn child_render(cx: &App) {
 Relay 到 resource state 和 folding 语义为止。两个具体 surface 共享完全相同的 render-ready 形状时，把适配器放在组件 crate；如果某个 surface 需要自己的 metadata 或 rows，就在本地 fold resource。
 
 source-driven resource 不需要把 UI 边界塞进 `Resource` 本身；在 entity
-作用域里把 source 接到 reload 即可。如果初始 ready 值已经存在，使用
+作用域里把 source 接到 load/reload 即可。初始值需要异步加载时使用
+`load_resource_on_changes`；初始 ready 值已经存在时使用
 `reload_resource_on_changes`：
+
+```rust
+scope.load_resource_on_changes(
+    cx,
+    output.clone(),
+    move |cx| { let _ = selected_task.get(cx); },
+    move |cx| {
+        let task = selected_task_for_load.get(cx);
+        move |cx| async move {
+            let value = fetch_output(cx, task).await?;
+            Ok(value)
+        }
+    },
+);
+```
 
 ```rust
 scope.reload_resource_on_changes(
@@ -247,7 +264,7 @@ selected.reconcile_keys_by(cx, &tasks, |task| task.id);
 | `watch` | `watch` / `watch_changes` 声明式副作用 |
 | `signal_vec` | `SignalVecExt` 响应式列表操作 |
 | `resource` | `Resource` 异步 pending/reloading/ready/error 和 latest 值 |
-| `source_resource` | `StateScope::reload_resource_on_changes` source-driven resource reload |
+| `source_resource` | `StateScope` source-driven resource load/reload helpers |
 | `context` | `provide_context` / `use_context` 跨层共享 |
 | `form` | `Form` 聚合、`is_dirty`、`reset`、`commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |

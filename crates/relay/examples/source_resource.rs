@@ -1,8 +1,9 @@
 //! Source resource - entity-scoped resource reloads from reactive sources.
 //!
-//! `StateScope::reload_resource_on_changes` wires declared signal reads to
-//! `Resource::reload` while keeping the resource itself UI-agnostic. Use it
-//! when a GPUI entity owns both the source tracking lifetime and the resource.
+//! `StateScope::load_resource_on_changes` wires declared signal reads to an
+//! initial `Resource::load`, then to `Resource::reload` after source changes.
+//! Use it when a GPUI entity owns both the source tracking lifetime and the
+//! resource.
 //!
 //! Run with `cargo run -p relay --example source_resource`.
 
@@ -11,13 +12,13 @@
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, AsyncApp, Bounds, Context, Div, InteractiveElement, IntoElement,
-    ParentElement, Render, Stateful, StatefulInteractiveElement, Styled, Window, WindowBounds,
-    WindowOptions, div, prelude::*, px, rgb, size,
+    div, prelude::*, px, rgb, size, AnyElement, App, AsyncApp, Bounds, Context, Div,
+    InteractiveElement, IntoElement, ParentElement, Render, Stateful, StatefulInteractiveElement,
+    Styled, Window, WindowBounds, WindowOptions,
 };
 use gpui_platform::application;
 use relay::{
-    ReactiveAppExt, ReactiveView, Resource, Signal, StateScope, init, view::reactive_render,
+    init, view::reactive_render, ReactiveAppExt, ReactiveView, Resource, Signal, StateScope,
 };
 
 struct SourceResourceDemo {
@@ -31,11 +32,11 @@ impl SourceResourceDemo {
         init(cx);
         let mut scope = StateScope::new();
         let selected_task = cx.signal("relay/runtime");
-        let report = cx.ready_resource::<_, String>(report_for_task("relay/runtime"));
+        let report = cx.pending_resource::<String, String>();
 
         let task_for_sources = selected_task.clone();
         let task_for_load = selected_task.clone();
-        scope.reload_resource_on_changes(
+        scope.load_resource_on_changes(
             cx,
             report.clone(),
             move |cx| {
@@ -189,7 +190,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn source_resource_enters_reloading_when_source_changes() {
+    fn source_resource_loads_initially_then_reloads_when_source_changes() {
         let mut app = TestApp::new();
         let mut window = app.open_window(|_, cx| SourceResourceDemo::new(cx));
         let root = window.root();
@@ -198,31 +199,29 @@ mod tests {
         let initial = app.update_entity(&root, |demo, cx| {
             demo.report.fold_latest(
                 cx,
-                || None,
-                |report, loading| Some((report.clone(), loading)),
-                |_| None,
+                || ("pending".to_string(), true),
+                |report, loading| (report.clone(), loading),
+                |error| (error.clone(), false),
             )
         });
-        assert_eq!(
-            initial,
-            Some(("Report ready for relay/runtime".to_string(), false))
-        );
+        assert_eq!(initial, ("pending".to_string(), true));
 
         app.update_entity(&root, |demo, cx| {
+            demo.report.set_ready(cx, report_for_task("relay/runtime"));
             demo.selected_task.set(cx, "relay/uikit");
         });
 
         let reloading = app.update_entity(&root, |demo, cx| {
             demo.report.fold_latest(
                 cx,
-                || None,
-                |report, loading| Some((report.clone(), loading)),
-                |_| None,
+                || ("pending".to_string(), true),
+                |report, loading| (report.clone(), loading),
+                |error| (error.clone(), false),
             )
         });
         assert_eq!(
             reloading,
-            Some(("Report ready for relay/runtime".to_string(), true))
+            ("Report ready for relay/runtime".to_string(), true)
         );
     }
 }

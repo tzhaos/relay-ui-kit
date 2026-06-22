@@ -69,6 +69,7 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`derived`** — semantic alias for `memo`, emphasizing "derived value". Register derived computation in `new()` with `cx.derived(|cx| ...)`, read via `derived.get(cx)` in render; recomputes only when dependencies change.
 - **`watch(cx, sources, react)`** — declarative side effects. `sources` reads dependencies; `react` runs in `untrack`, so side-effect reads do not become new sources.
 - **`watch_changes(cx, sources, react)`** — same source/react split, but skips the initial reaction. Use it when the initial visible state is already seeded and only later source changes should reload or sync.
+- **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource load. The first run records sources and starts `Resource::load`; later source changes call `Resource::reload` so the latest ready value remains visible while refreshing.
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource reload. `sources` declares dependencies, `build_load` snapshots current app state after a source change, and the resource reload keeps the latest ready value visible while async work runs.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification.
 - **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first. Command/picker-like surfaces can usually stay as host-owned item order plus `Selector<K>` instead of a Relay-level command registry.
@@ -144,8 +145,24 @@ fn child_render(cx: &App) {
 Relay intentionally stops at resource state and folding semantics. When two concrete surfaces share the same render-ready shape, put that adapter in the component crate; when a surface needs its own metadata or rows, fold the resource locally.
 
 For source-driven resources, keep the resource UI-agnostic and wire the source
-through an entity-scoped scope. `reload_resource_on_changes` is the right fit
-when a ready initial value has already been installed:
+through an entity-scoped scope. Use `load_resource_on_changes` when the initial
+value should be loaded asynchronously; use `reload_resource_on_changes` when a
+ready initial value has already been installed:
+
+```rust
+scope.load_resource_on_changes(
+    cx,
+    output.clone(),
+    move |cx| { let _ = selected_task.get(cx); },
+    move |cx| {
+        let task = selected_task_for_load.get(cx);
+        move |cx| async move {
+            let value = fetch_output(cx, task).await?;
+            Ok(value)
+        }
+    },
+);
+```
 
 ```rust
 scope.reload_resource_on_changes(
@@ -246,7 +263,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `watch` | `watch` / `watch_changes` declarative side effects |
 | `signal_vec` | `SignalVecExt` reactive list operations |
 | `resource` | `Resource` async pending/reloading/ready/error and latest value |
-| `source_resource` | `StateScope::reload_resource_on_changes` source-driven resource reload |
+| `source_resource` | `StateScope` source-driven resource load/reload helpers |
 | `context` | `provide_context` / `use_context` cross-layer sharing |
 | `form` | `Form` aggregation, `is_dirty`, `reset`, `commit` |
 | `component_hooks` | `WindowSignalExt::use_signal` — component-internal state |

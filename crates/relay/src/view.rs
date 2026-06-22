@@ -47,7 +47,7 @@
 //! }
 //! ```
 
-use std::future::Future;
+use std::{cell::Cell, future::Future};
 
 use gpui::{
     AnyElement, AnyView, App, AppContext, AsyncApp, Context, Entity, IntoElement, Render,
@@ -55,7 +55,7 @@ use gpui::{
 };
 
 use crate::{
-    Binding, Effect, Form, Memo, ReactiveAppExt, ReactiveContextExt, Resource, effect, effect_in,
+    effect, effect_in, Binding, Effect, Form, Memo, ReactiveAppExt, ReactiveContextExt, Resource,
 };
 
 // ---------------------------------------------------------------------------
@@ -144,6 +144,38 @@ impl StateScope {
         self.watch_changes(cx, sources, move |cx| {
             let load = build_load(cx);
             resource.reload(cx, load);
+        });
+    }
+
+    /// Load a resource immediately, then reload it when declared sources change.
+    ///
+    /// This is the source-driven helper for resources that start without a
+    /// ready value. The first run records sources and calls [`Resource::load`];
+    /// later source changes call [`Resource::reload`] so the last ready value
+    /// remains visible during refresh.
+    pub fn load_resource_on_changes<T, Value, Error, Sources, BuildLoad, Load, Fut>(
+        &mut self,
+        cx: &mut Context<T>,
+        resource: Resource<Value, Error>,
+        sources: Sources,
+        build_load: BuildLoad,
+    ) where
+        T: 'static,
+        Value: 'static,
+        Error: 'static,
+        Sources: Fn(&App) + 'static,
+        BuildLoad: Fn(&mut App) -> Load + 'static,
+        Load: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<Value, Error>> + 'static,
+    {
+        let initialized = Cell::new(false);
+        self.watch(cx, sources, move |cx| {
+            let load = build_load(cx);
+            if initialized.replace(true) {
+                resource.reload(cx, load);
+            } else {
+                resource.load(cx, load);
+            }
         });
     }
 
@@ -331,9 +363,9 @@ pub fn reactive_render<T: ReactiveView>(
 mod tests {
     use std::{cell::Cell, rc::Rc, time::Duration};
 
-    use gpui::{Context, IntoElement, ParentElement, Render, Styled, TestApp, Window, div};
+    use gpui::{div, Context, IntoElement, ParentElement, Render, Styled, TestApp, Window};
 
-    use crate::{ReactiveAppExt, Resource, ResourceState, Signal, init};
+    use crate::{init, ReactiveAppExt, Resource, ResourceState, Signal};
 
     use super::*;
 
@@ -755,5 +787,78 @@ mod tests {
 
         let reloading = app.update_entity(&root, |view, cx| view.resource.get(cx));
         assert_eq!(reloading, ResourceState::Reloading(10));
+    }
+
+    #[test]
+    fn state_scope_load_resource_on_changes_loads_initially_then_reloads() {
+        struct ResourceLoadView {
+            source: Signal<i32>,
+            resource: Resource<i32, &'static str>,
+            _scope: StateScope,
+        }
+
+        impl ResourceLoadView {
+            fn new(cx: &mut Context<Self>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                let source = cx.signal(0);
+                let resource = cx.pending_resource::<i32, &'static str>();
+                let source_for_sources = source.clone();
+                let source_for_load = source.clone();
+
+                scope.load_resource_on_changes(
+                    cx,
+                    resource.clone(),
+                    move |cx| {
+                        let _ = source_for_sources.get(cx);
+                    },
+                    move |cx| {
+                        let value = source_for_load.get(cx);
+                        move |cx| async move {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(20))
+                                .await;
+                            Ok(value)
+                        }
+                    },
+                );
+
+                Self {
+                    source,
+                    resource,
+                    _scope: scope,
+                }
+            }
+        }
+
+        impl ReactiveView for ResourceLoadView {
+            fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+                div()
+                    .child(self.source.get(cx).to_string())
+                    .into_any_element()
+            }
+        }
+
+        impl Render for ResourceLoadView {
+            fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                reactive_render(self, window, cx)
+            }
+        }
+
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ResourceLoadView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let initial = app.update_entity(&root, |view, cx| view.resource.get(cx));
+        assert_eq!(initial, ResourceState::Pending);
+
+        app.update_entity(&root, |view, cx| {
+            view.resource.set_ready(cx, 20);
+            view.source.set(cx, 1);
+        });
+
+        let reloading = app.update_entity(&root, |view, cx| view.resource.get(cx));
+        assert_eq!(reloading, ResourceState::Reloading(20));
     }
 }
