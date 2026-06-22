@@ -2,7 +2,10 @@ use gpui::{
     AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
     div, px,
 };
-use relay::{KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, view::reactive_render};
+use relay::{
+    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, SignalVecExt,
+    view::reactive_render,
+};
 use relay_uikit::patterns::ScrollSurface;
 use relay_uikit::{
     ActiveTheme, Button, ButtonVariant, IconButton, IconName, IconSize, Label, LabelSize, ListItem,
@@ -225,22 +228,8 @@ impl StressSessionList {
     }
 
     fn remove_active(&self, cx: &mut App) {
-        let Some(selected) = self.selection.get_untracked() else {
-            return;
-        };
-
-        self.sessions.update(cx, |sessions| {
-            let Some(index) = sessions.iter().position(|session| session.id == selected) else {
-                return false;
-            };
-            sessions.remove(index);
-            true
-        });
-
-        self.sessions.peek(|sessions| {
-            self.selection
-                .reconcile_keys_by(cx, sessions, |session| session.id);
-        });
+        self.sessions
+            .remove_selected_by(cx, &self.selection, |session| session.id);
     }
 }
 

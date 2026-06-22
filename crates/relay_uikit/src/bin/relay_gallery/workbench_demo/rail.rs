@@ -2,7 +2,7 @@ use gpui::{
     AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
     div, px,
 };
-use relay::{KeyedSubViews, ReactiveView, Selector, Signal, view::reactive_render};
+use relay::{KeyedSubViews, ReactiveView, Selector, Signal, SignalVecExt, view::reactive_render};
 use relay_uikit::patterns::{Pane, PaneToolbar, TaskRow};
 use relay_uikit::{Button, IconButton, IconName, TextInput, Theme};
 
@@ -128,21 +128,8 @@ impl TaskListView {
     }
 
     fn remove_active(&self, cx: &mut App) {
-        let Some(selected) = self.selection.get_untracked() else {
-            return;
-        };
-
-        self.tasks.update(cx, |tasks| {
-            let Some(index) = tasks.iter().position(|task| task.id == selected) else {
-                return false;
-            };
-            tasks.remove(index);
-            true
-        });
-
-        self.tasks.peek(|tasks| {
-            self.selection.reconcile_keys_by(cx, tasks, |task| task.id);
-        });
+        self.tasks
+            .remove_selected_by(cx, &self.selection, |task| task.id);
     }
 }
 

@@ -7,9 +7,11 @@
 //! rarely cheap to compare with `PartialEq`, and callers usually want every
 //! push/remove to refresh.
 
+use std::hash::Hash;
+
 use gpui::App;
 
-use crate::Signal;
+use crate::{Selector, Signal, batch};
 
 /// Extension trait with list mutation helpers for `Signal<Vec<T>>`.
 pub trait SignalVecExt<T: 'static> {
@@ -29,6 +31,17 @@ pub trait SignalVecExt<T: 'static> {
     /// Remove the first value matching `predicate` and return whether one was
     /// removed.
     fn remove_first(&self, cx: &mut App, predicate: impl FnMut(&T) -> bool) -> bool;
+
+    /// Remove the value selected by `selector` and reconcile the selector
+    /// against the resulting list.
+    fn remove_selected_by<K>(
+        &self,
+        cx: &mut App,
+        selector: &Selector<K>,
+        key: impl FnMut(&T) -> K,
+    ) -> Option<T>
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static;
 
     /// Retain only values for which `predicate` returns true.
     fn retain(&self, cx: &mut App, predicate: impl FnMut(&T) -> bool);
@@ -94,6 +107,38 @@ impl<T: 'static> SignalVecExt<T> for Signal<Vec<T>> {
         removed
     }
 
+    fn remove_selected_by<K>(
+        &self,
+        cx: &mut App,
+        selector: &Selector<K>,
+        mut key: impl FnMut(&T) -> K,
+    ) -> Option<T>
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        let selected = selector.get_untracked();
+        let mut removed = None;
+
+        batch(cx, |cx| {
+            if let Some(selected) = selected.as_ref() {
+                self.update(cx, |list| {
+                    let Some(index) = list.iter().position(|item| key(item) == selected.clone())
+                    else {
+                        return false;
+                    };
+                    removed = Some(list.remove(index));
+                    true
+                });
+            }
+
+            self.peek(|list| {
+                selector.reconcile_keys_by(cx, list, |item| key(item));
+            });
+        });
+
+        removed
+    }
+
     fn retain(&self, cx: &mut App, mut predicate: impl FnMut(&T) -> bool) {
         self.update(cx, |list| {
             let before = list.len();
@@ -127,7 +172,7 @@ mod tests {
 
     use gpui::{Context, IntoElement, ParentElement, Render, TestApp, Window, div};
 
-    use crate::{ReactiveAppExt, Signal, SignalVecExt, effect, init, track};
+    use crate::{ReactiveAppExt, Selector, Signal, SignalVecExt, effect, init, track};
 
     struct ListView {
         items: Signal<Vec<i32>>,
@@ -251,6 +296,72 @@ mod tests {
         app.update_entity(&root, |view, _cx| {
             assert_eq!(view.items.get_untracked(), vec![10, 30]);
         });
+    }
+
+    #[test]
+    fn remove_selected_by_removes_item_and_clears_selection() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            let signal: Signal<Vec<i32>> = cx.signal(vec![1, 2, 3]);
+            signal
+        });
+        let selector = app.update(|cx| Selector::new(cx, Some(2)));
+
+        let removed = app.update(|cx| signal.remove_selected_by(cx, &selector, |item| *item));
+
+        assert_eq!(removed, Some(2));
+        assert_eq!(signal.get_untracked(), vec![1, 3]);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn remove_selected_by_clears_stale_selection_without_mutating_list() {
+        let mut app = TestApp::new();
+        let signal = app.update(|cx| {
+            init(cx);
+            let signal: Signal<Vec<i32>> = cx.signal(vec![1, 2, 3]);
+            signal
+        });
+        let selector = app.update(|cx| Selector::new(cx, Some(7)));
+
+        let removed = app.update(|cx| signal.remove_selected_by(cx, &selector, |item| *item));
+
+        assert_eq!(removed, None);
+        assert_eq!(signal.get_untracked(), vec![1, 2, 3]);
+        assert_eq!(selector.get_untracked(), None);
+    }
+
+    #[test]
+    fn remove_selected_by_batches_list_and_selection_notifications() {
+        let mut app = TestApp::new();
+        let (signal, selector) = app.update(|cx| {
+            init(cx);
+            let signal: Signal<Vec<i32>> = cx.signal(vec![1, 2, 3]);
+            let selector = Selector::new(cx, Some(2));
+            (signal, selector)
+        });
+        let runs = Rc::new(Cell::new(0));
+        let _effect = app.update({
+            let signal = signal.clone();
+            let selector = selector.clone();
+            let runs = runs.clone();
+            move |cx| {
+                effect(cx, move |cx| {
+                    let _ = signal.get(cx).len();
+                    let _ = selector.get(cx);
+                    runs.set(runs.get() + 1);
+                })
+            }
+        });
+
+        assert_eq!(runs.get(), 1);
+
+        app.update(|cx| {
+            signal.remove_selected_by(cx, &selector, |item| *item);
+        });
+
+        assert_eq!(runs.get(), 2);
     }
 
     #[test]

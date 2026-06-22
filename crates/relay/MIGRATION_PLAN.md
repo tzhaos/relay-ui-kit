@@ -10,7 +10,7 @@ their public control surfaces.
 | Requirement | Current evidence | Status |
 |---|---|---|
 | Reactive entity tracking uses GPUI invalidation | `runtime.rs` tracks signal reads to the current `EntityId`, `reactive_render` wraps `render_state` in `cx.tracked`, and tests cover dependency replacement, entity release cleanup, `untrack`, and batching. | Complete |
-| State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. | Complete |
+| State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. `SignalVecExt::remove_selected_by` covers the repeated selector-backed removal shape without adding a collection store. | Complete |
 | Side effects have GPUI-scoped lifetime and cleanup | `effect_in`, `effect_in_with_cleanup`, `StateScope::effect_in_with_cleanup`, and cleanup tests cover rerun cleanup, dispose cleanup, entity release cleanup, and untracked cleanup reads. The `effect_cleanup` example covers source-dependent subscription switching. | Complete |
 | Declarative source/react split is available | `watch` and `watch_changes` track only declared sources and run reactions untracked. `hooks.rs`, `view.rs`, and the `watch` example cover source-only dependencies and skipped initial reactions. | Complete |
 | Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_on_changes` and `reload_resource_on_changes` are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
@@ -109,6 +109,21 @@ let selected_item = items.selected_by_or_first(cx, selection.clone(), |item| ite
 When there are no retained row entities, keep using `Selector::reconcile_keys`
 or `reconcile_keys_by` directly after collection changes.
 
+When a host removes the currently selected item, use `SignalVecExt` to keep the
+collection write and selector reconciliation atomic:
+
+```rust
+items.remove_selected_by(cx, &selection, |item| item.id);
+```
+
+Current migration checkpoint:
+
+- Workbench task/session lists and the gallery stress session list use
+  `remove_selected_by` for selected-row deletion.
+- This replaces repeated host-side `get_untracked + Vec::remove +
+  reconcile_keys_by` code while preserving host ownership of item order and row
+  presentation.
+
 ### 4. Migrate Async Data
 
 Use `Resource::load` for a reset load and `Resource::reload` when the last ready
@@ -122,6 +137,23 @@ value should stay visible. In entity-owned source-driven flows:
 
 Do not put UI fallback components or Suspense-like boundaries in relay unless
 multiple real GPUI surfaces converge on the same typed boundary.
+
+Current migration checkpoint:
+
+- Workbench transcript and review resources use
+  `StateScope::reload_resource_on_changes` because both start from ready seed
+  values and should keep stale-ready content visible while source selections
+  change.
+- The Relay `source_resource` example uses `StateScope::load_resource_on_changes`
+  for the pending-first version of the same source/resource pattern.
+- Output-log resources use the narrow `relay_uikit::output_resource_snapshot`
+  adapter because the shared render-ready shape is specific to
+  `Resource<Vec<OutputLine>, E>`.
+- Review data still folds locally with `Resource::fold_latest`; its render
+  shape has not repeated enough to justify a Relay or UIKit boundary.
+- No `create_resource`/Suspense-like API is currently justified: GPUI entity
+  lifetime, `StateScope`, and resource folding cover the real surfaces without
+  introducing an owner tree or UI fallback primitive in Relay.
 
 ### 5. Migrate Effects and External Handles
 
@@ -172,8 +204,8 @@ Current deferred ideas and their bar:
 - `watch_with_cleanup`: defer while `effect_in_with_cleanup` covers handle
   lifetime and `watch` remains a simpler source/react split.
 - Command registry or selector-backed collection store: defer while
-  `Selector`, `SelectedItemExt`, and `sync_with_selector` keep command and row
-  data host-owned.
+  `Selector`, `SelectedItemExt`, `sync_with_selector`, and
+  `SignalVecExt::remove_selected_by` keep command and row data host-owned.
 - Frame-boundary automatic batching: defer without a GPUI `Window` lifecycle
   hook that clearly improves real app write bursts beyond explicit `batch` and
   collection helpers.
