@@ -11,7 +11,7 @@ use relay_uikit::patterns::{
     layout::ListSection,
     navigation::{Tab, Tabs},
     overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
-    CommandPalette, CommandRow, ItemPicker, KeybindingShortcut, OutputLine, OutputLineStyle,
+    output_resource_snapshot, CommandPalette, CommandRow, ItemPicker, KeybindingShortcut,
     OutputLog, OutputSurface, PickerAction, PickerOption, QuickAction, SessionRow, SourceView,
     TabStrip, TaskRow, TaskRowData,
 };
@@ -123,23 +123,18 @@ fn output_patterns(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     let connected = state.core_disclosure_open.get(cx);
-    let (lines, loading, status_text) = state.pattern_output.fold_latest(
+    let output = output_resource_snapshot(
+        &state.pattern_output,
         cx,
-        || (Vec::new(), true, "Loading output".to_string()),
-        |lines, reloading| {
-            let status_text = if reloading {
-                "Refreshing output".to_string()
-            } else {
-                format!("{} lines ready", lines.len())
-            };
-            (lines.clone(), reloading, status_text)
-        },
-        |error| (
-            vec![OutputLine::new(format!("refresh failed: {error}")).style(OutputLineStyle::Error)],
-            false,
-            "Refresh failed".to_string(),
-        ),
+        "Loading output",
+        "Refreshing output",
+        |line_count| format!("{line_count} lines ready"),
+        "Refresh failed",
+        |error| format!("refresh failed: {error}"),
     );
+    let loading = output.loading;
+    let status_text = output.status_text;
+    let lines = output.lines;
     let refresh_host = host.clone();
 
     div().flex().flex_col().gap_2()

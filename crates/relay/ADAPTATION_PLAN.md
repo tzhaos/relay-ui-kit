@@ -80,6 +80,14 @@ window lifecycles as the source of truth.
   visible while the new report is loading. This gives a second compiled app
   surface for `Resource::reload` / latest-value semantics without adding a UI
   boundary yet.
+- The workbench center transcript now owns a
+  `Resource<Vec<OutputLine>, String>`. Its refresh action snapshots the
+  currently selected task/session, enters `Reloading`, and keeps the previous
+  terminal output visible until the new transcript resolves.
+- `relay_uikit` now exposes `output_resource_snapshot` for the repeated
+  output-log resource shape. This is deliberately narrower than a generic async
+  boundary: it only folds `Resource<Vec<OutputLine>, E>` into
+  lines/loading/status for `OutputSurface` + `OutputLog` call sites.
 
 ## List Boundary
 
@@ -108,9 +116,10 @@ runtime adapters only where they simplify real app state:
 - Keep `ForEach` focused on lightweight element lists; row entity caching lives
   in host entities through `KeyedSubViews`.
 - Use `Resource::reload` / `latest` for async data surfaces that should keep
-  stale-ready content visible while refreshing. Prefer local render branches
-  until repeated real app surfaces justify a shared boundary helper; the current
-  evidence is still the gallery output surface plus relay examples.
+  stale-ready content visible while refreshing. For terminal/output-log
+  resources, use `output_resource_snapshot`; for other data shapes, keep local
+  `fold_latest` render branches until repeated real app surfaces justify a
+  similarly narrow helper.
 - Use `batch` or single-operation collection helpers such as
   `SignalVecExt::extend` for write bursts that should notify once. Avoid
   assuming a global frame-boundary batch when code does not have a `Window`
@@ -122,12 +131,10 @@ runtime adapters only where they simplify real app state:
    app-shaped surface needs shared command registry or picker host behavior.
    Current evidence supports `Selector<K>` plus host-owned key order, not a
    broader Relay command/picker primitive.
-2. Compare the two real `fold_latest` surfaces before adding a shared async UI
-   boundary. The gallery output surface maps a resource into output lines and
-   toolbar status, while the workbench review surface maps one report into
-   metadata rows. If the next surface repeats one of those shapes, extract the
-   smallest view helper there; until then `Resource` remains a UI-agnostic state
-   primitive.
+2. Keep `output_resource_snapshot` specific to output logs. The gallery
+   Patterns output surface and Workbench transcript now share that exact shape;
+   the Workbench review surface still maps a report into metadata rows, so
+   Relay should not grow a generic async UI boundary from this evidence alone.
 3. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
 4. Keep expanding compiled app-shaped surfaces before adding new Relay

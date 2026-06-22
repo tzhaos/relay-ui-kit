@@ -1,10 +1,11 @@
 use gpui::{div, px, Context, IntoElement, ParentElement, Styled};
 use relay_uikit::patterns::{
-    OutputLog, OutputSurface, Pane, PaneToolbar, TabStrip, TopToolbar, WorkspaceBreadcrumb,
+    output_resource_snapshot, OutputLog, OutputSurface, Pane, PaneToolbar, TabStrip, TopToolbar,
+    WorkspaceBreadcrumb,
 };
 use relay_uikit::{IconButton, IconName, Theme};
 
-use super::{data::terminal_lines, WorkbenchApp, WorkbenchState};
+use super::{WorkbenchApp, WorkbenchState};
 
 pub(super) fn center_pane(
     state: &WorkbenchState,
@@ -14,7 +15,18 @@ pub(super) fn center_pane(
     let task = state.selected_task.get(cx);
     let session = state.selected_session.get(cx);
     let connected = session.as_ref().is_some_and(|session| session.connected);
-    let lines = terminal_lines(task.as_ref(), session.as_ref());
+    let output = output_resource_snapshot(
+        &state.terminal_output,
+        cx,
+        "Loading terminal output",
+        "Refreshing terminal output",
+        |line_count| format!("{line_count} lines ready"),
+        "Terminal refresh failed",
+        |error| format!("terminal refresh failed: {error}"),
+    );
+    let output_loading = output.loading;
+    let output_status = output.status_text;
+    let output_lines = output.lines;
     let active_task_title = task.as_ref().map_or("No task", |task| task.title.as_str());
     let tabs = state
         .sessions
@@ -29,7 +41,10 @@ pub(super) fn center_pane(
             .child(tabs)
             .child(
                 div().flex_1().min_h_0().child(
-                    OutputSurface::new("workbench-output", OutputLog::new(lines).prompt("> "))
+                    OutputSurface::new(
+                        "workbench-output",
+                        OutputLog::new(output_lines).prompt("> "),
+                    )
                         .connected(connected),
                 ),
             ),
@@ -47,9 +62,22 @@ pub(super) fn center_pane(
                         "workbench".into(),
                         active_task_title.into(),
                     ]))
+                    .center(
+                        div()
+                            .text_xs()
+                            .text_color(theme.text_muted)
+                            .child(output_status),
+                    )
                     .trailing(
                         PaneToolbar::new()
-                            .action(IconButton::new("workbench-refresh", IconName::RefreshCw))
+                            .action(
+                                IconButton::new("workbench-refresh", IconName::RefreshCw)
+                                    .active(output_loading)
+                                    .disabled(output_loading)
+                                    .on_click(cx.listener(|this, _event, _window, cx| {
+                                        this.state.refresh_terminal_output(cx);
+                                    })),
+                            )
                             .action(IconButton::new("workbench-more", IconName::Ellipsis)),
                     ),
             ),

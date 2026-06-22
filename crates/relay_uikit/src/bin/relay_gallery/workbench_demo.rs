@@ -1,5 +1,7 @@
 //! Orca-direction workbench sample assembled from the Relay UI crates.
 
+use std::time::Duration;
+
 mod center;
 mod context;
 mod data;
@@ -11,7 +13,9 @@ use relay::{
     view::{reactive_render, ReactiveView, StateScope},
     Binding, Memo, ReactiveAppExt, Resource, Selector, Signal,
 };
-use relay_uikit::patterns::{AppShell, SplitPane, SplitPaneState, StatusBar, StatusItem};
+use relay_uikit::patterns::{
+    AppShell, OutputLine, SplitPane, SplitPaneState, StatusBar, StatusItem,
+};
 use relay_uikit::{icon::IconName, theme::space, ActiveTheme, TextInputState, Tone};
 
 use center::center_pane;
@@ -19,7 +23,7 @@ use context::right_context;
 use data::{
     initial_review_report, initial_sessions, initial_tasks, review_report_for_task,
     selected_session as resolve_selected_session, selected_task as resolve_selected_task,
-    WorkbenchReviewReport, WorkbenchSession, WorkbenchTask,
+    terminal_lines, WorkbenchReviewReport, WorkbenchSession, WorkbenchTask,
 };
 use rail::left_rail;
 
@@ -47,6 +51,7 @@ pub struct WorkbenchState {
     active_session: Selector<u64>,
     selected_task: Memo<Option<WorkbenchTask>>,
     selected_session: Memo<Option<WorkbenchSession>>,
+    terminal_output: Resource<Vec<OutputLine>, String>,
     review_report: Resource<WorkbenchReviewReport, String>,
     task_list: Entity<rail::TaskListView>,
     session_list: Entity<context::SessionListView>,
@@ -60,10 +65,17 @@ pub struct WorkbenchState {
 
 impl WorkbenchState {
     pub fn new(cx: &mut Context<WorkbenchApp>) -> Self {
-        let tasks = cx.signal(initial_tasks());
-        let sessions = cx.signal(initial_sessions());
+        let task_seed = initial_tasks();
+        let session_seed = initial_sessions();
+        let initial_terminal_output = terminal_lines(
+            resolve_selected_task(&task_seed, Some(1)),
+            resolve_selected_session(&session_seed, Some(11)),
+        );
+        let tasks = cx.signal(task_seed);
+        let sessions = cx.signal(session_seed);
         let active_task = cx.selector(Some(1));
         let active_session = cx.selector(Some(11));
+        let terminal_output = cx.ready_resource(initial_terminal_output);
         let review_report = cx.ready_resource(initial_review_report());
         let selected_task = cx.derived({
             let tasks = tasks.clone();
@@ -101,6 +113,7 @@ impl WorkbenchState {
             active_session,
             selected_task,
             selected_session,
+            terminal_output,
             review_report,
             task_list,
             session_list,
@@ -117,9 +130,20 @@ impl WorkbenchState {
         let task = self.selected_task.get(cx);
         self.review_report.reload(cx, move |cx| async move {
             cx.background_executor()
-                .timer(std::time::Duration::from_millis(650))
+                .timer(Duration::from_millis(650))
                 .await;
             Ok(review_report_for_task(task.as_ref()))
+        });
+    }
+
+    fn refresh_terminal_output(&self, cx: &mut App) {
+        let task = self.selected_task.get(cx);
+        let session = self.selected_session.get(cx);
+        self.terminal_output.reload(cx, move |cx| async move {
+            cx.background_executor()
+                .timer(Duration::from_millis(500))
+                .await;
+            Ok(terminal_lines(task.as_ref(), session.as_ref()))
         });
     }
 }
@@ -260,5 +284,44 @@ mod tests {
             )
         });
         assert_eq!(refreshing, ("Review summary ready".to_string(), true));
+    }
+
+    #[test]
+    fn terminal_output_reload_retains_latest_lines_while_refreshing() {
+        let mut app = TestApp::new();
+        let window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            WorkbenchApp::new(cx)
+        });
+        let root = window.root();
+
+        let initial = app.update_entity(&root, |app, cx| {
+            app.state.terminal_output.fold_latest(
+                cx,
+                || (None, true),
+                |lines, loading| (lines.first().map(|line| line.text.clone()), loading),
+                |_error| (None, false),
+            )
+        });
+        assert_eq!(initial, (Some("$ codex work relay/workbench".to_string()), false));
+
+        app.update_entity(&root, |app, cx| {
+            app.state.active_task.select(cx, 2);
+            app.state.active_session.select(cx, 12);
+            app.state.refresh_terminal_output(cx);
+        });
+
+        let refreshing = app.update_entity(&root, |app, cx| {
+            app.state.terminal_output.fold_latest(
+                cx,
+                || (None, true),
+                |lines, loading| (lines.first().map(|line| line.text.clone()), loading),
+                |_error| (None, false),
+            )
+        });
+        assert_eq!(
+            refreshing,
+            (Some("$ codex work relay/workbench".to_string()), true)
+        );
     }
 }
