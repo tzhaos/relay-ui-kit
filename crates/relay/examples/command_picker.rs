@@ -46,6 +46,7 @@ struct CommandPickerSurface {
     commands: Signal<Vec<CommandItem>>,
     query: Binding<String>,
     visible_commands: Memo<Vec<CommandItem>>,
+    selected_command: Memo<Option<CommandItem>>,
     selection: Selector<&'static str>,
     last_action: Signal<String>,
 }
@@ -56,18 +57,33 @@ impl CommandPickerSurface {
 
         let commands = cx.signal(default_commands());
         let query = cx.binding(String::new());
+        let selection = cx.selector(Some("open-workspace"));
         let commands_for_visible = commands.clone();
         let query_for_visible = query.clone();
         let visible_commands = cx.derived(move |cx| {
             let query = query_for_visible.get(cx);
             commands_for_visible.read(cx, |commands| visible_commands(commands, &query))
         });
+        let visible_for_selected = visible_commands.clone();
+        let selection_for_selected = selection.clone();
+        let selected_command = cx.derived(move |cx| {
+            let selected = selection_for_selected.get(cx);
+            visible_for_selected.read(cx, |commands| {
+                selected.and_then(|selected| {
+                    commands
+                        .iter()
+                        .find(|command| command.id == selected)
+                        .cloned()
+                })
+            })
+        });
 
         Self {
             commands,
             query,
             visible_commands,
-            selection: cx.selector(Some("open-workspace")),
+            selected_command,
+            selection,
             last_action: cx.signal("ready".to_string()),
         }
     }
@@ -89,18 +105,7 @@ impl CommandPickerSurface {
     }
 
     fn execute_selected(&self, cx: &mut App) -> bool {
-        let Some(selected) = self.selection.get_untracked() else {
-            return false;
-        };
-
-        let selected_command = self.commands.peek(|commands| {
-            commands
-                .iter()
-                .find(|command| command.id == selected)
-                .cloned()
-        });
-
-        let Some(command) = selected_command else {
+        let Some(command) = self.selected_command.get(cx) else {
             self.selection.clear(cx);
             return false;
         };
@@ -169,6 +174,10 @@ impl ReactiveView for CommandPickerSurface {
         let selected = self.selection.get(cx);
         let query = self.query.get(cx);
         let last_action = self.last_action.get(cx);
+        let selected_command = self.selected_command.get(cx);
+        let selected_title = selected_command
+            .as_ref()
+            .map_or("None", |command| command.title);
 
         div()
             .id("command-picker")
@@ -192,6 +201,12 @@ impl ReactiveView for CommandPickerSurface {
                     .justify_between()
                     .gap_3()
                     .child(div().text_lg().child("Command picker"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(0xa1a1aa))
+                            .child(format!("Selected: {selected_title}")),
+                    )
                     .child(
                         div()
                             .text_xs()
@@ -449,6 +464,34 @@ mod tests {
 
         assert_eq!(visible, vec!["switch-branch"]);
         assert_eq!(selected, Some("switch-branch"));
+    }
+
+    #[test]
+    fn command_picker_selected_command_memo_tracks_selection_and_filter() {
+        let mut app = TestApp::new();
+        let window = app.open_window(|_, cx| CommandPickerSurface::new(cx));
+        let root = window.root();
+
+        let initial = app.update_entity(&root, |surface, cx| {
+            surface.selected_command.get(cx).map(|command| command.id)
+        });
+        assert_eq!(initial, Some("open-workspace"));
+
+        app.update_entity(&root, |surface, cx| {
+            surface.select_next(cx);
+        });
+        let selected = app.update_entity(&root, |surface, cx| {
+            surface.selected_command.get(cx).map(|command| command.id)
+        });
+        assert_eq!(selected, Some("save-file"));
+
+        app.update_entity(&root, |surface, cx| {
+            surface.set_query(cx, "branch");
+        });
+        let filtered = app.update_entity(&root, |surface, cx| {
+            surface.selected_command.get(cx).map(|command| command.id)
+        });
+        assert_eq!(filtered, Some("switch-branch"));
     }
 
     #[test]

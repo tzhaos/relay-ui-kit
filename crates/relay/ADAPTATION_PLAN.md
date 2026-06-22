@@ -75,6 +75,10 @@ window lifecycles as the source of truth.
   host state outside UIKit. It combines host-owned command data, query
   `Binding`, filtered `Memo`, and `Selector<&'static str>` navigation/execution
   without introducing a Relay command registry.
+- The same `command_picker` example now derives `selected_command` with an
+  ordinary `Memo<Option<CommandItem>>` from filtered commands plus `Selector`.
+  This repeats the Workbench selected task/session projection shape without
+  adding a selector-item helper.
 - The gallery workbench page is now a compiled app-like surface. It wires
   task/session state through stable-id `Selector<u64>` values, renders the task
   rail and session context list as `KeyedSubViews`, and keeps center/status
@@ -164,10 +168,10 @@ runtime adapters only where they simplify real app state:
 3. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
-   `Selector<K>` and row retention lived in host-owned `KeyedSubViews`. Its
-   selected-item projections also stayed inside ordinary `Memo`, so defer a
-   selector-item helper until at least one more surface repeats the same shape
-   with enough boilerplate to justify it.
+   `Selector<K>` and row retention lived in host-owned `KeyedSubViews`.
+   Workbench and `command_picker` selected-item projections both stayed inside
+   ordinary `Memo`; defer a selector-item helper until the repeated code becomes
+   harder than the helper's API surface.
 
 ## Verification Gates
 
