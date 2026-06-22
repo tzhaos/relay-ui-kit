@@ -1,6 +1,6 @@
 //! GPUI-friendly helpers for creating relay state.
 
-use std::{borrow::BorrowMut, hash::Hash};
+use std::{borrow::BorrowMut, cell::Cell, hash::Hash};
 
 use gpui::{App, Context};
 
@@ -123,12 +123,27 @@ pub trait ReactiveContextExt<T: 'static> {
     ///
     /// `sources` reads the dependencies (and is re-evaluated each run so
     /// conditional dependencies work). `react` runs the side effect after the
-    /// sources are collected. The effect is scoped to the current entity and
-    /// disposed when it is released.
+    /// sources are collected and is wrapped in `untrack`, so reads inside the
+    /// side effect do not become dependencies. The effect is scoped to the
+    /// current entity and disposed when it is released.
     ///
     /// Unlike [`ReactiveContextExt::effect_in`], this separates dependency
     /// declaration from the side effect, making "when X changes, do Y" explicit.
     fn watch<S, R>(
+        &mut self,
+        sources: S,
+        react: R,
+    ) -> Effect
+    where
+        S: Fn(&App) + 'static,
+        R: Fn(&mut App) + 'static;
+
+    /// Watch signals for changes without firing the side effect on creation.
+    ///
+    /// This is useful when the initial visible state is already seeded, but
+    /// later source changes should trigger a reload, sync, or other side
+    /// effect.
+    fn watch_changes<S, R>(
         &mut self,
         sources: S,
         react: R,
@@ -156,14 +171,23 @@ impl<T: 'static> ReactiveContextExt<T> for Context<'_, T> {
         S: Fn(&App) + 'static,
         R: Fn(&mut App) + 'static,
     {
-        // Store both closures in shared cells so the effect callback can invoke
-        // them on every run without moving them out. Each run reads the sources
-        // (establishing dependencies) then fires the side effect.
-        let sources: std::rc::Rc<S> = std::rc::Rc::new(sources);
-        let react: std::rc::Rc<R> = std::rc::Rc::new(react);
         effect_in(self, move |cx| {
             (sources)(cx);
-            (react)(cx);
+            untrack(cx, |cx| (react)(cx));
+        })
+    }
+
+    fn watch_changes<S, R>(&mut self, sources: S, react: R) -> Effect
+    where
+        S: Fn(&App) + 'static,
+        R: Fn(&mut App) + 'static,
+    {
+        let initialized = Cell::new(false);
+        effect_in(self, move |cx| {
+            (sources)(cx);
+            if initialized.replace(true) {
+                untrack(cx, |cx| (react)(cx));
+            }
         })
     }
 }
@@ -440,5 +464,103 @@ mod tests {
 
         // `watched` is a source, so the effect fires again.
         assert_eq!(fires.get(), 2);
+    }
+
+    #[test]
+    fn watch_does_not_track_react_reads() {
+        use gpui::{Context, IntoElement, ParentElement, Render, Window, div};
+
+        use crate::{ReactiveContextExt, Signal, init, track};
+
+        struct WatchView {
+            watched: Signal<i32>,
+            react_only: Signal<i32>,
+        }
+
+        impl WatchView {
+            fn new(cx: &mut Context<Self>, fires: std::rc::Rc<std::cell::Cell<i32>>) -> Self {
+                init(cx);
+                let watched = cx.signal(0);
+                let react_only = cx.signal(0);
+                let watched_for_sources = watched.clone();
+                let react_only_for_react = react_only.clone();
+                cx.watch(
+                    move |cx| {
+                        let _ = watched_for_sources.get(cx);
+                    },
+                    move |cx| {
+                        let _ = react_only_for_react.get(cx);
+                        fires.set(fires.get() + 1);
+                    },
+                );
+                Self { watched, react_only }
+            }
+        }
+
+        impl Render for WatchView {
+            fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                track(cx, |cx| div().child(self.watched.get(cx).to_string()))
+            }
+        }
+
+        let fires = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| WatchView::new(cx, fires.clone()));
+        window.draw();
+
+        assert_eq!(fires.get(), 1);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.react_only.set(cx, 1);
+        });
+
+        assert_eq!(fires.get(), 1);
+    }
+
+    #[test]
+    fn watch_changes_skips_initial_react() {
+        use gpui::{Context, IntoElement, ParentElement, Render, Window, div};
+
+        use crate::{ReactiveContextExt, Signal, init, track};
+
+        struct WatchView {
+            watched: Signal<i32>,
+        }
+
+        impl WatchView {
+            fn new(cx: &mut Context<Self>, fires: std::rc::Rc<std::cell::Cell<i32>>) -> Self {
+                init(cx);
+                let watched = cx.signal(0);
+                let watched_for_sources = watched.clone();
+                cx.watch_changes(
+                    move |cx| {
+                        let _ = watched_for_sources.get(cx);
+                    },
+                    move |_cx| {
+                        fires.set(fires.get() + 1);
+                    },
+                );
+                Self { watched }
+            }
+        }
+
+        impl Render for WatchView {
+            fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                track(cx, |cx| div().child(self.watched.get(cx).to_string()))
+            }
+        }
+
+        let fires = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| WatchView::new(cx, fires.clone()));
+        window.draw();
+
+        assert_eq!(fires.get(), 0);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.watched.set(cx, 1);
+        });
+
+        assert_eq!(fires.get(), 1);
     }
 }

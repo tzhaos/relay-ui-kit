@@ -9,6 +9,10 @@ window lifecycles as the source of truth.
 - `Signal`, `Binding`, `Memo` / `derived`, `Effect`, `watch`, `untrack`, and
   reactive context cover app state, derivation, side effects, and cross-layer
   state sharing.
+- `watch` now tracks only the declared `sources`; its `react` closure runs in
+  `untrack` so side-effect reads do not expand the source set. `watch_changes`
+  covers the common "seed initial state, react only to later source changes"
+  case.
 - `SignalVecExt` covers common `Signal<Vec<T>>` structural mutations,
   including `extend` for appending multiple items with a single reactive
   notification.
@@ -84,6 +88,9 @@ window lifecycles as the source of truth.
   `Resource<Vec<OutputLine>, String>`. Its refresh action snapshots the
   currently selected task/session, enters `Reloading`, and keeps the previous
   terminal output visible until the new transcript resolves.
+- The workbench transcript is now source-driven: selected task/session memos
+  are watched with `StateScope::watch_changes`, so task or session changes
+  automatically reload the transcript while retaining the last ready output.
 - `relay_uikit` now exposes `output_resource_snapshot` for the repeated
   output-log resource shape. This is deliberately narrower than a generic async
   boundary: it only folds `Resource<Vec<OutputLine>, E>` into
@@ -120,6 +127,10 @@ runtime adapters only where they simplify real app state:
   resources, use `output_resource_snapshot`; for other data shapes, keep local
   `fold_latest` render branches until repeated real app surfaces justify a
   similarly narrow helper.
+- Use `watch_changes` plus `Resource::reload` for source-driven resources when
+  the initial value is already ready. This gives the useful part of
+  SolidJS-style source resources while keeping the resource itself UI-agnostic
+  and scoped to the owning GPUI entity.
 - Use `batch` or single-operation collection helpers such as
   `SignalVecExt::extend` for write bursts that should notify once. Avoid
   assuming a global frame-boundary batch when code does not have a `Window`
@@ -135,9 +146,13 @@ runtime adapters only where they simplify real app state:
    Patterns output surface and Workbench transcript now share that exact shape;
    the Workbench review surface still maps a report into metadata rows, so
    Relay should not grow a generic async UI boundary from this evidence alone.
-3. Revisit show/switch style helpers only after there is repeated app code that
+3. Watch for one more source-driven resource surface before adding a
+   `Resource::from_source` / `create_resource`-style helper. The Workbench
+   transcript proves `watch_changes + Resource::reload` is enough for one real
+   surface.
+4. Revisit show/switch style helpers only after there is repeated app code that
    needs persistent branch state.
-4. Keep expanding compiled app-shaped surfaces before adding new Relay
+5. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in
    `Selector<K>` and row retention lived in host-owned `KeyedSubViews`. Its

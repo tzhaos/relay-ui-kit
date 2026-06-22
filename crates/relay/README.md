@@ -67,7 +67,8 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`untrack(cx, |cx| ...)`** — read signals within a scope without establishing dependencies. Replaces the `get_untracked()` anti-pattern for "read snapshot but don't subscribe". Also exposed as `cx.untrack(...)`.
 - **`Signal::update_silent` / `set_silent`** — silent writes that don't notify dependents. For effect write-back, internal coordination, and avoiding ping-pong. `Binding` has the same methods.
 - **`derived`** — semantic alias for `memo`, emphasizing "derived value". Register derived computation in `new()` with `cx.derived(|cx| ...)`, read via `derived.get(cx)` in render; recomputes only when dependencies change.
-- **`watch(cx, sources, react)`** — declarative side effects. `sources` closure reads dependencies; `react` closure executes the side effect. Separates declaration from execution. Vue `watch` equivalent.
+- **`watch(cx, sources, react)`** — declarative side effects. `sources` reads dependencies; `react` runs in `untrack`, so side-effect reads do not become new sources.
+- **`watch_changes(cx, sources, react)`** — same source/react split, but skips the initial reaction. Use it when the initial visible state is already seeded and only later source changes should reload or sync.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification.
 - **`Selector<K>`** — keyed selection state. Rows call `selector.is_selected(cx, key)` to track only their own key; changing selection notifies the previous and next selected keys instead of every row. Hosts can call `selector.reconcile_keys(cx, keys)` when a list changes to drop stale row signals and clear a selected key that no longer exists, and `select_next` / `select_previous` / `select_first` / `select_last` for ordered list navigation. Use the `_by` variants when the host has item structs and wants to map each item to its stable key without cloning the whole list first.
 - **`SubView`** — stable GPUI child entity wrapper. Use it to split stateful or heavy regions into their own `Entity` and render them with GPUI's `AnyView::cached` path.
@@ -135,6 +136,24 @@ fn child_render(cx: &App) {
 ## Async resources
 
 `Resource::load` starts a reset load and enters `Pending`. `Resource::reload` keeps a previous ready value available as `Reloading(value)`, so views can keep rendering the latest data while showing refresh progress. Use `state.latest()` or `resource.latest(cx)` when the UI wants "last usable value" semantics. Use `is_loading(cx)`, `has_latest(cx)`, `read_error(cx, ...)`, and `error_value(cx)` for signal-backed status reads without matching the whole state. Use `fold_latest` when a view wants to handle pending, latest-value, and error branches without repeating the `Ready` / `Reloading` match.
+
+For source-driven resources, keep the resource UI-agnostic and wire the source
+through an entity-scoped watch. `watch_changes` is the right fit when a ready
+initial value has already been installed:
+
+```rust
+scope.watch_changes(
+    cx,
+    move |cx| { let _ = selected_task.get(cx); },
+    move |cx| {
+        let task = selected_task_for_reload.get(cx);
+        output.reload(cx, move |cx| async move {
+            let value = fetch_output(cx, task).await?;
+            Ok(value)
+        });
+    },
+);
+```
 
 ```rust
 resource.reload(cx, |cx| async move {
@@ -217,7 +236,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `untrack` | `untrack`, `set_silent` / `update_silent` |
 | `effect` | `Effect`, `effect_in` entity-scoped effects |
 | `derived` | `derived` / `memo` derived values |
-| `watch` | `watch` declarative side effects |
+| `watch` | `watch` / `watch_changes` declarative side effects |
 | `signal_vec` | `SignalVecExt` reactive list operations |
 | `resource` | `Resource` async pending/reloading/ready/error and latest value |
 | `context` | `provide_context` / `use_context` cross-layer sharing |

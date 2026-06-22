@@ -35,11 +35,10 @@ pub struct WorkbenchApp {
 
 impl WorkbenchApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let scope = StateScope::new();
-        Self {
-            state: WorkbenchState::new(cx),
-            scope,
-        }
+        let mut scope = StateScope::new();
+        let state = WorkbenchState::new(cx);
+        state.watch_terminal_output_sources(cx, &mut scope);
+        Self { state, scope }
     }
 }
 
@@ -139,13 +138,50 @@ impl WorkbenchState {
     fn refresh_terminal_output(&self, cx: &mut App) {
         let task = self.selected_task.get(cx);
         let session = self.selected_session.get(cx);
-        self.terminal_output.reload(cx, move |cx| async move {
-            cx.background_executor()
-                .timer(Duration::from_millis(500))
-                .await;
-            Ok(terminal_lines(task.as_ref(), session.as_ref()))
-        });
+        reload_terminal_output(self.terminal_output.clone(), task, session, cx);
     }
+
+    fn watch_terminal_output_sources(
+        &self,
+        cx: &mut Context<WorkbenchApp>,
+        scope: &mut StateScope,
+    ) {
+        let task_source = self.selected_task.clone();
+        let session_source = self.selected_session.clone();
+        let task_for_reload = self.selected_task.clone();
+        let session_for_reload = self.selected_session.clone();
+        let terminal_output = self.terminal_output.clone();
+
+        scope.watch_changes(
+            cx,
+            move |cx| {
+                let _ = task_source.get(cx);
+                let _ = session_source.get(cx);
+            },
+            move |cx| {
+                reload_terminal_output(
+                    terminal_output.clone(),
+                    task_for_reload.get(cx),
+                    session_for_reload.get(cx),
+                    cx,
+                );
+            },
+        );
+    }
+}
+
+fn reload_terminal_output(
+    terminal_output: Resource<Vec<OutputLine>, String>,
+    task: Option<WorkbenchTask>,
+    session: Option<WorkbenchSession>,
+    cx: &mut App,
+) {
+    terminal_output.reload(cx, move |cx| async move {
+        cx.background_executor()
+            .timer(Duration::from_millis(500))
+            .await;
+        Ok(terminal_lines(task.as_ref(), session.as_ref()))
+    });
 }
 
 impl ReactiveView for WorkbenchApp {
@@ -287,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_output_reload_retains_latest_lines_while_refreshing() {
+    fn terminal_output_reloads_when_selection_source_changes() {
         let mut app = TestApp::new();
         let window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);
@@ -308,7 +344,6 @@ mod tests {
         app.update_entity(&root, |app, cx| {
             app.state.active_task.select(cx, 2);
             app.state.active_session.select(cx, 12);
-            app.state.refresh_terminal_output(cx);
         });
 
         let refreshing = app.update_entity(&root, |app, cx| {

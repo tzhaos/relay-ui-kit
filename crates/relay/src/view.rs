@@ -106,6 +106,17 @@ impl StateScope {
         self.effects.push(e);
     }
 
+    /// Register a declarative watch that skips the initial reaction.
+    pub fn watch_changes<T, S, R>(&mut self, cx: &mut Context<T>, sources: S, react: R)
+    where
+        T: 'static,
+        S: Fn(&App) + 'static,
+        R: Fn(&mut App) + 'static,
+    {
+        let e = cx.watch_changes(sources, react);
+        self.effects.push(e);
+    }
+
     /// Create a derived value (memo). The scope tracks it for future disposal.
     pub fn derived<T: PartialEq + 'static>(
         &mut self,
@@ -553,5 +564,65 @@ mod tests {
 
         // Watch fired again.
         assert_eq!(fired.get(), 2);
+    }
+
+    #[test]
+    fn state_scope_watch_changes_skips_initial_reaction() {
+        let fired = Rc::new(Cell::new(0));
+
+        struct WatchView {
+            count: Signal<i32>,
+            _scope: StateScope,
+        }
+
+        impl WatchView {
+            fn new(cx: &mut Context<Self>, fired: Rc<Cell<i32>>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                let count = cx.signal(0);
+                let count_for_sources = count.clone();
+                scope.watch_changes(
+                    cx,
+                    move |cx| {
+                        let _ = count_for_sources.get(cx);
+                    },
+                    move |_cx| {
+                        fired.set(fired.get() + 1);
+                    },
+                );
+                Self {
+                    count,
+                    _scope: scope,
+                }
+            }
+        }
+
+        impl ReactiveView for WatchView {
+            fn render_state(
+                &mut self,
+                _window: &mut Window,
+                cx: &mut Context<Self>,
+            ) -> AnyElement {
+                div().child(self.count.get(cx).to_string()).into_any_element()
+            }
+        }
+
+        impl Render for WatchView {
+            fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                reactive_render(self, window, cx)
+            }
+        }
+
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| WatchView::new(cx, fired.clone()));
+        window.draw();
+
+        assert_eq!(fired.get(), 0);
+
+        app.update_entity(&window.root(), |view, cx| {
+            view.count.set(cx, 5);
+        });
+
+        assert_eq!(fired.get(), 1);
     }
 }

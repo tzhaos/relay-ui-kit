@@ -69,7 +69,8 @@ UIKit 组件可以接收 `Binding<T>` 做双向绑定；底层仍走 GPUI 的元
 - **`untrack(cx, |cx| ...)`** — 在作用域内读取信号但不建立依赖。替代 `get_untracked()` 反模式，适合"读快照但不订阅"的场景。也通过 `cx.untrack(...)` 暴露。
 - **`Signal::update_silent` / `set_silent`** — 静默写入，不通知依赖。用于 effect 回写自身读取的信号、内部协调等避免 ping-pong 的场景。`Binding` 也有同名方法。
 - **`derived`** — `memo` 的语义别名，强调"派生值"。在 view 的 `new()` 里用 `cx.derived(|cx| ...)` 注册派生计算，渲染时 `derived.get(cx)` 读取，依赖变化才重算。
-- **`watch(cx, sources, react)`** — 声明式副作用。`sources` 闭包读取依赖，`react` 闭包执行副作用，分离声明与执行。对标 Vue `watch`。
+- **`watch(cx, sources, react)`** — 声明式副作用。`sources` 读取依赖，`react` 在 `untrack` 中执行，因此副作用里的读取不会变成新的 source。
+- **`watch_changes(cx, sources, react)`** — 同样分离 source/react，但跳过初始 reaction。适合初始可见状态已经 seed 好、只希望后续 source 变化触发 reload 或同步的场景。
 - **`SignalVecExt`** — `Signal<Vec<T>>` 的增量 API：`push` / `extend` / `insert` / `remove` / `remove_first` / `retain` / `clear` / `set_all`，每个操作走正常通知路径。批量追加并希望只触发一次响应式通知时，用 `extend`。
 - **`Selector<K>`** — keyed 选择状态。行视图用 `selector.is_selected(cx, key)` 只追踪自己的 key；选择项变化时只通知上一个和下一个选中 key，而不是整张列表。列表变化时，host 可以调用 `selector.reconcile_keys(cx, keys)` 丢弃失效行信号，并在当前选中 key 已不存在时清空选择；有序列表导航可以用 `select_next` / `select_previous` / `select_first` / `select_last`。当 host 手里是 item struct 列表时，用 `_by` 变体直接把 item 映射到稳定 key，避免先克隆整张列表。
 - **`SubView`** — 稳定的 GPUI 子 Entity 包装。把有状态或较重的区域拆到自己的 `Entity` 中，再通过 GPUI 的 `AnyView::cached` 路径渲染。
@@ -137,6 +138,24 @@ fn child_render(cx: &App) {
 ## 异步资源
 
 `Resource::load` 会重置为 `Pending` 并开始加载。`Resource::reload` 会把上一份 ready 值保留为 `Reloading(value)`，让 view 可以继续展示最新可用数据，同时表达刷新进度。UI 需要“最后一份可用值”语义时，用 `state.latest()` 或 `resource.latest(cx)`。状态读取可以用 `is_loading(cx)`、`has_latest(cx)`、`read_error(cx, ...)` 和 `error_value(cx)`，避免为了 loading/error 这类状态匹配整份 state。当 view 只需要处理 pending、latest-value 和 error 三类分支时，用 `fold_latest` 避免重复匹配 `Ready` / `Reloading`。
+
+source-driven resource 不需要把 UI 边界塞进 `Resource` 本身；在 entity
+作用域里用 watch 把 source 接到 reload 即可。如果初始 ready 值已经存在，
+使用 `watch_changes`：
+
+```rust
+scope.watch_changes(
+    cx,
+    move |cx| { let _ = selected_task.get(cx); },
+    move |cx| {
+        let task = selected_task_for_reload.get(cx);
+        output.reload(cx, move |cx| async move {
+            let value = fetch_output(cx, task).await?;
+            Ok(value)
+        });
+    },
+);
+```
 
 ```rust
 resource.reload(cx, |cx| async move {
@@ -218,7 +237,7 @@ selected.reconcile_keys_by(cx, &tasks, |task| task.id);
 | `untrack` | `untrack`、`set_silent` / `update_silent` |
 | `effect` | `Effect`、`effect_in` entity 作用域 effect |
 | `derived` | `derived` / `memo` 派生值 |
-| `watch` | `watch` 声明式副作用 |
+| `watch` | `watch` / `watch_changes` 声明式副作用 |
 | `signal_vec` | `SignalVecExt` 响应式列表操作 |
 | `resource` | `Resource` 异步 pending/reloading/ready/error 和 latest 值 |
 | `context` | `provide_context` / `use_context` 跨层共享 |
