@@ -70,6 +70,10 @@ window lifecycles as the source of truth.
   Home/End/arrow navigation, Enter activation, and Delete removal. Its tests
   verify row entity reuse, row-local state survival across reorder, and command
   keyboard behavior.
+- The compiled `branch_subviews` Relay example promotes persistent branch state
+  outside UIKit. It keeps each branch as a host-owned `SubView`, renders only
+  the active branch, and tests that inactive branches do not render while their
+  GPUI entity state survives switching away and back.
 - The compiled `source_resource` Relay example promotes source-driven resource
   loading outside gallery/workbench. It keeps `Resource` UI-agnostic, scopes
   source tracking to the owning GPUI entity, starts from `Pending`, and tests
@@ -136,6 +140,19 @@ Choose `KeyedSubViews` when a row owns state, focus or scroll-like element
 state, scoped effects, async resources, or enough rendering work that sibling
 rows should remain cached. Otherwise prefer the simpler element path.
 
+## Branch Boundary
+
+Persistent conditional UI should use the same GPUI entity boundary as retained
+rows. For tabs, panes, and view modes that own state, store each branch as a
+`SubView<T>` field in the host entity and render the active branch through
+`cached(...)`.
+
+This is the useful GPUI-shaped subset of Show/Switch-style design. GPUI's
+`hidden()` sets `display: none`; hidden children are skipped during layout,
+prepaint, and paint, so it should not be treated as a branch lifecycle
+primitive. Add a Relay branch helper only after repeated app code shows a
+common typed shape beyond ordinary host-owned `SubView` fields.
+
 ## UIKit Adaptation
 
 Keep presentation components value-first and `Binding`-friendly. Add Relay
@@ -168,8 +185,9 @@ runtime adapters only where they simplify real app state:
    The Workbench transcript/review report and Relay `source_resource` example
    fit the smaller `StateScope` helpers, which match GPUI entity lifetime
    better and keep `Resource` independent from source tracking.
-2. Revisit show/switch style helpers only after there is repeated app code that
-   needs persistent branch state.
+2. Do not add a Show/Switch helper yet. The `branch_subviews` example covers
+   persistent branch state with GPUI entity boundaries; revisit only if repeated
+   app code shows a common typed helper would remove real boilerplate.
 3. Keep expanding compiled app-shaped surfaces before adding new Relay
    primitives. The workbench migration did not require a new UIKit adapter:
    existing `selected_by` / `active_by` hooks were enough once state lived in

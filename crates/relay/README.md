@@ -207,6 +207,12 @@ Relay's UI-level granularity follows GPUI's `Entity` cache boundary. Split expen
 
 Use lightweight element mapping for cheap stateless rows. Move a row to `SubView` / `KeyedSubViews` when it owns state, focus or scroll-like element state, async resources, scoped effects, or enough rendering work that clean siblings should stay cached. This keeps Relay aligned with GPUI's real lifecycle: element helpers rebuild elements during parent render, while `KeyedSubViews` retains child entities by stable key.
 
+Persistent branches, such as tabs, panes, and view modes, follow the same rule:
+keep each stateful branch as a `SubView` field in the host and render the active
+branch. GPUI `hidden()` sets `display: none`; those children are skipped during
+layout, prepaint, and paint, so use it for presentation rather than branch
+lifetime. See the `branch_subviews` example for the retained-branch pattern.
+
 ```rust
 struct TaskList {
     rows: KeyedSubViews<u64, TaskRow>,
@@ -269,6 +275,7 @@ Each example demonstrates a specific API or pattern. Run with `cargo run -p rela
 | `component_hooks` | `WindowSignalExt::use_signal` — component-internal state |
 | `reactive_struct` | `#[derive(Reactive)]` — field-level reactivity |
 | `subview` | `SubView` cached child entity splitting |
+| `branch_subviews` | Persistent branch/panel state with host-owned `SubView`s |
 | `keyed_subviews` | `KeyedSubViews` retained row entities with `Selector` navigation |
 | `command_picker` | Command/picker-style host state with `Binding`, `Memo`, and `Selector` |
 | `session_surface` | GPUI session surface with retained rows and host-level keyboard navigation |

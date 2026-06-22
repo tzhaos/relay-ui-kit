@@ -209,6 +209,12 @@ Relay 的 UI 粒度跟随 GPUI 的 `Entity` 缓存边界。把昂贵区域拆成
 
 便宜且无状态的 row 可以继续用普通元素映射。row 自己持有状态、focus/scroll 一类 element state、异步 resource、scoped effect，或者渲染成本高到希望干净兄弟 row 复用缓存时，再拆成 `SubView` / `KeyedSubViews`。这样 Relay 的抽象会贴合 GPUI 的真实生命周期：元素 helper 在父 render 中重建元素，而 `KeyedSubViews` 按稳定 key 保持子 entity。
 
+tab、pane、view mode 这类需要保留状态的分支也遵循同一条规则：host
+把每个有状态分支存成 `SubView` 字段，渲染时只渲染当前 active 分支。
+GPUI 的 `hidden()` 设置的是 `display: none`；这类 child 会跳过 layout、
+prepaint 和 paint，因此更适合作为展示控制，而不是分支生命周期机制。
+`branch_subviews` 示例展示了这个 retained-branch 模式。
+
 ```rust
 struct TaskList {
     rows: KeyedSubViews<u64, TaskRow>,
@@ -270,6 +276,7 @@ selected.reconcile_keys_by(cx, &tasks, |task| task.id);
 | `component_hooks` | `WindowSignalExt::use_signal` — 组件内 hooks |
 | `reactive_struct` | `#[derive(Reactive)]` — 字段级响应 |
 | `subview` | `SubView` cached 子 Entity 拆分 |
+| `branch_subviews` | host-owned `SubView` 保持 branch/panel 状态 |
 | `keyed_subviews` | `KeyedSubViews` 稳定 row entity 与 `Selector` 导航 |
 | `command_picker` | 用 `Binding`、`Memo`、`Selector` 组合 command/picker 风格 host state |
 | `session_surface` | GPUI session surface，覆盖稳定 row entity 与宿主级键盘导航 |
