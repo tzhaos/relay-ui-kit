@@ -1,19 +1,19 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, px, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
+    IntoElement, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled,
+    Window,
 };
-use relay::Binding;
+use relay::{Binding, Selector};
 
 use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
-    theme::{ActiveTheme, radius},
+    theme::{radius, ActiveTheme},
 };
 
 use super::picker_panel::{branch_picker_panel, default_picker_actions};
-use super::picker_types::{PickerOption, PickerAction};
+use super::picker_types::{PickerAction, PickerOption};
 
 /// Compact branch selector for title bars and pane toolbars.
 #[derive(IntoElement)]
@@ -24,6 +24,7 @@ pub struct ItemPicker {
     actions: Vec<PickerAction>,
     open: bool,
     selected_binding: Option<Binding<&'static str>>,
+    selection: Option<Selector<&'static str>>,
     open_binding: Option<Binding<bool>>,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SharedSelectHandler>,
@@ -44,6 +45,7 @@ impl ItemPicker {
             actions: default_picker_actions(),
             open: false,
             selected_binding: None,
+            selection: None,
             open_binding: None,
             on_toggle: None,
             on_select: None,
@@ -64,6 +66,7 @@ impl ItemPicker {
             actions: default_picker_actions(),
             open: false,
             selected_binding: Some(selected),
+            selection: None,
             open_binding: None,
             on_toggle: None,
             on_select: None,
@@ -79,6 +82,11 @@ impl ItemPicker {
 
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+
+    pub fn selected_by(mut self, selector: Selector<&'static str>) -> Self {
+        self.selection = Some(selector);
         self
     }
 
@@ -117,16 +125,25 @@ impl ItemPicker {
     }
 
     /// Returns the display label for the currently selected branch.
-    /// Reads from selected_binding first, falls back to selected_key.
+    /// Reads from a selector or binding first, falls back to selected_key.
     pub fn selected_label(&self, cx: &App) -> String {
-        let key = self
-            .selected_binding
-            .as_ref()
-            .map_or(self.selected_key, |b| b.get(cx));
+        let key = self.current_selected_key(cx);
         self.items
             .iter()
             .find(|branch| branch.key == key)
             .map_or(key.to_string(), |branch| branch.label.to_string())
+    }
+
+    fn current_selected_key(&self, cx: &App) -> &'static str {
+        if let Some(selection) = &self.selection {
+            if let Some(key) = selection.get(cx) {
+                return key;
+            }
+        }
+
+        self.selected_binding
+            .as_ref()
+            .map_or(self.selected_key, |b| b.get(cx))
     }
 }
 
@@ -134,8 +151,15 @@ impl RenderOnce for ItemPicker {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let selected_binding = self.selected_binding;
+        let selection = self.selection;
         let open_binding = self.open_binding;
-        let selected_key = selected_binding.as_ref().map_or(self.selected_key, |b| b.get(cx));
+        let selected_key = if let Some(selection) = &selection {
+            selection.get(cx).unwrap_or(self.selected_key)
+        } else {
+            selected_binding
+                .as_ref()
+                .map_or(self.selected_key, |b| b.get(cx))
+        };
         let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
         let selected_label = self
             .items
@@ -163,11 +187,7 @@ impl RenderOnce for ItemPicker {
             } else {
                 theme.border
             })
-            .bg(if open {
-                theme.panel_alt
-            } else {
-                theme.panel
-            })
+            .bg(if open { theme.panel_alt } else { theme.panel })
             .text_color(theme.text_secondary)
             .when(trigger_clickable, |this| {
                 this.cursor_pointer()
@@ -218,6 +238,7 @@ impl RenderOnce for ItemPicker {
                 self.items,
                 self.actions,
                 selected_binding.clone(),
+                selection.clone(),
                 select_handler,
                 action_handler,
             ),
@@ -242,6 +263,7 @@ impl RenderOnce for ItemPicker {
 #[cfg(test)]
 mod tests {
     use gpui::TestApp;
+    use relay::{init, ReactiveAppExt};
 
     use super::*;
 
@@ -265,5 +287,33 @@ mod tests {
         let label = app.read(|cx| selector.selected_label(cx));
 
         assert_eq!(label, "main");
+    }
+
+    #[test]
+    fn branch_selector_reads_selected_label_from_selector() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            cx.selector(Some("feat-ui"))
+        });
+        let picker = ItemPicker::new(
+            "branch-selector",
+            "main",
+            vec![
+                PickerOption::new("main", "main"),
+                PickerOption::new("feat-ui", "feature/ui-kit"),
+            ],
+        )
+        .selected_by(selector.clone());
+
+        let initial = app.read(|cx| picker.selected_label(cx));
+        assert_eq!(initial, "feature/ui-kit");
+
+        app.update(|cx| {
+            selector.select(cx, "main");
+        });
+
+        let selected = app.read(|cx| picker.selected_label(cx));
+        assert_eq!(selected, "main");
     }
 }
