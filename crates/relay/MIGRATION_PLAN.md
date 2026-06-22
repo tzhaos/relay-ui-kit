@@ -13,7 +13,7 @@ their public control surfaces.
 | State primitives cover app data flow | `Signal`, `ReadSignal`, `WriteSignal`, `Binding`, `Memo`, `derived`, `batch`, and `SignalVecExt` are exported and covered by unit tests plus `counter`, `binding`, `derived`, `signal_vec`, and `untrack` examples. `SignalVecExt::remove_selected_by` covers the repeated selector-backed removal shape without adding a collection store. | Complete |
 | Side effects have GPUI-scoped lifetime and cleanup | `effect_in`, `effect_in_with_cleanup`, `StateScope::effect_in_with_cleanup`, and cleanup tests cover rerun cleanup, dispose cleanup, entity release cleanup, StateScope-held entity cleanup, and untracked cleanup reads. The `effect_cleanup` example covers source-dependent subscription switching. | Complete |
 | Declarative source/react split is available | `watch` and `watch_changes` track only declared sources and run reactions untracked. `hooks.rs`, `view.rs`, and the `watch` example cover source-only dependencies and skipped initial reactions. | Complete |
-| Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_on_changes` and `reload_resource_on_changes` are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
+| Async resource state fits app surfaces without UI ownership | `Resource::load`, `reload`, `latest`, status helpers, `fold_latest`, and stale-ready reload semantics are tested in `resource.rs`. `StateScope::load_resource_from_source`, `reload_resource_from_source`, and the lower-level `_on_changes` variants are covered in `view.rs`, `source_resource`, and workbench transcript/review tests. | Complete |
 | Entity-grained UI retention follows GPUI cache boundaries | `SubView`, `KeyedSubViews`, and `KeyedSubViews::sync_with_selector` keep stateful regions and rows as GPUI entities. Tests cover cached sibling reuse, retained branches, row reuse, row-local state survival, and stale selection reconciliation. | Complete |
 | Selection-heavy lists avoid whole-list invalidation | `Selector<K>` provides per-key selected signals, ordered navigation, key reconciliation, and `_by` helpers. `SelectedItemExt` covers selected-item projection from `Signal<Vec<T>>` and `Memo<Vec<T>>`; examples and gallery/workbench call sites use it. | Complete |
 | Field-level state wrappers are available | `#[derive(Reactive)]` supports nested reactive state wrappers; `tests/reactive_derive.rs` covers nested field tracking and snapshots. | Complete |
@@ -129,9 +129,13 @@ Current migration checkpoint:
 Use `Resource::load` for a reset load and `Resource::reload` when the last ready
 value should stay visible. In entity-owned source-driven flows:
 
-- Use `StateScope::load_resource_on_changes` when the resource starts pending.
-- Use `StateScope::reload_resource_on_changes` when the view already has a ready
-  seed value.
+- Use `StateScope::load_resource_from_source` when the resource starts pending
+  and the load inputs are exactly the tracked source snapshot.
+- Use `StateScope::reload_resource_from_source` when the view already has a
+  ready seed value and should reload from that source snapshot after changes.
+- Use `StateScope::load_resource_on_changes` or
+  `StateScope::reload_resource_on_changes` when source declaration and load
+  construction intentionally differ.
 - Use `fold_latest` in app code or a narrow adapter in the component crate when
   repeated UI surfaces share the exact same render-ready shape.
 
@@ -141,11 +145,13 @@ multiple real GPUI surfaces converge on the same typed boundary.
 Current migration checkpoint:
 
 - Workbench transcript and review resources use
-  `StateScope::reload_resource_on_changes` because both start from ready seed
-  values and should keep stale-ready content visible while source selections
-  change.
-- The Relay `source_resource` example uses `StateScope::load_resource_on_changes`
+  `StateScope::reload_resource_from_source` because both start from ready seed
+  values and should keep stale-ready content visible while selected
+  task/session source snapshots change.
+- The Relay `source_resource` example uses `StateScope::load_resource_from_source`
   for the pending-first version of the same source/resource pattern.
+- `view.rs` tests cover both `_from_source` helpers and the lower-level
+  `_on_changes` helpers, including the source snapshot passed to load builders.
 - Output-log resources use the narrow `relay_uikit::output_resource_snapshot`
   adapter because the shared render-ready shape is specific to
   `Resource<Vec<OutputLine>, E>`.
@@ -229,8 +235,10 @@ SolidJS-like names for their own sake.
 
 Current deferred ideas and their bar:
 
-- Source resource constructor: defer while `StateScope::*resource_on_changes`
-  covers entity-scoped source/resource lifetime.
+- Source resource constructor: defer while
+  `StateScope::*resource_from_source` covers the repeated source snapshot
+  shape and `_on_changes` covers the flexible lower-level source/resource
+  lifetime.
 - Show/Switch helper: defer while host-owned `SubView` fields cover persistent
   branch state.
 - `watch_with_cleanup`: defer while `effect_in_with_cleanup` covers handle

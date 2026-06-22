@@ -71,6 +71,8 @@ Beyond `Signal` / `Binding` / `Memo` / `Effect` / `Resource`, relay provides the
 - **`watch_changes(cx, sources, react)`** — same source/react split, but skips the initial reaction. Use it when the initial visible state is already seeded and only later source changes should reload or sync.
 - **`effect_with_cleanup` / `effect_in_with_cleanup`** — per-run cleanup for source-dependent side effects. Register cleanup work with `CleanupScope::on_cleanup`; relay runs it before the effect re-runs and when the effect is disposed or the owning GPUI entity is released. Cleanup reads are untracked, while cleanup writes still notify normally.
 - **`StateScope`** — entity-owned handle storage for scoped effects, source-driven resource watchers, and dirty-check-only forms. Store it as a view field; entity-scoped effects release through GPUI `on_release`, while app-scoped effects should keep an explicit `Effect` handle when manual disposal is needed.
+- **`StateScope::load_resource_from_source(cx, resource, source, build_load)`** — entity-scoped source resource load. `source` runs tracked and returns the exact snapshot passed to `build_load`; the first run calls `Resource::load`, later source changes call `Resource::reload`.
+- **`StateScope::reload_resource_from_source(cx, resource, source, build_load)`** — source snapshot variant for ready-seeded resources. It skips the initial reaction, then reloads from the tracked source snapshot after changes.
 - **`StateScope::load_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource load. The first run records sources and starts `Resource::load`; later source changes call `Resource::reload` so the latest ready value remains visible while refreshing.
 - **`StateScope::reload_resource_on_changes(cx, resource, sources, build_load)`** — entity-scoped source-driven resource reload. `sources` declares dependencies, `build_load` snapshots current app state after a source change, and the resource reload keeps the latest ready value visible while async work runs.
 - **`SignalVecExt`** — incremental API for `Signal<Vec<T>>`: `push` / `extend` / `insert` / `remove` / `remove_first` / `remove_selected_by` / `retain` / `clear` / `set_all`, each going through the normal notification path. Use `extend` when appending multiple items should trigger one reactive notification. Use `remove_selected_by` when a selector-backed list should remove the selected item and reconcile stale selection in one batched operation.
@@ -159,17 +161,18 @@ fn child_render(cx: &App) {
 Relay intentionally stops at resource state and folding semantics. When two concrete surfaces share the same render-ready shape, put that adapter in the component crate; when a surface needs its own metadata or rows, fold the resource locally.
 
 For source-driven resources, keep the resource UI-agnostic and wire the source
-through an entity-scoped scope. Use `load_resource_on_changes` when the initial
-value should be loaded asynchronously; use `reload_resource_on_changes` when a
-ready initial value has already been installed:
+through an entity-scoped scope. Use the `_from_source` helpers when the async
+load inputs are exactly the tracked source snapshot. Use `load_resource_from_source`
+when the initial value should be loaded asynchronously; use
+`reload_resource_from_source` when a ready initial value has already been
+installed:
 
 ```rust
-scope.load_resource_on_changes(
+scope.load_resource_from_source(
     cx,
     output.clone(),
-    move |cx| { let _ = selected_task.get(cx); },
-    move |cx| {
-        let task = selected_task_for_load.get(cx);
+    move |cx| selected_task.get(cx),
+    move |task| {
         move |cx| async move {
             let value = fetch_output(cx, task).await?;
             Ok(value)
@@ -179,12 +182,11 @@ scope.load_resource_on_changes(
 ```
 
 ```rust
-scope.reload_resource_on_changes(
+scope.reload_resource_from_source(
     cx,
     output.clone(),
-    move |cx| { let _ = selected_task.get(cx); },
-    move |cx| {
-        let task = selected_task_for_reload.get(cx);
+    move |cx| selected_task.get(cx),
+    move |task| {
         move |cx| async move {
             let value = fetch_output(cx, task).await?;
             Ok(value)
@@ -192,6 +194,9 @@ scope.reload_resource_on_changes(
     },
 );
 ```
+
+Use `load_resource_on_changes` / `reload_resource_on_changes` when the tracked
+source declaration and load construction intentionally differ.
 
 ```rust
 resource.reload(cx, |cx| async move {

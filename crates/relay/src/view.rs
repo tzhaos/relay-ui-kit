@@ -47,7 +47,11 @@
 //! }
 //! ```
 
-use std::{cell::Cell, future::Future};
+use std::{
+    cell::{Cell, RefCell},
+    future::Future,
+    rc::Rc,
+};
 
 use gpui::{
     AnyElement, AnyView, App, AppContext, AsyncApp, Context, Entity, IntoElement, Render,
@@ -166,6 +170,50 @@ impl StateScope {
         });
     }
 
+    /// Reload a resource from a tracked source snapshot when that source changes.
+    ///
+    /// The `source` closure runs inside the tracked source phase and returns
+    /// the exact value handed to `build_load` in the untracked reaction phase.
+    /// Use this when the async load inputs are the declared sources; use
+    /// [`StateScope::reload_resource_on_changes`] when source declaration and
+    /// load construction intentionally differ.
+    pub fn reload_resource_from_source<T, Value, Error, Source, SourceFn, BuildLoad, Load, Fut>(
+        &mut self,
+        cx: &mut Context<T>,
+        resource: Resource<Value, Error>,
+        source: SourceFn,
+        build_load: BuildLoad,
+    ) where
+        T: 'static,
+        Value: 'static,
+        Error: 'static,
+        Source: 'static,
+        SourceFn: Fn(&App) -> Source + 'static,
+        BuildLoad: Fn(Source) -> Load + 'static,
+        Load: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<Value, Error>> + 'static,
+    {
+        let latest_source: Rc<RefCell<Option<Source>>> = Rc::new(RefCell::new(None));
+        let latest_source_for_sources = latest_source.clone();
+        let initialized = Cell::new(false);
+
+        self.watch(
+            cx,
+            move |cx| {
+                *latest_source_for_sources.borrow_mut() = Some(source(cx));
+            },
+            move |cx| {
+                let Some(source) = latest_source.borrow_mut().take() else {
+                    return;
+                };
+                if initialized.replace(true) {
+                    let load = build_load(source);
+                    resource.reload(cx, load);
+                }
+            },
+        );
+    }
+
     /// Load a resource immediately, then reload it when declared sources change.
     ///
     /// This is the source-driven helper for resources that start without a
@@ -196,6 +244,49 @@ impl StateScope {
                 resource.load(cx, load);
             }
         });
+    }
+
+    /// Load a resource from a tracked source snapshot, then reload on changes.
+    ///
+    /// The first run records the source and calls [`Resource::load`]; later
+    /// source changes call [`Resource::reload`] with the latest source snapshot.
+    pub fn load_resource_from_source<T, Value, Error, Source, SourceFn, BuildLoad, Load, Fut>(
+        &mut self,
+        cx: &mut Context<T>,
+        resource: Resource<Value, Error>,
+        source: SourceFn,
+        build_load: BuildLoad,
+    ) where
+        T: 'static,
+        Value: 'static,
+        Error: 'static,
+        Source: 'static,
+        SourceFn: Fn(&App) -> Source + 'static,
+        BuildLoad: Fn(Source) -> Load + 'static,
+        Load: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<Value, Error>> + 'static,
+    {
+        let latest_source: Rc<RefCell<Option<Source>>> = Rc::new(RefCell::new(None));
+        let latest_source_for_sources = latest_source.clone();
+        let initialized = Cell::new(false);
+
+        self.watch(
+            cx,
+            move |cx| {
+                *latest_source_for_sources.borrow_mut() = Some(source(cx));
+            },
+            move |cx| {
+                let Some(source) = latest_source.borrow_mut().take() else {
+                    return;
+                };
+                let load = build_load(source);
+                if initialized.replace(true) {
+                    resource.reload(cx, load);
+                } else {
+                    resource.load(cx, load);
+                }
+            },
+        );
     }
 
     /// Create a derived value (memo).
@@ -380,7 +471,11 @@ pub fn reactive_render<T: ReactiveView>(
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::Cell, rc::Rc, time::Duration};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+        time::Duration,
+    };
 
     use gpui::{
         AppContext, Context, IntoElement, ParentElement, Render, Styled, TestApp, Window, div,
@@ -772,6 +867,123 @@ mod tests {
 
         weak.assert_released();
         assert_eq!(cleanup_count.get(), 1);
+    }
+
+    #[test]
+    fn state_scope_reload_resource_from_source_uses_changed_source_snapshot() {
+        struct SourceReloadView {
+            source: Signal<i32>,
+            resource: Resource<i32, &'static str>,
+            _scope: StateScope,
+        }
+
+        impl SourceReloadView {
+            fn new(cx: &mut Context<Self>, load_inputs: Rc<RefCell<Vec<i32>>>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                let source = cx.signal(0);
+                let resource = cx.ready_resource::<_, &'static str>(10);
+                let source_for_scope = source.clone();
+
+                scope.reload_resource_from_source(
+                    cx,
+                    resource.clone(),
+                    move |cx| source_for_scope.get(cx),
+                    move |value| {
+                        load_inputs.borrow_mut().push(value);
+                        move |cx| async move {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(20))
+                                .await;
+                            Ok(value)
+                        }
+                    },
+                );
+
+                Self {
+                    source,
+                    resource,
+                    _scope: scope,
+                }
+            }
+        }
+
+        let load_inputs = Rc::new(RefCell::new(Vec::new()));
+        let mut app = TestApp::new();
+        let entity = app.update({
+            let load_inputs = load_inputs.clone();
+            move |cx| cx.new(|cx| SourceReloadView::new(cx, load_inputs))
+        });
+
+        assert!(load_inputs.borrow().is_empty());
+
+        app.update_entity(&entity, |view, cx| {
+            view.source.set(cx, 1);
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[1]);
+        let state = app.update_entity(&entity, |view, cx| view.resource.get(cx));
+        assert_eq!(state, ResourceState::Reloading(10));
+    }
+
+    #[test]
+    fn state_scope_load_resource_from_source_loads_initially_then_reloads() {
+        struct SourceLoadView {
+            source: Signal<i32>,
+            resource: Resource<i32, &'static str>,
+            _scope: StateScope,
+        }
+
+        impl SourceLoadView {
+            fn new(cx: &mut Context<Self>, load_inputs: Rc<RefCell<Vec<i32>>>) -> Self {
+                init(cx);
+                let mut scope = StateScope::new();
+                let source = cx.signal(0);
+                let resource = cx.pending_resource::<i32, &'static str>();
+                let source_for_scope = source.clone();
+
+                scope.load_resource_from_source(
+                    cx,
+                    resource.clone(),
+                    move |cx| source_for_scope.get(cx),
+                    move |value| {
+                        load_inputs.borrow_mut().push(value);
+                        move |cx| async move {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(20))
+                                .await;
+                            Ok(value)
+                        }
+                    },
+                );
+
+                Self {
+                    source,
+                    resource,
+                    _scope: scope,
+                }
+            }
+        }
+
+        let load_inputs = Rc::new(RefCell::new(Vec::new()));
+        let mut app = TestApp::new();
+        let entity = app.update({
+            let load_inputs = load_inputs.clone();
+            move |cx| cx.new(|cx| SourceLoadView::new(cx, load_inputs))
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[0]);
+        let initial = app.update_entity(&entity, |view, cx| view.resource.get(cx));
+        assert_eq!(initial, ResourceState::Pending);
+
+        app.update_entity(&entity, |view, cx| {
+            view.resource.set_ready(cx, 20);
+            view.source.set(cx, 1);
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[0, 1]);
+        let reloading = app.update_entity(&entity, |view, cx| view.resource.get(cx));
+        assert_eq!(reloading, ResourceState::Reloading(20));
     }
 
     #[test]

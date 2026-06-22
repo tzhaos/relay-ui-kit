@@ -130,42 +130,27 @@ impl WorkbenchState {
         cx: &mut Context<WorkbenchApp>,
         scope: &mut StateScope,
     ) {
-        let task_source = self.selected_task.clone();
-        let session_source = self.selected_session.clone();
+        let selected_task = self.selected_task.clone();
+        let selected_session = self.selected_session.clone();
         let terminal_output = self.terminal_output.clone();
-        let task_for_reload = self.selected_task.clone();
-        let session_for_reload = self.selected_session.clone();
 
-        scope.reload_resource_on_changes(
+        scope.reload_resource_from_source(
             cx,
             terminal_output,
-            move |cx| {
-                let _ = task_source.get(cx);
-                let _ = session_source.get(cx);
-            },
-            move |cx| {
-                let task = task_for_reload.get(cx);
-                let session = session_for_reload.get(cx);
-                move |cx| load_terminal_output(cx, task, session)
-            },
+            move |cx| (selected_task.get(cx), selected_session.get(cx)),
+            move |(task, session)| move |cx| load_terminal_output(cx, task, session),
         );
     }
 
     fn watch_review_report_sources(&self, cx: &mut Context<WorkbenchApp>, scope: &mut StateScope) {
-        let task_source = self.selected_task.clone();
+        let selected_task = self.selected_task.clone();
         let review_report = self.review_report.clone();
-        let task_for_reload = self.selected_task.clone();
 
-        scope.reload_resource_on_changes(
+        scope.reload_resource_from_source(
             cx,
             review_report,
-            move |cx| {
-                let _ = task_source.get(cx);
-            },
-            move |cx| {
-                let task = task_for_reload.get(cx);
-                move |cx| load_review_report(cx, task)
-            },
+            move |cx| selected_task.get(cx),
+            move |task| move |cx| load_review_report(cx, task),
         );
     }
 }

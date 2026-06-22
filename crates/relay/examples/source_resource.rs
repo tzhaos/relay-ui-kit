@@ -1,7 +1,7 @@
 //! Source resource - entity-scoped resource reloads from reactive sources.
 //!
-//! `StateScope::load_resource_on_changes` wires declared signal reads to an
-//! initial `Resource::load`, then to `Resource::reload` after source changes.
+//! `StateScope::load_resource_from_source` wires a tracked source snapshot to
+//! an initial `Resource::load`, then to `Resource::reload` after source changes.
 //! Use it when a GPUI entity owns both the source tracking lifetime and the
 //! resource.
 //!
@@ -12,13 +12,13 @@
 use std::time::Duration;
 
 use gpui::{
-    div, prelude::*, px, rgb, size, AnyElement, App, AsyncApp, Bounds, Context, Div,
-    InteractiveElement, IntoElement, ParentElement, Render, Stateful, StatefulInteractiveElement,
-    Styled, Window, WindowBounds, WindowOptions,
+    AnyElement, App, AsyncApp, Bounds, Context, Div, InteractiveElement, IntoElement,
+    ParentElement, Render, Stateful, StatefulInteractiveElement, Styled, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, rgb, size,
 };
 use gpui_platform::application;
 use relay::{
-    init, view::reactive_render, ReactiveAppExt, ReactiveView, Resource, Signal, StateScope,
+    ReactiveAppExt, ReactiveView, Resource, Signal, StateScope, init, view::reactive_render,
 };
 
 struct SourceResourceDemo {
@@ -34,18 +34,12 @@ impl SourceResourceDemo {
         let selected_task = cx.signal("relay/runtime");
         let report = cx.pending_resource::<String, String>();
 
-        let task_for_sources = selected_task.clone();
-        let task_for_load = selected_task.clone();
-        scope.load_resource_on_changes(
+        let task_for_source = selected_task.clone();
+        scope.load_resource_from_source(
             cx,
             report.clone(),
-            move |cx| {
-                let _ = task_for_sources.get(cx);
-            },
-            move |cx| {
-                let task = task_for_load.get(cx);
-                move |cx| load_report(cx, task)
-            },
+            move |cx| task_for_source.get(cx),
+            move |task| move |cx| load_report(cx, task),
         );
 
         Self {
