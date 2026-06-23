@@ -46,9 +46,10 @@ mod window_ext;
 
 pub use binding::Binding;
 pub use composables::{
-    FocusState, FormModel, FormModelBuilder, Mutation, MutationState, Query, SelectionModel,
-    SourceQuery, use_error_query, use_focus_state, use_form_model, use_mutation, use_query,
-    use_query_from_source, use_ready_query, use_selection_model,
+    FocusState, FormModel, FormModelBuilder, Mutation, MutationState, OrderedSelectionModel, Query,
+    SelectionModel, SelectionReconcilePolicy, SourceQuery, use_error_query, use_focus_state,
+    use_form_model, use_mutation, use_ordered_selection_model, use_query, use_query_from_source,
+    use_ready_query, use_selection_model,
 };
 pub use context::{ContextHandle, provide_context, use_context};
 pub use effect::{
@@ -73,12 +74,13 @@ pub mod prelude {
     pub use crate::view;
     pub use crate::{
         Binding, CleanupScope, ContextHandle, Effect, Form, FormBuilder, KeyedSubView,
-        KeyedSubViews, Memo, Mutation, MutationState, Query, Reactive, ReactiveAppExt,
-        ReactiveContextExt, ReactiveView, Resource, ResourceState, SelectedItemExt, SelectionModel,
-        Selector, Signal, SignalVecExt, SourceQuery, StateScope, SubView, WindowSignalExt, batch,
-        effect, effect_in, effect_in_with_cleanup, effect_with_cleanup, init, install,
-        provide_context, track, untrack, use_context, use_error_query, use_focus_state,
-        use_form_model, use_mutation, use_query, use_query_from_source, use_ready_query,
+        KeyedSubViews, Memo, Mutation, MutationState, OrderedSelectionModel, Query, Reactive,
+        ReactiveAppExt, ReactiveContextExt, ReactiveView, Resource, ResourceState, SelectedItemExt,
+        SelectionModel, SelectionReconcilePolicy, Selector, Signal, SignalVecExt, SourceQuery,
+        StateScope, SubView, WindowSignalExt, batch, effect, effect_in, effect_in_with_cleanup,
+        effect_with_cleanup, init, install, provide_context, track, untrack, use_context,
+        use_error_query, use_focus_state, use_form_model, use_mutation,
+        use_ordered_selection_model, use_query, use_query_from_source, use_ready_query,
         use_selection_model,
     };
 }

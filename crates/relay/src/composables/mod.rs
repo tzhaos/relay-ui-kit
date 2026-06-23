@@ -12,4 +12,7 @@ pub use mutation::{Mutation, MutationState, use_mutation};
 pub use query::{
     Query, SourceQuery, use_error_query, use_query, use_query_from_source, use_ready_query,
 };
-pub use selection::{SelectionModel, use_selection_model};
+pub use selection::{
+    OrderedSelectionModel, SelectionModel, SelectionReconcilePolicy, use_ordered_selection_model,
+    use_selection_model,
+};

@@ -27,6 +27,7 @@ First v2 composables are now implemented in `crates/relay/src/composables/`:
 - `use_query_from_source`
 - `use_mutation`
 - `SelectionModel` via `use_selection_model`
+- `OrderedSelectionModel` via `use_ordered_selection_model`
 - `FormModel` via `use_form_model`
 - `FocusState` via `use_focus_state`
 
@@ -36,6 +37,7 @@ These are intentionally modest first steps:
 - `SourceQuery` standardizes entity-scoped source tracking plus initial load / reload behavior.
 - `Mutation` standardizes write-side async state, stale completion suppression, retained last-success state, follow-up hooks, and optimistic rollback behavior.
 - `SelectionModel` packages `Selector<K>` with reusable selection-presence and item-projection helpers.
+- `OrderedSelectionModel` packages source-driven ordered keys, automatic reconcile, and latest-order navigation for picker/list surfaces.
 - `FormModel` removes the awkward lifetime split between `Form` and its dirty memo, and adds submitted-state semantics.
 - `FocusState` keeps GPUI `FocusHandle` as the source of truth while making focus a composable signal-backed state source.
 
@@ -83,6 +85,12 @@ Why:
 This is where Zed-like async controller glue becomes reusable composable logic instead of being rewritten per surface.
 
 ## Phase 3: richer selection and projection models
+
+Status: started
+
+Progress so far:
+
+- `use_ordered_selection_model(...)` is landed for single-selection list/picker surfaces with source-driven reconcile and navigation.
 
 Targets:
 
