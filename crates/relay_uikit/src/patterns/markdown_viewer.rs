@@ -9,46 +9,66 @@ use crate::theme::{ActiveTheme, BORDER_WIDTH, Theme, mono_family, radius};
 /// An inline formatted span within a block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum InlineSpan {
-    Text(String),
-    Bold(String),
-    Italic(String),
-    Strikethrough(String),
-    Code(String),
-    Link { text: String, url: String },
+    Text(InlineTextSpan),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InlineTextSpan {
+    text: String,
+    bold: bool,
+    italic: bool,
+    strikethrough: bool,
+    code: bool,
+    link_url: Option<String>,
 }
 
 impl InlineSpan {
     fn render(&self, theme: Theme) -> gpui::Div {
         match self {
-            InlineSpan::Text(text) => div().child(text.clone()),
-            InlineSpan::Bold(text) => div().font_weight(FontWeight::BOLD).child(text.clone()),
-            InlineSpan::Italic(text) => div().italic().child(text.clone()),
-            InlineSpan::Strikethrough(text) => div().italic().opacity(0.6).child(text.clone()),
-            InlineSpan::Code(text) => div()
+            InlineSpan::Text(span) => span.render(theme),
+        }
+    }
+
+    fn text(&self) -> &str {
+        match self {
+            InlineSpan::Text(span) => &span.text,
+        }
+    }
+}
+
+impl InlineTextSpan {
+    fn render(&self, theme: Theme) -> gpui::Div {
+        let mut element = div().child(self.text.clone());
+
+        if self.code {
+            element = element
                 .px(px(2.0))
                 .rounded(px(2.0))
                 .bg(theme.inset)
                 .font_family(mono_family())
-                .text_size(px(11.0))
-                .child(text.clone()),
-            InlineSpan::Link { text, url: _ } => {
-                div().text_color(theme.accent).underline().child(text.clone())
-            }
+                .text_size(px(11.0));
         }
+        if self.bold {
+            element = element.font_weight(FontWeight::BOLD);
+        }
+        if self.italic {
+            element = element.italic();
+        }
+        if self.strikethrough {
+            element = element.line_through().opacity(0.6);
+        }
+        if self.link_url.is_some() {
+            element = element.text_color(theme.accent).underline();
+        }
+
+        element
     }
 }
 
 fn spans_to_string(spans: &[InlineSpan]) -> String {
     spans
         .iter()
-        .map(|s| match s {
-            InlineSpan::Text(t)
-            | InlineSpan::Bold(t)
-            | InlineSpan::Italic(t)
-            | InlineSpan::Strikethrough(t)
-            | InlineSpan::Code(t) => t.clone(),
-            InlineSpan::Link { text, .. } => text.clone(),
-        })
+        .map(|span| span.text())
         .collect::<Vec<_>>()
         .join("")
 }
@@ -154,19 +174,53 @@ struct Accumulator {
     spans: Vec<InlineSpan>,
     /// Pending text buffer for building span content.
     buf: String,
-    /// Current inline formatting mode.
-    inline_mode: InlineMode,
-    /// Pending link URL.
+    /// Active inline formatting state.
+    inline_style: InlineStyleState,
+}
+
+#[derive(Clone, Default)]
+struct InlineStyleState {
+    bold_depth: u8,
+    italic_depth: u8,
+    strikethrough_depth: u8,
     link_url: Option<String>,
 }
 
-#[derive(Clone, Copy, Default)]
-enum InlineMode {
-    #[default]
-    Plain,
-    Bold,
-    Italic,
-    Strikethrough,
+impl InlineStyleState {
+    fn text_span(&self, text: String, code: bool) -> InlineSpan {
+        InlineSpan::Text(InlineTextSpan {
+            text,
+            bold: self.bold_depth > 0,
+            italic: self.italic_depth > 0,
+            strikethrough: self.strikethrough_depth > 0,
+            code,
+            link_url: self.link_url.clone(),
+        })
+    }
+
+    fn enter_italic(&mut self) {
+        self.italic_depth = self.italic_depth.saturating_add(1);
+    }
+
+    fn exit_italic(&mut self) {
+        self.italic_depth = self.italic_depth.saturating_sub(1);
+    }
+
+    fn enter_bold(&mut self) {
+        self.bold_depth = self.bold_depth.saturating_add(1);
+    }
+
+    fn exit_bold(&mut self) {
+        self.bold_depth = self.bold_depth.saturating_sub(1);
+    }
+
+    fn enter_strikethrough(&mut self) {
+        self.strikethrough_depth = self.strikethrough_depth.saturating_add(1);
+    }
+
+    fn exit_strikethrough(&mut self) {
+        self.strikethrough_depth = self.strikethrough_depth.saturating_sub(1);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -188,17 +242,13 @@ impl Accumulator {
             return;
         }
         let text = std::mem::take(&mut self.buf);
-        let span = if let Some(url) = self.link_url.take() {
-            InlineSpan::Link { text, url }
-        } else {
-            match self.inline_mode {
-                InlineMode::Plain => InlineSpan::Text(text),
-                InlineMode::Bold => InlineSpan::Bold(text),
-                InlineMode::Italic => InlineSpan::Italic(text),
-                InlineMode::Strikethrough => InlineSpan::Strikethrough(text),
-            }
-        };
-        self.spans.push(span);
+        self.spans.push(self.inline_style.text_span(text, false));
+    }
+
+    fn push_code(&mut self, text: &str) {
+        self.flush_buf();
+        self.spans
+            .push(self.inline_style.text_span(text.to_string(), true));
     }
 
     fn take_spans(&mut self) -> Vec<InlineSpan> {
@@ -216,6 +266,24 @@ impl Accumulator {
     fn clear(&mut self) {
         self.spans.clear();
         self.buf.clear();
+        self.inline_style = InlineStyleState::default();
+    }
+}
+
+fn current_accumulator(stack: &mut Vec<Accumulator>) -> &mut Accumulator {
+    if stack.is_empty() {
+        stack.push(Accumulator::default());
+    }
+
+    let index = stack.len() - 1;
+    &mut stack[index]
+}
+
+fn pop_accumulator(stack: &mut Vec<Accumulator>) -> Accumulator {
+    if stack.len() > 1 {
+        stack.pop().unwrap_or_default()
+    } else {
+        std::mem::take(current_accumulator(stack))
     }
 }
 
@@ -230,7 +298,7 @@ fn parse_markdown(source: &str) -> Vec<MarkdownBlock> {
         match event {
             Event::Start(tag) => match tag {
                 Tag::Heading { level, .. } => {
-                    stack.last_mut().unwrap().clear();
+                    current_accumulator(&mut stack).clear();
                     block_kind = Some(BlockKind::Heading(level_to_u8(level)));
                 }
                 Tag::List(_) => {
@@ -265,26 +333,30 @@ fn parse_markdown(source: &str) -> Vec<MarkdownBlock> {
                     block_kind = Some(BlockKind::Code);
                 }
                 Tag::Emphasis => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Italic;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.enter_italic();
                 }
                 Tag::Strong => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Bold;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.enter_bold();
                 }
                 Tag::Strikethrough => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Strikethrough;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.enter_strikethrough();
                 }
                 Tag::Link { dest_url, .. } => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().link_url = Some(dest_url.to_string());
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.link_url = Some(dest_url.to_string());
                 }
                 _ => {}
             },
             Event::End(tag) => match tag {
                 TagEnd::Heading(_) => {
-                    let spans = stack.last_mut().unwrap().take_spans();
+                    let spans = current_accumulator(&mut stack).take_spans();
                     let level = match block_kind {
                         Some(BlockKind::Heading(l)) => l,
                         _ => 1,
@@ -300,7 +372,7 @@ fn parse_markdown(source: &str) -> Vec<MarkdownBlock> {
                     }
                 }
                 TagEnd::Item => {
-                    let spans = stack.pop().unwrap_or_default().take_spans();
+                    let spans = pop_accumulator(&mut stack).take_spans();
                     if !spans.is_empty() {
                         blocks.push(MarkdownBlock::ListItem(spans));
                     }
@@ -316,52 +388,52 @@ fn parse_markdown(source: &str) -> Vec<MarkdownBlock> {
                     }
                 }
                 TagEnd::BlockQuote(_) => {
-                    let spans = stack.pop().unwrap_or_default().take_spans();
+                    let spans = pop_accumulator(&mut stack).take_spans();
                     if !spans.is_empty() {
                         blocks.push(MarkdownBlock::Quote(spans));
                     }
                     block_kind = Some(BlockKind::Paragraph);
                 }
                 TagEnd::CodeBlock => {
-                    let text = stack.pop().unwrap_or_default().take_text();
+                    let text = pop_accumulator(&mut stack).take_text();
                     if !text.is_empty() {
                         blocks.push(MarkdownBlock::Code(text));
                     }
                     block_kind = Some(BlockKind::Paragraph);
                 }
                 TagEnd::Emphasis => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Plain;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.exit_italic();
                 }
                 TagEnd::Strong => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Plain;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.exit_bold();
                 }
                 TagEnd::Strikethrough => {
-                    stack.last_mut().unwrap().flush_buf();
-                    stack.last_mut().unwrap().inline_mode = InlineMode::Plain;
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.exit_strikethrough();
                 }
                 TagEnd::Link => {
-                    // Link URL already consumed when building the span
+                    let acc = current_accumulator(&mut stack);
+                    acc.flush_buf();
+                    acc.inline_style.link_url = None;
                 }
                 _ => {}
             },
             Event::Text(text) => {
-                stack.last_mut().unwrap().push_text(&text);
+                current_accumulator(&mut stack).push_text(&text);
             }
             Event::Code(text) => {
-                stack.last_mut().unwrap().flush_buf();
-                stack
-                    .last_mut()
-                    .unwrap()
-                    .spans
-                    .push(InlineSpan::Code(text.to_string()));
+                current_accumulator(&mut stack).push_code(&text);
             }
             Event::SoftBreak | Event::HardBreak => {
                 if block_kind == Some(BlockKind::Code) {
-                    stack.last_mut().unwrap().push_text("\n");
+                    current_accumulator(&mut stack).push_text("\n");
                 } else {
-                    stack.last_mut().unwrap().push_text(" ");
+                    current_accumulator(&mut stack).push_text(" ");
                 }
             }
             Event::Rule => {
@@ -382,7 +454,7 @@ fn flush_block(
     stack: &mut Vec<Accumulator>,
     block_kind: &mut Option<BlockKind>,
 ) {
-    let acc = stack.last_mut().unwrap();
+    let acc = current_accumulator(stack);
     let spans = acc.take_spans();
     if spans.is_empty() {
         return;
@@ -418,6 +490,19 @@ fn level_to_u8(level: HeadingLevel) -> u8 {
 mod tests {
     use super::*;
 
+    fn paragraph_spans(blocks: &[MarkdownBlock]) -> &[InlineSpan] {
+        match blocks.first() {
+            Some(MarkdownBlock::Paragraph(spans)) => spans,
+            other => panic!("expected first block to be a paragraph, found {other:?}"),
+        }
+    }
+
+    fn text_span(span: &InlineSpan) -> &InlineTextSpan {
+        match span {
+            InlineSpan::Text(span) => span,
+        }
+    }
+
     #[test]
     fn parse_markdown_extracts_heading_and_list_item() {
         let blocks = parse_markdown("# Relay\n\n- Terminal context");
@@ -427,9 +512,7 @@ mod tests {
     #[test]
     fn parse_markdown_preserves_code_block_newlines() {
         let blocks = parse_markdown("```rust\nfn main() {}\nprintln!();\n```");
-        assert!(
-            matches!(&blocks[0], MarkdownBlock::Code(text) if text.contains('\n'))
-        );
+        assert!(matches!(&blocks[0], MarkdownBlock::Code(text) if text.contains('\n')));
     }
 
     #[test]
@@ -443,64 +526,74 @@ mod tests {
     fn parse_markdown_handles_inline_bold() {
         let blocks = parse_markdown("**bold text** here");
         assert_eq!(blocks.len(), 1);
-        match &blocks[0] {
-            MarkdownBlock::Paragraph(spans) => {
-                assert!(spans.iter().any(|s| matches!(s, InlineSpan::Bold(_))));
-            }
-            _ => panic!("expected paragraph"),
-        }
+        let spans = paragraph_spans(&blocks);
+        assert!(spans.iter().any(|span| text_span(span).bold));
     }
 
     #[test]
     fn parse_markdown_handles_inline_italic() {
         let blocks = parse_markdown("*italic text* here");
         assert_eq!(blocks.len(), 1);
-        match &blocks[0] {
-            MarkdownBlock::Paragraph(spans) => {
-                assert!(spans.iter().any(|s| matches!(s, InlineSpan::Italic(_))));
-            }
-            _ => panic!("expected paragraph"),
-        }
+        let spans = paragraph_spans(&blocks);
+        assert!(spans.iter().any(|span| text_span(span).italic));
     }
 
     #[test]
     fn parse_markdown_handles_inline_strikethrough() {
         let blocks = parse_markdown("~~struck~~ text");
         assert_eq!(blocks.len(), 1);
-        match &blocks[0] {
-            MarkdownBlock::Paragraph(spans) => {
-                assert!(
-                    spans
-                        .iter()
-                        .any(|s| matches!(s, InlineSpan::Strikethrough(_)))
-                );
-            }
-            _ => panic!("expected paragraph"),
-        }
+        let spans = paragraph_spans(&blocks);
+        assert!(spans.iter().any(|span| text_span(span).strikethrough));
     }
 
     #[test]
     fn parse_markdown_handles_inline_code() {
         let blocks = parse_markdown("use `println!` macro");
         assert_eq!(blocks.len(), 1);
-        match &blocks[0] {
-            MarkdownBlock::Paragraph(spans) => {
-                assert!(spans.iter().any(|s| matches!(s, InlineSpan::Code(_))));
-            }
-            _ => panic!("expected paragraph"),
-        }
+        let spans = paragraph_spans(&blocks);
+        assert!(spans.iter().any(|span| text_span(span).code));
     }
 
     #[test]
     fn parse_markdown_handles_link() {
         let blocks = parse_markdown("[click here](https://example.com)");
         assert_eq!(blocks.len(), 1);
-        match &blocks[0] {
-            MarkdownBlock::Paragraph(spans) => {
-                assert!(spans.iter().any(|s| matches!(s, InlineSpan::Link { .. })));
-            }
-            _ => panic!("expected paragraph"),
-        }
+        let spans = paragraph_spans(&blocks);
+        assert!(
+            spans
+                .iter()
+                .any(|span| text_span(span).link_url.as_deref() == Some("https://example.com"))
+        );
+    }
+
+    #[test]
+    fn parse_markdown_preserves_nested_emphasis_style() {
+        let blocks = parse_markdown("***bold italic***");
+        let spans = paragraph_spans(&blocks);
+
+        assert!(spans.iter().any(|span| {
+            let span = text_span(span);
+            span.text == "bold italic" && span.bold && span.italic
+        }));
+    }
+
+    #[test]
+    fn parse_markdown_preserves_link_style_across_nested_segments() {
+        let blocks = parse_markdown("[**Relay** docs](https://example.com)");
+        let spans = paragraph_spans(&blocks);
+
+        assert!(spans.iter().any(|span| {
+            let span = text_span(span);
+            span.text == "Relay"
+                && span.bold
+                && span.link_url.as_deref() == Some("https://example.com")
+        }));
+        assert!(spans.iter().any(|span| {
+            let span = text_span(span);
+            span.text == " docs"
+                && !span.bold
+                && span.link_url.as_deref() == Some("https://example.com")
+        }));
     }
 
     #[test]
