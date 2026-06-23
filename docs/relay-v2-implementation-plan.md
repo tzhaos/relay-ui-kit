@@ -34,7 +34,7 @@ These are intentionally modest first steps:
 
 - `Query` standardizes loading, reloading, error, and latest-value status around `Resource<T, E>`.
 - `SourceQuery` standardizes entity-scoped source tracking plus initial load / reload behavior.
-- `Mutation` standardizes write-side async state, stale completion suppression, retained last-success state, and follow-up hooks.
+- `Mutation` standardizes write-side async state, stale completion suppression, retained last-success state, follow-up hooks, and optimistic rollback behavior.
 - `SelectionModel` packages `Selector<K>` with reusable selection-presence and item-projection helpers.
 - `FormModel` removes the awkward lifetime split between `Form` and its dirty memo, and adds submitted-state semantics.
 - `FocusState` keeps GPUI `FocusHandle` as the source of truth while making focus a composable signal-backed state source.
@@ -68,7 +68,8 @@ Progress so far:
 
 - `use_query_from_source(...)` is landed.
 - `use_mutation(...)` is landed.
-- next highest-value additions are query invalidation/reload helpers and optimistic mutation support.
+- source-query invalidation/reload helpers are landed.
+- optimistic mutation support with rollback hooks is landed.
 
 Candidates:
 

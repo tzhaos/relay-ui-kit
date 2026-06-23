@@ -1,8 +1,9 @@
-//! Mutation - async write operations with retained last-success state.
+//! Mutation - async write operations with optimistic commit and rollback.
 //!
-//! `use_mutation(...)` models action-driven async work. The mutation retains
-//! the latest successful result across retries so the UI can keep showing the
-//! last committed value while a save is pending or after a failure.
+//! `use_mutation(...)` models action-driven async work. This example uses
+//! `run_optimistic_with_followup(...)` so the server value updates immediately,
+//! rolls back on failure or cancel, and then reconciles to the canonical
+//! server response on success.
 //!
 //! Run with `cargo run -p relay --example mutation`.
 
@@ -48,24 +49,33 @@ impl MutationDemo {
     }
 
     fn save_current(&self, cx: &mut App) {
-        let draft = self.draft.get(cx);
-        let server_value = self.server_value.clone();
+        let optimistic_value = self.draft.get(cx);
+        let request_value = optimistic_value.clone();
+        let server_value_for_optimistic = self.server_value.clone();
+        let server_value_for_followup = self.server_value.clone();
 
-        self.save.run_with_followup(
+        self.save.run_optimistic_with_followup(
             cx,
+            move |cx| {
+                let previous = server_value_for_optimistic.get(cx);
+                server_value_for_optimistic.set(cx, optimistic_value);
+                move |cx| {
+                    server_value_for_optimistic.set(cx, previous);
+                }
+            },
             move |cx| async move {
                 cx.background_executor()
                     .timer(Duration::from_millis(900))
                     .await;
-                if draft == "error" {
+                if request_value == "error" {
                     Err("Server rejected this payload".to_string())
                 } else {
-                    Ok(draft)
+                    Ok(format!("{request_value} (synced)"))
                 }
             },
             move |cx, mutation| {
                 if let Some(saved) = mutation.last_success_value(cx) {
-                    server_value.set(cx, saved);
+                    server_value_for_followup.set(cx, saved);
                 }
             },
         );
@@ -182,7 +192,7 @@ impl Render for MutationDemo {
                         ),
                 )
                 .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(
-                    "Successful saves update the server value. Failures keep the last successful value visible.",
+                    "Saving updates the server value optimistically. Failures and cancel roll back automatically, while success reconciles to the canonical response.",
                 ))
         })
     }

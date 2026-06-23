@@ -2,7 +2,9 @@ use std::{cell::RefCell, future::Future, rc::Rc};
 
 use gpui::{App, AsyncApp};
 
-use crate::{Memo, Signal};
+use crate::{Memo, Signal, batch};
+
+type OptimisticRollback = Box<dyn FnOnce(&mut App)>;
 
 /// Current state of an asynchronous mutation.
 ///
@@ -116,6 +118,7 @@ pub struct Mutation<T, E> {
 #[derive(Default)]
 struct MutationControl {
     generation: u64,
+    optimistic_rollback: Option<OptimisticRollback>,
 }
 
 /// Create a mutation model in the idle state.
@@ -236,58 +239,64 @@ impl<T: 'static, E: 'static> Mutation<T, E> {
 
     /// Reset the mutation back to the idle state.
     pub fn reset(&self, cx: &mut App) {
-        {
-            let mut control = self.control.borrow_mut();
-            control.generation = control.generation.wrapping_add(1);
-        }
-        self.state.update(cx, |state| {
-            *state = MutationState::Idle;
-            true
+        batch(cx, |cx| {
+            self.invalidate_active_run();
+            self.rollback_active_optimistic(cx);
+            self.state.update(cx, |state| {
+                *state = MutationState::Idle;
+                true
+            });
         });
     }
 
     /// Store a successful mutation result.
     pub fn set_succeeded(&self, cx: &mut App, value: T) {
-        self.state.update(cx, |state| {
-            *state = MutationState::Succeeded(value);
-            true
+        batch(cx, |cx| {
+            self.clear_active_optimistic();
+            self.state.update(cx, |state| {
+                *state = MutationState::Succeeded(value);
+                true
+            });
         });
     }
 
     /// Store a failed mutation result.
     pub fn set_failed(&self, cx: &mut App, error: E) {
-        self.state.update(cx, |state| {
-            let current = std::mem::replace(state, MutationState::Idle);
-            *state = MutationState::Failed {
-                error,
-                last_success: current.into_last_success(),
-            };
-            true
+        batch(cx, |cx| {
+            self.rollback_active_optimistic(cx);
+            self.state.update(cx, |state| {
+                let current = std::mem::replace(state, MutationState::Idle);
+                *state = MutationState::Failed {
+                    error,
+                    last_success: current.into_last_success(),
+                };
+                true
+            });
         });
     }
 
     /// Cancel the active mutation and restore the latest stable state.
     pub fn cancel(&self, cx: &mut App) {
-        {
-            let mut control = self.control.borrow_mut();
-            control.generation = control.generation.wrapping_add(1);
-        }
+        batch(cx, |cx| {
+            self.invalidate_active_run();
+            self.rollback_active_optimistic(cx);
 
-        self.state.update(cx, |state| {
-            let current = std::mem::replace(state, MutationState::Idle);
-            match current {
-                MutationState::Pending { last_success } => {
-                    *state = match last_success {
-                        Some(value) => MutationState::Succeeded(value),
-                        None => MutationState::Idle,
-                    };
-                    true
+            self.state.update(cx, |state| {
+                let current = std::mem::replace(state, MutationState::Idle);
+                match current {
+                    MutationState::Pending { last_success } => {
+                        *state = match last_success {
+                            Some(value) => MutationState::Succeeded(value),
+                            None => MutationState::Idle,
+                        };
+                        true
+                    }
+                    current => {
+                        *state = current;
+                        false
+                    }
                 }
-                current => {
-                    *state = current;
-                    false
-                }
-            }
+            });
         });
     }
 
@@ -302,6 +311,27 @@ impl<T: 'static, E: 'static> Mutation<T, E> {
         self.run_with_followup(cx, run, |_cx, _mutation| {});
     }
 
+    /// Run the mutation with an immediate optimistic update.
+    ///
+    /// `optimistic` runs synchronously on the GPUI app thread before the async
+    /// work is spawned. It can update external state and must return a rollback
+    /// closure that restores the previous stable state. Relay runs that
+    /// rollback if the mutation fails, is cancelled, is reset, or is superseded
+    /// by a newer run.
+    pub fn run_optimistic<F, Fut, Optimistic, Rollback>(
+        &self,
+        cx: &mut App,
+        optimistic: Optimistic,
+        run: F,
+    ) where
+        F: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<T, E>> + 'static,
+        Optimistic: FnOnce(&mut App) -> Rollback + 'static,
+        Rollback: FnOnce(&mut App) + 'static,
+    {
+        self.run_optimistic_with_followup(cx, optimistic, run, |_cx, _mutation| {});
+    }
+
     /// Run the mutation and invoke a follow-up callback after the latest completion.
     ///
     /// The follow-up runs on the GPUI app thread after relay commits the latest
@@ -313,7 +343,57 @@ impl<T: 'static, E: 'static> Mutation<T, E> {
         Fut: Future<Output = Result<T, E>> + 'static,
         Followup: FnOnce(&mut App, &Mutation<T, E>) + 'static,
     {
-        let generation = self.begin_run(cx);
+        let generation = batch(cx, |cx| self.begin_run(cx));
+        let control = Rc::downgrade(&self.control);
+        let mutation = self.clone();
+
+        cx.spawn(async move |cx| {
+            let result = run(cx.clone()).await;
+            cx.update(move |cx| {
+                let Some(control) = control.upgrade() else {
+                    return;
+                };
+                if control.borrow().generation != generation {
+                    return;
+                }
+
+                mutation.commit_result(cx, result);
+                followup(cx, &mutation);
+            });
+        })
+        .detach();
+    }
+
+    /// Run the mutation with an optimistic update and a latest-only follow-up.
+    ///
+    /// The optimistic closure runs immediately and returns a rollback closure.
+    /// Relay keeps that rollback alive only for the active pending run. On
+    /// success, the rollback is discarded. On failure, cancel, reset, or when
+    /// a newer run supersedes this one, relay executes the rollback on the
+    /// GPUI app thread before the surface observes the reverted state.
+    ///
+    /// The follow-up runs only for the latest completion, after relay commits
+    /// the mutation result and after any rollback required by an error has
+    /// already run.
+    pub fn run_optimistic_with_followup<F, Fut, Optimistic, Rollback, Followup>(
+        &self,
+        cx: &mut App,
+        optimistic: Optimistic,
+        run: F,
+        followup: Followup,
+    ) where
+        F: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<T, E>> + 'static,
+        Optimistic: FnOnce(&mut App) -> Rollback + 'static,
+        Rollback: FnOnce(&mut App) + 'static,
+        Followup: FnOnce(&mut App, &Mutation<T, E>) + 'static,
+    {
+        let generation = batch(cx, |cx| {
+            let generation = self.begin_run(cx);
+            let rollback = optimistic(cx);
+            self.install_active_optimistic(Box::new(rollback));
+            generation
+        });
         let control = Rc::downgrade(&self.control);
         let mutation = self.clone();
 
@@ -335,10 +415,8 @@ impl<T: 'static, E: 'static> Mutation<T, E> {
     }
 
     fn begin_run(&self, cx: &mut App) -> u64 {
-        let mut control = self.control.borrow_mut();
-        control.generation = control.generation.wrapping_add(1);
-        let generation = control.generation;
-        drop(control);
+        let generation = self.invalidate_active_run();
+        self.rollback_active_optimistic(cx);
 
         self.state.update(cx, |state| {
             let current = std::mem::replace(state, MutationState::Idle);
@@ -352,17 +430,47 @@ impl<T: 'static, E: 'static> Mutation<T, E> {
     }
 
     fn commit_result(&self, cx: &mut App, result: Result<T, E>) {
-        self.state.update(cx, |state| {
-            let current = std::mem::replace(state, MutationState::Idle);
-            *state = match result {
-                Ok(value) => MutationState::Succeeded(value),
-                Err(error) => MutationState::Failed {
-                    error,
-                    last_success: current.into_last_success(),
-                },
-            };
-            true
+        let rollback_on_error = result.is_err();
+        batch(cx, |cx| {
+            if rollback_on_error {
+                self.rollback_active_optimistic(cx);
+            } else {
+                self.clear_active_optimistic();
+            }
+
+            self.state.update(cx, |state| {
+                let current = std::mem::replace(state, MutationState::Idle);
+                *state = match result {
+                    Ok(value) => MutationState::Succeeded(value),
+                    Err(error) => MutationState::Failed {
+                        error,
+                        last_success: current.into_last_success(),
+                    },
+                };
+                true
+            });
         });
+    }
+
+    fn invalidate_active_run(&self) -> u64 {
+        let mut control = self.control.borrow_mut();
+        control.generation = control.generation.wrapping_add(1);
+        control.generation
+    }
+
+    fn install_active_optimistic(&self, rollback: OptimisticRollback) {
+        self.control.borrow_mut().optimistic_rollback = Some(rollback);
+    }
+
+    fn clear_active_optimistic(&self) {
+        self.control.borrow_mut().optimistic_rollback = None;
+    }
+
+    fn rollback_active_optimistic(&self, cx: &mut App) {
+        let rollback = self.control.borrow_mut().optimistic_rollback.take();
+        if let Some(rollback) = rollback {
+            rollback(cx);
+        }
     }
 }
 
@@ -581,5 +689,234 @@ mod tests {
         });
         assert_eq!(followups.get(), 1);
         assert_eq!(&*seen_values.borrow(), &[7]);
+    }
+
+    #[gpui::test]
+    fn optimistic_mutation_failure_rolls_back_external_state(cx: &mut TestAppContext) {
+        let (mutation, server_value) = cx.update(|cx| {
+            init(cx);
+            (
+                use_mutation::<String, &'static str>(cx),
+                Signal::new(cx, "stable".to_string()),
+            )
+        });
+
+        cx.update({
+            let mutation_for_run = mutation.clone();
+            let server_value = server_value.clone();
+            move |cx| {
+                mutation_for_run.run_optimistic(
+                    cx,
+                    move |cx| {
+                        let previous = server_value.get(cx);
+                        server_value.set(cx, "optimistic".to_string());
+                        move |cx| {
+                            server_value.set(cx, previous);
+                        }
+                    },
+                    |cx| async move {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(20))
+                            .await;
+                        Err("failed")
+                    },
+                );
+            }
+        });
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "optimistic".to_string());
+            assert!(mutation.is_pending(cx));
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "stable".to_string());
+            assert_eq!(
+                mutation.get(cx),
+                MutationState::Failed {
+                    error: "failed",
+                    last_success: None,
+                }
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn optimistic_mutation_cancel_rolls_back_external_state(cx: &mut TestAppContext) {
+        let (mutation, server_value) = cx.update(|cx| {
+            init(cx);
+            (
+                use_mutation::<String, &'static str>(cx),
+                Signal::new(cx, "stable".to_string()),
+            )
+        });
+
+        cx.update({
+            let mutation_for_run = mutation.clone();
+            let server_value = server_value.clone();
+            move |cx| {
+                mutation_for_run.run_optimistic(
+                    cx,
+                    move |cx| {
+                        let previous = server_value.get(cx);
+                        server_value.set(cx, "optimistic".to_string());
+                        move |cx| {
+                            server_value.set(cx, previous);
+                        }
+                    },
+                    |cx| async move {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(20))
+                            .await;
+                        Ok("server".to_string())
+                    },
+                );
+                mutation_for_run.cancel(cx);
+            }
+        });
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "stable".to_string());
+            assert_eq!(mutation.get(cx), MutationState::Idle);
+        });
+    }
+
+    #[gpui::test]
+    fn optimistic_mutation_success_can_reconcile_with_followup(cx: &mut TestAppContext) {
+        let (mutation, server_value) = cx.update(|cx| {
+            init(cx);
+            (
+                use_mutation::<String, &'static str>(cx),
+                Signal::new(cx, "stable".to_string()),
+            )
+        });
+
+        cx.update({
+            let mutation_for_run = mutation.clone();
+            let server_value_for_optimistic = server_value.clone();
+            let server_value_for_followup = server_value.clone();
+            move |cx| {
+                mutation_for_run.run_optimistic_with_followup(
+                    cx,
+                    move |cx| {
+                        let previous = server_value_for_optimistic.get(cx);
+                        server_value_for_optimistic.set(cx, "optimistic".to_string());
+                        move |cx| {
+                            server_value_for_optimistic.set(cx, previous);
+                        }
+                    },
+                    |cx| async move {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(20))
+                            .await;
+                        Ok("canonical".to_string())
+                    },
+                    move |cx, mutation| {
+                        if let Some(saved) = mutation.last_success_value(cx) {
+                            server_value_for_followup.set(cx, saved);
+                        }
+                    },
+                );
+            }
+        });
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "optimistic".to_string());
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "canonical".to_string());
+            assert_eq!(
+                mutation.get(cx),
+                MutationState::Succeeded("canonical".to_string())
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn newer_run_rolls_back_previous_optimistic_state_before_applying_next(
+        cx: &mut TestAppContext,
+    ) {
+        let (mutation, server_value) = cx.update(|cx| {
+            init(cx);
+            (
+                use_mutation::<String, &'static str>(cx),
+                Signal::new(cx, "stable".to_string()),
+            )
+        });
+        let seen_before_second_apply = Rc::new(RefCell::new(Vec::new()));
+
+        cx.update({
+            let mutation_for_first_run = mutation.clone();
+            let server_value = server_value.clone();
+            move |cx| {
+                mutation_for_first_run.run_optimistic(
+                    cx,
+                    move |cx| {
+                        let previous = server_value.get(cx);
+                        server_value.set(cx, "first".to_string());
+                        move |cx| {
+                            server_value.set(cx, previous);
+                        }
+                    },
+                    |cx| async move {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(20))
+                            .await;
+                        Ok("first-result".to_string())
+                    },
+                );
+            }
+        });
+
+        cx.update({
+            let mutation_for_second_run = mutation.clone();
+            let server_value = server_value.clone();
+            let seen_before_second_apply = seen_before_second_apply.clone();
+            move |cx| {
+                mutation_for_second_run.run_optimistic(
+                    cx,
+                    move |cx| {
+                        seen_before_second_apply
+                            .borrow_mut()
+                            .push(server_value.get(cx));
+                        let previous = server_value.get(cx);
+                        server_value.set(cx, "second".to_string());
+                        move |cx| {
+                            server_value.set(cx, previous);
+                        }
+                    },
+                    |_| async move { Ok("second-result".to_string()) },
+                );
+            }
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(&*seen_before_second_apply.borrow(), &["stable".to_string()]);
+            assert_eq!(server_value.get(cx), "second".to_string());
+            assert_eq!(
+                mutation.get(cx),
+                MutationState::Succeeded("second-result".to_string())
+            );
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(server_value.get(cx), "second".to_string());
+            assert_eq!(
+                mutation.get(cx),
+                MutationState::Succeeded("second-result".to_string())
+            );
+        });
     }
 }
