@@ -14,7 +14,8 @@ use gpui::{
 };
 use gpui_platform::application;
 use relay::{
-    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, SignalVecExt, init,
+    KeyedSubViews, Memo, OrderedSelectionModel, ReactiveAppExt, ReactiveView,
+    SelectionReconcilePolicy, Selector, Signal, SignalVecExt, init, use_ordered_selection_model,
     view::reactive_render,
 };
 
@@ -68,7 +69,8 @@ impl Session {
 
 struct SessionSurface {
     sessions: Signal<Vec<Session>>,
-    selection: Selector<u64>,
+    selection: OrderedSelectionModel<u64>,
+    selected_session: Memo<Option<Session>>,
     rows: KeyedSubViews<u64, SessionRow>,
     last_action: Signal<String>,
     next_id: u64,
@@ -77,17 +79,32 @@ struct SessionSurface {
 impl SessionSurface {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
+        let sessions = cx.signal(vec![
+            Session::new(1, "Implement relay core", "codex", "relay/core"),
+            Session::new(2, "Review GPUI cache boundary", "codex", "gpui/cache"),
+            {
+                let mut session = Session::new(3, "Ship gallery migration", "cargo", "uikit");
+                session.status = SessionStatus::Done;
+                session
+            },
+        ]);
+        let sessions_for_selection = sessions.clone();
+        let selection = use_ordered_selection_model(
+            cx,
+            Some(1),
+            move |cx| {
+                sessions_for_selection.read(cx, |sessions| {
+                    sessions.iter().map(|session| session.id).collect()
+                })
+            },
+            SelectionReconcilePolicy::SelectFirst,
+        );
+        let selected_session = selection.selected_from_signal(cx, &sessions, |session| session.id);
+
         Self {
-            sessions: cx.signal(vec![
-                Session::new(1, "Implement relay core", "codex", "relay/core"),
-                Session::new(2, "Review GPUI cache boundary", "codex", "gpui/cache"),
-                {
-                    let mut session = Session::new(3, "Ship gallery migration", "cargo", "uikit");
-                    session.status = SessionStatus::Done;
-                    session
-                },
-            ]),
-            selection: cx.selector(Some(1)),
+            sessions,
+            selection,
+            selected_session,
             rows: KeyedSubViews::new(),
             last_action: cx.signal("ready".to_string()),
             next_id: 4,
@@ -100,8 +117,11 @@ impl SessionSurface {
         let session = Session::new(id, format!("Session {id}"), "codex", "scratch");
 
         cx.batch(|cx| {
-            self.sessions
-                .push_selected_by(cx, &self.selection, session, |session| session.id);
+            self.sessions.update(cx, |sessions| {
+                sessions.push(session);
+                true
+            });
+            self.selection.select(cx, id);
             self.last_action.set(cx, format!("created session {id}"));
         });
     }
@@ -136,26 +156,16 @@ impl SessionSurface {
         let Some(selected) = self.selection.get_untracked() else {
             return false;
         };
-        let (found, remaining) = self.sessions.peek(|sessions| {
-            (
-                sessions.iter().any(|session| session.id == selected),
-                sessions
-                    .iter()
-                    .filter(|session| session.id != selected)
-                    .map(|session| session.id)
-                    .collect::<Vec<_>>(),
-            )
-        });
+        let found = self
+            .sessions
+            .peek(|sessions| sessions.iter().any(|session| session.id == selected));
 
         if !found {
-            self.selection.clear(cx);
             return false;
         }
 
-        let next_selection = remaining.first().copied();
         cx.batch(|cx| {
             self.sessions.retain(cx, |session| session.id != selected);
-            self.selection.set(cx, next_selection);
             self.last_action
                 .set(cx, format!("closed session {selected}"));
         });
@@ -174,31 +184,19 @@ impl SessionSurface {
     }
 
     fn select_next_session(&self, cx: &mut App) {
-        self.sessions.peek(|sessions| {
-            self.selection
-                .select_next_by(cx, sessions, |session| session.id);
-        });
+        let _ = self.selection.select_next(cx);
     }
 
     fn select_previous_session(&self, cx: &mut App) {
-        self.sessions.peek(|sessions| {
-            self.selection
-                .select_previous_by(cx, sessions, |session| session.id);
-        });
+        let _ = self.selection.select_previous(cx);
     }
 
     fn select_first_session(&self, cx: &mut App) {
-        self.sessions.peek(|sessions| {
-            self.selection
-                .select_first_by(cx, sessions, |session| session.id);
-        });
+        let _ = self.selection.select_first(cx);
     }
 
     fn select_last_session(&self, cx: &mut App) {
-        self.sessions.peek(|sessions| {
-            self.selection
-                .select_last_by(cx, sessions, |session| session.id);
-        });
+        let _ = self.selection.select_last(cx);
     }
 
     fn handle_key_down(&self, event: &KeyDownEvent, cx: &mut App) -> bool {
@@ -226,12 +224,9 @@ impl SessionSurface {
     }
 
     fn selected_label(&self, cx: &App) -> String {
-        let selected = self.selection.get(cx);
-        self.sessions.read(cx, |sessions| {
-            selected
-                .and_then(|selected| sessions.iter().find(|session| session.id == selected))
-                .map_or_else(|| "No session".to_string(), |session| session.title.clone())
-        })
+        self.selected_session
+            .get(cx)
+            .map_or_else(|| "No session".to_string(), |session| session.title)
     }
 
     #[cfg(test)]
@@ -251,10 +246,12 @@ impl ReactiveView for SessionSurface {
 
         self.rows.sync_with_selector(
             cx,
-            &self.selection,
+            self.selection.selection().selector(),
             sessions,
             |session| session.id,
-            |session, cx| SessionRow::new(session, self.selection.clone(), cx),
+            |session, cx| {
+                SessionRow::new(session, self.selection.selection().selector().clone(), cx)
+            },
             |session, row, _cx| row.update_session(session),
         );
 

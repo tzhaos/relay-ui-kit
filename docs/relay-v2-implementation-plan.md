@@ -146,6 +146,7 @@ Every migration should reduce controller glue or lifetime bookkeeping. If a comp
 Progress so far:
 
 - `examples/command_picker.rs` now uses `use_ordered_selection_model(...)` instead of host-side selection reconcile glue.
+- `examples/session_surface.rs` now uses `use_ordered_selection_model(...)` while keeping retained row entities and host-level keyboard orchestration.
 - `examples/tree_projection.rs` now demonstrates `use_tree_projection(...)` and `use_multi_selection_model(...)` composed into a panel-like surface.
 
 ## Explicit non-goals
