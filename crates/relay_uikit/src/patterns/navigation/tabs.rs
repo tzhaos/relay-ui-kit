@@ -2,11 +2,11 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, Selector};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::SelectHandler,
+    interaction::{SelectHandler, SelectionSource},
     theme::ActiveTheme,
 };
 
@@ -45,7 +45,7 @@ pub struct Tabs {
     id: ElementId,
     tabs: Vec<Tab>,
     active: &'static str,
-    binding: Option<Binding<&'static str>>,
+    selection: Option<SelectionSource<&'static str>>,
     on_select: Option<SelectHandler>,
 }
 
@@ -55,7 +55,7 @@ impl Tabs {
             id: id.into(),
             tabs,
             active: "",
-            binding: None,
+            selection: None,
             on_select: None,
         }
     }
@@ -69,13 +69,23 @@ impl Tabs {
             id: id.into(),
             tabs,
             active: "",
-            binding: Some(binding),
+            selection: Some(SelectionSource::binding(binding)),
             on_select: None,
         }
     }
 
     pub fn active(mut self, active: &'static str) -> Self {
         self.active = active;
+        self
+    }
+
+    pub fn selected_with(mut self, selection: SelectionSource<&'static str>) -> Self {
+        self.selection = Some(selection);
+        self
+    }
+
+    pub fn selected_by(mut self, selector: Selector<&'static str>) -> Self {
+        self.selection = Some(SelectionSource::selector(selector));
         self
     }
 
@@ -91,8 +101,11 @@ impl Tabs {
 impl RenderOnce for Tabs {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let binding = self.binding;
-        let active = binding.as_ref().map_or(self.active, |b| b.get(cx));
+        let selection = self.selection;
+        let active = selection
+            .as_ref()
+            .and_then(|selection| selection.get(cx))
+            .unwrap_or(self.active);
         let handler = self.on_select.map(std::rc::Rc::new);
         let mut row = div()
             .id(self.id)
@@ -108,13 +121,13 @@ impl RenderOnce for Tabs {
             let is_active = tab.key == active;
             let key = tab.key;
             let handler = handler.clone();
-            let binding = binding.clone();
+            let selection = selection.clone();
             let (fg, underline) = if is_active {
                 (theme.text, theme.accent)
             } else {
                 (theme.text_muted, gpui::transparent_black())
             };
-            let clickable = !is_active && (binding.is_some() || handler.is_some());
+            let clickable = !is_active && (selection.is_some() || handler.is_some());
 
             let cell = div()
                 .id(("tab", index))
@@ -154,8 +167,8 @@ impl RenderOnce for Tabs {
                 })
                 .when(clickable, |this| {
                     this.on_click(move |_: &ClickEvent, window, cx| {
-                        if let Some(binding) = &binding {
-                            binding.set(cx, key);
+                        if let Some(selection) = &selection {
+                            selection.select(cx, key);
                         }
                         if let Some(handler) = &handler {
                             handler(key, window, cx);
@@ -166,5 +179,44 @@ impl RenderOnce for Tabs {
             row = row.child(cell);
         }
         row
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    fn current_active_key(tabs: &Tabs, cx: &App) -> &'static str {
+        tabs.selection
+            .as_ref()
+            .and_then(|selection| selection.get(cx))
+            .unwrap_or(tabs.active)
+    }
+
+    #[test]
+    fn tabs_reads_active_key_from_selection_source() {
+        let mut app = TestApp::new();
+        let selection = app.update(|cx| {
+            init(cx);
+            SelectionModel::new(cx, Some("files"))
+        });
+        let tabs = Tabs::new(
+            "tabs",
+            vec![Tab::new("files", "Files"), Tab::new("review", "Review")],
+        )
+        .selected_with(SelectionSource::selection_model(selection.clone()));
+
+        let initial = app.read(|cx| current_active_key(&tabs, cx));
+        assert_eq!(initial, "files");
+
+        app.update(|cx| {
+            selection.select(cx, "review");
+        });
+
+        let updated = app.read(|cx| current_active_key(&tabs, cx));
+        assert_eq!(updated, "review");
     }
 }

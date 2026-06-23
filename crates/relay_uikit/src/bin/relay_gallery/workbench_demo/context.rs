@@ -2,7 +2,10 @@ use gpui::{
     AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
     div, px,
 };
-use relay::{KeyedSubViews, ReactiveView, Selector, Signal, SignalVecExt, view::reactive_render};
+use relay::{
+    KeyedSubViews, OrderedSelectionModel, ReactiveView, Selector, Signal, SignalVecExt,
+    view::reactive_render,
+};
 use relay_uikit::patterns::{
     Pane, PaneToolbar, SessionRow, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
@@ -212,14 +215,14 @@ fn review_panel(
 pub(super) struct SessionListView {
     sessions: Signal<Vec<WorkbenchSession>>,
     rows: KeyedSubViews<u64, SessionRowView>,
-    selection: Selector<u64>,
+    selection: OrderedSelectionModel<u64>,
 }
 
 impl SessionListView {
     pub(super) fn new(
         cx: &mut Context<Self>,
         sessions: Signal<Vec<WorkbenchSession>>,
-        selection: Selector<u64>,
+        selection: OrderedSelectionModel<u64>,
     ) -> Self {
         relay::init(cx);
         Self {
@@ -230,29 +233,28 @@ impl SessionListView {
     }
 
     fn activate_next(&self, cx: &mut App) {
-        self.sessions.peek(|sessions| {
-            self.selection
-                .select_next_by(cx, sessions, |session| session.id);
-        });
+        let _ = self.selection.select_next(cx);
     }
 
     fn remove_active(&self, cx: &mut App) {
-        self.sessions
-            .remove_selected_by(cx, &self.selection, |session| session.id);
+        self.sessions.remove_selected_by(
+            cx,
+            self.selection.selection().selector(),
+            |session| session.id,
+        );
     }
 }
 
 impl ReactiveView for SessionListView {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let sessions = self.sessions.get(cx);
-
-        let selection = self.selection.clone();
+        let selector = self.selection.selection().selector().clone();
         self.rows.sync_with_selector(
             cx,
-            &self.selection,
+            self.selection.selection().selector(),
             sessions,
             |session| session.id,
-            move |session, _cx| SessionRowView::new(session, selection.clone()),
+            move |session, _cx| SessionRowView::new(session, selector.clone()),
             |session, row, _cx| row.update_session(session),
         );
 
@@ -375,7 +377,17 @@ mod tests {
         let mut window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);
             let sessions = cx.signal(initial_sessions());
-            let selection = cx.selector(Some(11));
+            let sessions_for_selection = sessions.clone();
+            let selection = relay::use_ordered_selection_model(
+                cx,
+                Some(11),
+                move |cx| {
+                    sessions_for_selection.read(cx, |sessions| {
+                        sessions.iter().map(|session| session.id).collect()
+                    })
+                },
+                relay::SelectionReconcilePolicy::SelectFirst,
+            );
             SessionListView::new(cx, sessions, selection)
         });
         let root = window.root();
@@ -389,7 +401,7 @@ mod tests {
         let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
         let sessions = app.update_entity(&root, |list, _cx| session_ids(list));
         let rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
-        assert_eq!(selected, None);
+        assert_eq!(selected, Some(12));
         assert_eq!(sessions, vec![12, 13]);
         assert_eq!(
             rows.iter().map(|(key, _)| *key).collect::<Vec<_>>(),

@@ -3,7 +3,8 @@ use gpui::{
     Styled, Window, div, px,
 };
 use relay::{
-    KeyedSubViews, ReactiveAppExt, ReactiveView, Selector, Signal, SignalVecExt,
+    KeyedSubViews, OrderedSelectionModel, ReactiveAppExt, ReactiveView, Selector, Signal,
+    SignalVecExt, SelectionReconcilePolicy, use_ordered_selection_model,
     view::reactive_render,
 };
 use relay_uikit::patterns::{
@@ -17,6 +18,7 @@ use relay_uikit::patterns::{
     TabStrip, TaskRow, TaskRowData,
 };
 use relay_uikit::{
+    interaction::{SelectionBinding, SelectionSource},
     ActiveTheme, Button, IconButton, IconName, Label, ListItem, ListItemSpacing, StatusDot, Theme,
     Tone,
 };
@@ -209,7 +211,9 @@ fn command_picker_patterns(
                             "main",
                             pattern_branch_options(),
                         )
-                        .selected_by(state.pattern_branch_selection.clone())
+                        .selected_with(SelectionSource::ordered_selection_model(
+                            state.pattern_branch_selection.clone(),
+                        ))
                         .open_bound(state.command_popover_open.clone())
                         .actions(pattern_branch_actions())
                         .on_select({
@@ -241,7 +245,10 @@ fn command_palette_sample(state: &GalleryState) -> impl IntoElement + use<> {
                 .detail("Open a shell in the selected branch")
                 .icon(IconName::Terminal)
                 .shortcut(KeybindingShortcut::new(["Ctrl", "`"]))
-                .selected_by(selection.clone())
+                .selected_with(SelectionBinding::ordered_selection_model(
+                    selection.clone(),
+                    "terminal:new",
+                ))
                 .on_select(pattern_command_event(state)),
         )
         .row(
@@ -249,7 +256,10 @@ fn command_palette_sample(state: &GalleryState) -> impl IntoElement + use<> {
                 .detail("Start a Codex session for the workspace")
                 .icon(IconName::Bot)
                 .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
-                .selected_by(selection.clone())
+                .selected_with(SelectionBinding::ordered_selection_model(
+                    selection.clone(),
+                    "agent:launch",
+                ))
                 .on_select(pattern_command_event(state)),
         )
         .row(
@@ -257,7 +267,10 @@ fn command_palette_sample(state: &GalleryState) -> impl IntoElement + use<> {
                 .detail("Focus the review panel")
                 .icon(IconName::MessageSquareText)
                 .shortcut(KeybindingShortcut::new(["Ctrl", "R"]))
-                .selected_by(selection)
+                .selected_with(SelectionBinding::ordered_selection_model(
+                    selection,
+                    "review:open",
+                ))
                 .on_select(pattern_command_event(state)),
         )
 }
@@ -346,31 +359,41 @@ impl PatternProject {
 pub(super) struct PatternProjectPicker {
     projects: Signal<Vec<PatternProject>>,
     rows: KeyedSubViews<u64, PatternProjectRow>,
-    selection: Selector<u64>,
+    selection: OrderedSelectionModel<u64>,
     next_id: u64,
     revision: u64,
 }
 
 impl PatternProjectPicker {
     pub(super) fn new(cx: &mut Context<Self>) -> Self {
+        let projects = cx.signal(vec![
+            PatternProject::new(1, "relay-ui-kit", "workspace / main", Tone::Accent, "ACTIVE"),
+            PatternProject::new(2, "relay", "crates / runtime", Tone::Info, "READY"),
+            PatternProject::new(3, "gallery", "bin / relay_gallery", Tone::Warning, "REVIEW"),
+        ]);
+        let projects_for_selection = projects.clone();
+        let selection = use_ordered_selection_model(
+            cx,
+            Some(1),
+            move |cx| {
+                projects_for_selection.read(cx, |projects| {
+                    projects.iter().map(|project| project.id).collect()
+                })
+            },
+            SelectionReconcilePolicy::SelectFirst,
+        );
+
         Self {
-            projects: cx.signal(vec![
-                PatternProject::new(1, "relay-ui-kit", "workspace / main", Tone::Accent, "ACTIVE"),
-                PatternProject::new(2, "relay", "crates / runtime", Tone::Info, "READY"),
-                PatternProject::new(3, "gallery", "bin / relay_gallery", Tone::Warning, "REVIEW"),
-            ]),
+            projects,
             rows: KeyedSubViews::new(),
-            selection: cx.selector(Some(1)),
+            selection,
             next_id: 4,
             revision: 0,
         }
     }
 
     fn cycle_selection(&self, cx: &mut App) {
-        self.projects.peek(|projects| {
-            self.selection
-                .select_next_by(cx, projects, |project| project.id);
-        });
+        let _ = self.selection.select_next(cx);
     }
 
     fn rotate_projects(&self, cx: &mut App) {
@@ -405,7 +428,7 @@ impl PatternProjectPicker {
         self.next_id += 1;
         self.projects.push_selected_by(
             cx,
-            &self.selection,
+            self.selection.selection().selector(),
             PatternProject::new(
                 id,
                 format!("generated-{id:02}"),
@@ -422,10 +445,10 @@ impl ReactiveView for PatternProjectPicker {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let projects = self.projects.get(cx);
 
-        let selection = self.selection.clone();
+        let selection = self.selection.selection().selector().clone();
         self.rows.sync_with_selector(
             cx,
-            &self.selection,
+            self.selection.selection().selector(),
             projects,
             |project| project.id,
             move |project, _cx| PatternProjectRow::new(project, selection.clone()),
@@ -916,7 +939,41 @@ mod tests {
     }
 
     #[test]
-    fn command_picker_selectors_drive_gallery_labels() {
+    fn project_picker_remove_active_reselects_first_remaining_project() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            PatternProjectPicker::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        app.update_entity(&root, |picker, cx| {
+            picker.projects.remove_selected_by(
+                cx,
+                picker.selection.selection().selector(),
+                |project| project.id,
+            );
+        });
+        window.draw();
+
+        let (selected, projects) = app.update_entity(&root, |picker, _cx| {
+            (
+                picker.selection.get_untracked(),
+                picker
+                    .projects
+                    .get_untracked()
+                    .into_iter()
+                    .map(|project| project.id)
+                    .collect::<Vec<_>>(),
+            )
+        });
+        assert_eq!(selected, Some(2));
+        assert_eq!(projects, vec![2, 3]);
+    }
+
+    #[test]
+    fn command_picker_selection_models_drive_gallery_labels() {
         let mut app = TestApp::new();
         let mut window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);

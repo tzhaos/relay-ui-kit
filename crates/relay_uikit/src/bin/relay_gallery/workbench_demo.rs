@@ -12,7 +12,8 @@ use gpui::{
     AnyElement, AppContext, AsyncApp, Context, Entity, FocusHandle, IntoElement, Render, Window,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, Resource, SelectedItemExt, Selector, Signal,
+    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource,
+    SelectionReconcilePolicy, Signal, use_ordered_selection_model,
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{
@@ -50,8 +51,8 @@ impl WorkbenchApp {
 pub struct WorkbenchState {
     tasks: Signal<Vec<WorkbenchTask>>,
     sessions: Signal<Vec<WorkbenchSession>>,
-    active_task: Selector<u64>,
-    active_session: Selector<u64>,
+    active_task: OrderedSelectionModel<u64>,
+    active_session: OrderedSelectionModel<u64>,
     selected_task: Memo<Option<WorkbenchTask>>,
     selected_session: Memo<Option<WorkbenchSession>>,
     terminal_output: Resource<Vec<OutputLine>, String>,
@@ -76,13 +77,31 @@ impl WorkbenchState {
         );
         let tasks = cx.signal(task_seed);
         let sessions = cx.signal(session_seed);
-        let active_task = cx.selector(Some(1));
-        let active_session = cx.selector(Some(11));
+        let tasks_for_selection = tasks.clone();
+        let active_task = use_ordered_selection_model(
+            cx,
+            Some(1),
+            move |cx| {
+                tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect())
+            },
+            SelectionReconcilePolicy::SelectFirst,
+        );
+        let sessions_for_selection = sessions.clone();
+        let active_session = use_ordered_selection_model(
+            cx,
+            Some(11),
+            move |cx| {
+                sessions_for_selection.read(cx, |sessions| {
+                    sessions.iter().map(|session| session.id).collect()
+                })
+            },
+            SelectionReconcilePolicy::SelectFirst,
+        );
         let terminal_output = cx.ready_resource(initial_terminal_output);
         let review_report = cx.ready_resource(initial_review_report());
-        let selected_task = tasks.selected_by_or_first(cx, active_task.clone(), |task| task.id);
+        let selected_task = active_task.selected_from_signal(cx, &tasks, |task| task.id);
         let selected_session =
-            sessions.selected_by_or_first(cx, active_session.clone(), |session| session.id);
+            active_session.selected_from_signal(cx, &sessions, |session| session.id);
         let task_list = cx.new({
             let tasks = tasks.clone();
             let active_task = active_task.clone();
@@ -259,11 +278,12 @@ fn status_bar(state: &WorkbenchState, cx: &App) -> impl IntoElement {
 #[cfg(test)]
 mod tests {
     use gpui::TestApp;
+    use relay::SignalVecExt;
 
     use super::*;
 
     #[test]
-    fn selected_task_memo_tracks_selector_and_list_updates() {
+    fn selected_task_memo_tracks_selection_model_and_list_updates() {
         let mut app = TestApp::new();
         let window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);
@@ -294,6 +314,22 @@ mod tests {
             updated.as_ref().map(|task| task.title.as_str()),
             Some("Updated GPUI boundary audit")
         );
+
+        app.update_entity(&root, |app, cx| {
+            app.state
+                .tasks
+                .remove_selected_by(cx, app.state.active_task.selection().selector(), |task| {
+                    task.id
+                });
+        });
+
+        let reselected = app.update_entity(&root, |app, cx| {
+            (
+                app.state.active_task.get(cx),
+                app.state.selected_task.get(cx).map(|task| task.id),
+            )
+        });
+        assert_eq!(reselected, (Some(1), Some(1)));
     }
 
     #[test]

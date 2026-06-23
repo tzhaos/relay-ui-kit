@@ -2,11 +2,9 @@ use gpui::{
     div, prelude::FluentBuilder, px, App, ClickEvent, FontWeight, InteractiveElement, IntoElement,
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window,
 };
-use relay::{Binding, Selector};
-
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::SharedSelectHandler,
+    interaction::{SelectionSource, SharedSelectHandler},
     motion::{MotionDirection, MotionExt},
     theme::{radius, space, ActiveTheme, BORDER_WIDTH},
 };
@@ -17,8 +15,7 @@ pub(super) fn branch_picker_panel(
     selected_key: &'static str,
     items: Vec<PickerOption>,
     actions: Vec<PickerAction>,
-    selected_binding: Option<Binding<&'static str>>,
-    selection: Option<Selector<&'static str>>,
+    selection: Option<SelectionSource<&'static str>>,
     select_handler: Option<SharedSelectHandler>,
     action_handler: Option<SharedSelectHandler>,
 ) -> impl IntoElement {
@@ -26,7 +23,6 @@ pub(super) fn branch_picker_panel(
         selected_key,
         items,
         actions,
-        selected_binding,
         selection,
         select_handler,
         action_handler,
@@ -38,8 +34,7 @@ struct PickerPanel {
     selected_key: &'static str,
     items: Vec<PickerOption>,
     actions: Vec<PickerAction>,
-    selected_binding: Option<Binding<&'static str>>,
-    selection: Option<Selector<&'static str>>,
+    selection: Option<SelectionSource<&'static str>>,
     select_handler: Option<SharedSelectHandler>,
     action_handler: Option<SharedSelectHandler>,
 }
@@ -47,15 +42,11 @@ struct PickerPanel {
 impl RenderOnce for PickerPanel {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selected_binding = self.selected_binding;
         let selection = self.selection;
-        let selected_key = if let Some(selection) = &selection {
-            selection.get(cx).unwrap_or(self.selected_key)
-        } else {
-            selected_binding
-                .as_ref()
-                .map_or(self.selected_key, |b| b.get(cx))
-        };
+        let selected_key = selection
+            .as_ref()
+            .and_then(|selection| selection.get(cx))
+            .unwrap_or(self.selected_key);
         let select_handler = self.select_handler;
         let mut panel = div()
             .id("branch-picker-panel")
@@ -95,14 +86,13 @@ impl RenderOnce for PickerPanel {
             let selected = item.key == selected_key;
             let key = item.key;
             let handler = select_handler.clone();
-            let binding = selected_binding.clone();
             let selection = selection.clone();
             let row_fg = if selected {
                 theme.text
             } else {
                 theme.text_secondary
             };
-            let clickable = selection.is_some() || binding.is_some() || handler.is_some();
+            let clickable = selection.is_some() || handler.is_some();
 
             panel = panel.child(
                 div()
@@ -166,8 +156,6 @@ impl RenderOnce for PickerPanel {
                         this.on_click(move |_event: &ClickEvent, window, cx| {
                             if let Some(selection) = &selection {
                                 selection.select(cx, key);
-                            } else if let Some(binding) = &binding {
-                                binding.set(cx, key);
                             }
                             if let Some(handler) = &handler {
                                 handler(key, window, cx);

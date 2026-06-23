@@ -8,7 +8,7 @@ use relay::{Binding, Selector};
 use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ClickHandler, SharedDismissHandler, SharedSelectHandler},
+    interaction::{ClickHandler, SelectionSource, SharedDismissHandler, SharedSelectHandler},
     theme::{radius, ActiveTheme},
 };
 
@@ -23,8 +23,7 @@ pub struct ItemPicker {
     items: Vec<PickerOption>,
     actions: Vec<PickerAction>,
     open: bool,
-    selected_binding: Option<Binding<&'static str>>,
-    selection: Option<Selector<&'static str>>,
+    selection: Option<SelectionSource<&'static str>>,
     open_binding: Option<Binding<bool>>,
     on_toggle: Option<ClickHandler>,
     on_select: Option<SharedSelectHandler>,
@@ -44,7 +43,6 @@ impl ItemPicker {
             items,
             actions: default_picker_actions(),
             open: false,
-            selected_binding: None,
             selection: None,
             open_binding: None,
             on_toggle: None,
@@ -65,8 +63,7 @@ impl ItemPicker {
             items,
             actions: default_picker_actions(),
             open: false,
-            selected_binding: Some(selected),
-            selection: None,
+            selection: Some(SelectionSource::binding(selected)),
             open_binding: None,
             on_toggle: None,
             on_select: None,
@@ -85,9 +82,13 @@ impl ItemPicker {
         self
     }
 
-    pub fn selected_by(mut self, selector: Selector<&'static str>) -> Self {
-        self.selection = Some(selector);
+    pub fn selected_with(mut self, selection: SelectionSource<&'static str>) -> Self {
+        self.selection = Some(selection);
         self
+    }
+
+    pub fn selected_by(self, selector: Selector<&'static str>) -> Self {
+        self.selected_with(SelectionSource::selector(selector))
     }
 
     pub fn actions(mut self, actions: Vec<PickerAction>) -> Self {
@@ -135,31 +136,22 @@ impl ItemPicker {
     }
 
     fn current_selected_key(&self, cx: &App) -> &'static str {
-        if let Some(selection) = &self.selection {
-            if let Some(key) = selection.get(cx) {
-                return key;
-            }
-        }
-
-        self.selected_binding
+        self.selection
             .as_ref()
-            .map_or(self.selected_key, |b| b.get(cx))
+            .and_then(|selection| selection.get(cx))
+            .unwrap_or(self.selected_key)
     }
 }
 
 impl RenderOnce for ItemPicker {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selected_binding = self.selected_binding;
         let selection = self.selection;
         let open_binding = self.open_binding;
-        let selected_key = if let Some(selection) = &selection {
-            selection.get(cx).unwrap_or(self.selected_key)
-        } else {
-            selected_binding
-                .as_ref()
-                .map_or(self.selected_key, |b| b.get(cx))
-        };
+        let selected_key = selection
+            .as_ref()
+            .and_then(|selection| selection.get(cx))
+            .unwrap_or(self.selected_key);
         let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
         let selected_label = self
             .items
@@ -237,7 +229,6 @@ impl RenderOnce for ItemPicker {
                 selected_key,
                 self.items,
                 self.actions,
-                selected_binding.clone(),
                 selection.clone(),
                 select_handler,
                 action_handler,
@@ -263,7 +254,7 @@ impl RenderOnce for ItemPicker {
 #[cfg(test)]
 mod tests {
     use gpui::TestApp;
-    use relay::{init, ReactiveAppExt};
+    use relay::{SelectionModel, ReactiveAppExt, init};
 
     use super::*;
 
@@ -311,6 +302,34 @@ mod tests {
 
         app.update(|cx| {
             selector.select(cx, "main");
+        });
+
+        let selected = app.read(|cx| picker.selected_label(cx));
+        assert_eq!(selected, "main");
+    }
+
+    #[test]
+    fn branch_selector_reads_selected_label_from_selection_source() {
+        let mut app = TestApp::new();
+        let selection = app.update(|cx| {
+            init(cx);
+            SelectionModel::new(cx, Some("feat-ui"))
+        });
+        let picker = ItemPicker::new(
+            "branch-selector",
+            "main",
+            vec![
+                PickerOption::new("main", "main"),
+                PickerOption::new("feat-ui", "feature/ui-kit"),
+            ],
+        )
+        .selected_with(SelectionSource::selection_model(selection.clone()));
+
+        let initial = app.read(|cx| picker.selected_label(cx));
+        assert_eq!(initial, "feature/ui-kit");
+
+        app.update(|cx| {
+            selection.select(cx, "main");
         });
 
         let selected = app.read(|cx| picker.selected_label(cx));

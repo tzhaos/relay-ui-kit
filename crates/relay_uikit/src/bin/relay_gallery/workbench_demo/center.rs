@@ -88,6 +88,8 @@ fn session_tabs(
     state: &WorkbenchState,
     sessions: &[super::data::WorkbenchSession],
 ) -> impl IntoElement + use<> {
+    let selection = state.active_session.selection().selector().clone();
+
     div()
         .h(px(40.0))
         .px_2()
@@ -102,6 +104,6 @@ fn session_tabs(
                 session.label.clone(),
             )
             .status(session.tone)
-            .active_by(state.active_session.clone(), session.id)
+            .active_by(selection.clone(), session.id)
         }))
 }

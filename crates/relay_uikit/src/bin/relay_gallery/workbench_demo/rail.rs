@@ -2,7 +2,10 @@ use gpui::{
     AnyElement, AnyView, App, Context, Entity, IntoElement, ParentElement, Render, Styled, Window,
     div, px,
 };
-use relay::{KeyedSubViews, ReactiveView, Selector, Signal, SignalVecExt, view::reactive_render};
+use relay::{
+    KeyedSubViews, OrderedSelectionModel, ReactiveView, Selector, Signal, SignalVecExt,
+    view::reactive_render,
+};
 use relay_uikit::patterns::{Pane, PaneToolbar, TaskRow};
 use relay_uikit::{Button, IconButton, IconName, TextInput, Theme};
 
@@ -98,14 +101,14 @@ fn cached_task_list(list: Entity<TaskListView>) -> AnyElement {
 pub(super) struct TaskListView {
     tasks: Signal<Vec<WorkbenchTask>>,
     rows: KeyedSubViews<u64, TaskRowView>,
-    selection: Selector<u64>,
+    selection: OrderedSelectionModel<u64>,
 }
 
 impl TaskListView {
     pub(super) fn new(
         cx: &mut Context<Self>,
         tasks: Signal<Vec<WorkbenchTask>>,
-        selection: Selector<u64>,
+        selection: OrderedSelectionModel<u64>,
     ) -> Self {
         relay::init(cx);
         Self {
@@ -116,34 +119,32 @@ impl TaskListView {
     }
 
     fn activate_next(&self, cx: &mut App) {
-        self.tasks.peek(|tasks| {
-            self.selection.select_next_by(cx, tasks, |task| task.id);
-        });
+        let _ = self.selection.select_next(cx);
     }
 
     fn activate_previous(&self, cx: &mut App) {
-        self.tasks.peek(|tasks| {
-            self.selection.select_previous_by(cx, tasks, |task| task.id);
-        });
+        let _ = self.selection.select_previous(cx);
     }
 
     fn remove_active(&self, cx: &mut App) {
-        self.tasks
-            .remove_selected_by(cx, &self.selection, |task| task.id);
+        self.tasks.remove_selected_by(
+            cx,
+            self.selection.selection().selector(),
+            |task| task.id,
+        );
     }
 }
 
 impl ReactiveView for TaskListView {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let tasks = self.tasks.get(cx);
-
-        let selection = self.selection.clone();
+        let selector = self.selection.selection().selector().clone();
         self.rows.sync_with_selector(
             cx,
-            &self.selection,
+            self.selection.selection().selector(),
             tasks,
             |task| task.id,
-            move |task, _cx| TaskRowView::new(task, selection.clone()),
+            move |task, _cx| TaskRowView::new(task, selector.clone()),
             |task, row, _cx| row.update_task(task),
         );
 
@@ -224,7 +225,13 @@ mod tests {
         let mut window = app.open_window(|_, cx| {
             relay_uikit::theme::init(cx);
             let tasks = cx.signal(initial_tasks());
-            let selection = cx.selector(Some(1));
+            let tasks_for_selection = tasks.clone();
+            let selection = relay::use_ordered_selection_model(
+                cx,
+                Some(1),
+                move |cx| tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect()),
+                relay::SelectionReconcilePolicy::SelectFirst,
+            );
             TaskListView::new(cx, tasks, selection)
         });
         let root = window.root();
@@ -241,5 +248,43 @@ mod tests {
         let updated_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
         assert_eq!(selected, Some(2));
         assert_eq!(updated_rows, initial_rows);
+    }
+
+    #[test]
+    fn task_list_remove_active_reselects_first_remaining_task() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            let tasks = cx.signal(initial_tasks());
+            let tasks_for_selection = tasks.clone();
+            let selection = relay::use_ordered_selection_model(
+                cx,
+                Some(1),
+                move |cx| tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect()),
+                relay::SelectionReconcilePolicy::SelectFirst,
+            );
+            TaskListView::new(cx, tasks, selection)
+        });
+        let root = window.root();
+
+        window.draw();
+        app.update_entity(&root, |list, cx| {
+            list.activate_next(cx);
+            list.remove_active(cx);
+        });
+        window.draw();
+
+        let (selected, tasks) = app.update_entity(&root, |list, _cx| {
+            (
+                list.selection.get_untracked(),
+                list.tasks
+                    .get_untracked()
+                    .into_iter()
+                    .map(|task| task.id)
+                    .collect::<Vec<_>>(),
+            )
+        });
+        assert_eq!(selected, Some(1));
+        assert_eq!(tasks, vec![1, 3]);
     }
 }

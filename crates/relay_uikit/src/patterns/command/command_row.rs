@@ -86,9 +86,14 @@ impl CommandRow {
         self
     }
 
-    pub fn selected_by(mut self, selector: Selector<&'static str>) -> Self {
-        self.selection = Some(SelectionBinding::selector(selector, self.key));
+    pub fn selected_with(mut self, selection: SelectionBinding) -> Self {
+        self.selection = Some(selection);
         self
+    }
+
+    pub fn selected_by(self, selector: Selector<&'static str>) -> Self {
+        let key = self.key;
+        self.selected_with(SelectionBinding::selector(selector, key))
     }
 
     pub fn disabled(mut self, disabled: bool) -> Self {
@@ -197,7 +202,7 @@ impl RenderOnce for CommandRow {
 #[cfg(test)]
 mod tests {
     use gpui::TestApp;
-    use relay::{init, ReactiveAppExt};
+    use relay::{SelectionModel, ReactiveAppExt, init};
 
     use super::*;
 
@@ -234,6 +239,31 @@ mod tests {
 
         app.read(|cx| {
             assert_eq!(selector.get(cx), Some("close"));
+        });
+    }
+
+    #[test]
+    fn command_row_selected_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, row) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("open"));
+            let row = CommandRow::new("command-close", "close", "Close")
+                .selected_with(SelectionBinding::selection_model(selection.clone(), "close"));
+            (selection, row)
+        });
+
+        app.update(|cx| {
+            let selection_binding = row.selection.as_ref().expect("row should store selection");
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("close"));
         });
     }
 }

@@ -74,12 +74,16 @@ impl SessionRow {
         self
     }
 
-    pub fn active_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    pub fn active_with(mut self, selection: SelectionBinding) -> Self {
+        self.selection = Some(selection);
+        self
+    }
+
+    pub fn active_by<K>(self, selector: Selector<K>, key: K) -> Self
     where
         K: Clone + Eq + Hash + PartialEq + 'static,
     {
-        self.selection = Some(SelectionBinding::selector(selector, key));
-        self
+        self.active_with(SelectionBinding::selector(selector, key))
     }
 
     pub fn on_click(
@@ -88,6 +92,39 @@ impl SessionRow {
     ) -> Self {
         self.on_click = Some(Box::new(handler));
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    #[test]
+    fn session_row_active_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, row) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("open"));
+            let row = SessionRow::new("session", "codex", "relay/patterns")
+                .active_with(SelectionBinding::selection_model(selection.clone(), "close"));
+            (selection, row)
+        });
+
+        app.update(|cx| {
+            let selection_binding = row.selection.as_ref().expect("row should store selection");
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("close"));
+        });
     }
 }
 

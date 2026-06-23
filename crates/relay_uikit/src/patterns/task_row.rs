@@ -58,12 +58,16 @@ impl TaskRow {
         }
     }
 
-    pub fn selected_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    pub fn selected_with(mut self, selection: SelectionBinding) -> Self {
+        self.selection = Some(selection);
+        self
+    }
+
+    pub fn selected_by<K>(self, selector: Selector<K>, key: K) -> Self
     where
         K: Clone + Eq + Hash + PartialEq + 'static,
     {
-        self.selection = Some(SelectionBinding::selector(selector, key));
-        self
+        self.selected_with(SelectionBinding::selector(selector, key))
     }
 
     pub fn selected(mut self, selected: bool) -> Self {
@@ -176,4 +180,48 @@ fn task_meta(data: &TaskRowData) -> String {
         parts.push(format!("{} review", data.review));
     }
     parts.join("  ·  ")
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    fn row_data() -> TaskRowData {
+        TaskRowData {
+            title: "Ship v2".to_string(),
+            status_label: "ready".to_string(),
+            status_tone: Tone::Accent,
+            branch: Some("feat/v2".to_string()),
+            changed: 3,
+            review: 1,
+        }
+    }
+
+    #[test]
+    fn task_row_selected_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, row) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("open"));
+            let row = TaskRow::new("task", row_data())
+                .selected_with(SelectionBinding::selection_model(selection.clone(), "close"));
+            (selection, row)
+        });
+
+        app.update(|cx| {
+            let selection_binding = row.selection.as_ref().expect("row should store selection");
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("close"));
+        });
+    }
 }

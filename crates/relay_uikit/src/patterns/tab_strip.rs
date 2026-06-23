@@ -60,12 +60,16 @@ impl TabStrip {
         self
     }
 
-    pub fn active_by<K>(mut self, selector: Selector<K>, key: K) -> Self
+    pub fn active_with(mut self, selection: SelectionBinding) -> Self {
+        self.selection = Some(selection);
+        self
+    }
+
+    pub fn active_by<K>(self, selector: Selector<K>, key: K) -> Self
     where
         K: Clone + Eq + Hash + PartialEq + 'static,
     {
-        self.selection = Some(SelectionBinding::selector(selector, key));
-        self
+        self.active_with(SelectionBinding::selector(selector, key))
     }
 
     pub fn status(mut self, status: Tone) -> Self {
@@ -79,6 +83,39 @@ impl TabStrip {
     ) -> Self {
         self.on_click = Some(Box::new(handler));
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    #[test]
+    fn tab_strip_active_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, tab) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("terminal"));
+            let tab = TabStrip::new("preview-tab", "Preview")
+                .active_with(SelectionBinding::selection_model(selection.clone(), "preview"));
+            (selection, tab)
+        });
+
+        app.update(|cx| {
+            let selection_binding = tab.selection.as_ref().expect("tab should store selection");
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("preview"));
+        });
     }
 }
 

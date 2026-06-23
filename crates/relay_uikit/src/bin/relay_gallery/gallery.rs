@@ -10,7 +10,8 @@ use gpui::{
     Render, Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, ReactiveAppExt, Resource, Selector, Signal, SignalVecExt,
+    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource, Selector, Signal,
+    SignalVecExt, SelectionReconcilePolicy, use_ordered_selection_model,
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
@@ -24,6 +25,8 @@ mod stress_scene;
 
 pub(super) const FEEDBACK_TOAST_DURATION: Duration = Duration::from_secs(4);
 const FEEDBACK_TOAST_LIMIT: usize = 4;
+const PATTERN_COMMAND_KEYS: [&str; 3] = ["terminal:new", "agent:launch", "review:open"];
+const PATTERN_BRANCH_KEYS: [&str; 3] = ["main", "relay/runtime", "gallery/patterns"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GallerySurface {
@@ -81,8 +84,8 @@ pub struct GalleryState {
     pub pattern_dialog_open: Binding<bool>,
     pub pattern_row_selection: Selector<&'static str>,
     pub pattern_tab_selection: Selector<&'static str>,
-    pub pattern_command_selection: Selector<&'static str>,
-    pub pattern_branch_selection: Selector<&'static str>,
+    pub pattern_command_selection: OrderedSelectionModel<&'static str>,
+    pub pattern_branch_selection: OrderedSelectionModel<&'static str>,
     pub pattern_output: Resource<Vec<OutputLine>, String>,
     pattern_output_refresh_serial: u64,
     pattern_project_picker: Entity<patterns_scene::PatternProjectPicker>,
@@ -140,6 +143,18 @@ impl GalleryState {
             .field("ui_font_size", ui_font_size.clone(), cx)
             .field("theme_choice", theme_choice.clone(), cx)
             .build_is_dirty(cx);
+        let pattern_command_selection = use_ordered_selection_model(
+            cx,
+            Some("terminal:new"),
+            |_cx| PATTERN_COMMAND_KEYS.to_vec(),
+            SelectionReconcilePolicy::SelectFirst,
+        );
+        let pattern_branch_selection = use_ordered_selection_model(
+            cx,
+            Some("main"),
+            |_cx| PATTERN_BRANCH_KEYS.to_vec(),
+            SelectionReconcilePolicy::SelectFirst,
+        );
 
         Self {
             name_input: cx.binding(TextInputState::with_text("relay-agent")),
@@ -165,8 +180,8 @@ impl GalleryState {
             pattern_dialog_open: cx.binding(false),
             pattern_row_selection: cx.selector(Some("task")),
             pattern_tab_selection: cx.selector(Some("terminal")),
-            pattern_command_selection: cx.selector(Some("terminal:new")),
-            pattern_branch_selection: cx.selector(Some("main")),
+            pattern_command_selection,
+            pattern_branch_selection,
             pattern_output: cx.ready_resource(initial_pattern_output_lines()),
             pattern_output_refresh_serial: 0,
             pattern_project_picker: cx.new(patterns_scene::PatternProjectPicker::new),
