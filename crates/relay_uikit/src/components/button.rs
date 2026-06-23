@@ -5,7 +5,7 @@
 //! concrete view — the gallery and the real workbench wire the same component to
 //! different handlers.
 
-use gpui::{App, ClickEvent, ElementId, FontWeight, IntoElement, RenderOnce, Window};
+use gpui::{App, ClickEvent, ElementId, FocusHandle, FontWeight, IntoElement, RenderOnce, Window};
 
 use crate::{
     components::button_like::{ButtonLike, ButtonLikeColors},
@@ -35,6 +35,8 @@ pub struct Button {
     variant: ButtonVariant,
     icon: Option<IconName>,
     disabled: bool,
+    focus_handle: Option<FocusHandle>,
+    aria_expanded: Option<bool>,
     on_click: Option<ClickHandler>,
 }
 
@@ -46,6 +48,8 @@ impl Button {
             variant: ButtonVariant::Secondary,
             icon: None,
             disabled: false,
+            focus_handle: None,
+            aria_expanded: None,
             on_click: None,
         }
     }
@@ -79,6 +83,16 @@ impl Button {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
+    }
+
+    pub fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.aria_expanded = Some(expanded);
         self
     }
 
@@ -143,6 +157,14 @@ impl RenderOnce for Button {
         .disabled(self.disabled)
         .on_click(self.on_click);
 
+        if let Some(expanded) = self.aria_expanded {
+            button = button.aria_expanded(expanded);
+        }
+
+        if let Some(focus_handle) = self.focus_handle {
+            button = button.track_focus(focus_handle);
+        }
+
         if let Some(icon) = self.icon {
             button = button.child(Icon::new(icon).size(IconSize::Small).color(icon_color));
         }
@@ -160,6 +182,8 @@ pub struct IconButton {
     active: bool,
     disabled: bool,
     aria_label: Option<String>,
+    focus_handle: Option<FocusHandle>,
+    aria_expanded: Option<bool>,
     on_click: Option<ClickHandler>,
 }
 
@@ -172,6 +196,8 @@ impl IconButton {
             active: false,
             disabled: false,
             aria_label: None,
+            focus_handle: None,
+            aria_expanded: None,
             on_click: None,
         }
     }
@@ -194,6 +220,16 @@ impl IconButton {
 
     pub fn aria_label(mut self, label: impl Into<String>) -> Self {
         self.aria_label = Some(label.into());
+        self
+    }
+
+    pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
+    }
+
+    pub fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.aria_expanded = Some(expanded);
         self
     }
 
@@ -231,10 +267,37 @@ impl RenderOnce for IconButton {
         .disabled(self.disabled)
         .on_click(self.on_click);
 
+        if let Some(expanded) = self.aria_expanded {
+            button = button.aria_expanded(expanded);
+        }
+
+        if let Some(focus_handle) = self.focus_handle {
+            button = button.track_focus(focus_handle);
+        }
+
         if let Some(label) = self.aria_label {
             button = button.aria_label(label);
         }
 
         button.child(Icon::new(self.icon).size(self.size).color(fg))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn button_aria_expanded_builder_stores_value() {
+        let button = Button::new("button", "Open").aria_expanded(true);
+
+        assert_eq!(button.aria_expanded, Some(true));
+    }
+
+    #[test]
+    fn icon_button_aria_expanded_builder_stores_value() {
+        let button = IconButton::new("button", IconName::ChevronDown).aria_expanded(false);
+
+        assert_eq!(button.aria_expanded, Some(false));
     }
 }

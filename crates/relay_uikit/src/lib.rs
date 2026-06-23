@@ -13,6 +13,22 @@
 //! The two styles can be mixed during migration. App-specific workflows can
 //! keep using GPUI entities and callbacks, while simple fields such as toggles,
 //! sliders, selects, and text inputs can move to relay bindings.
+//!
+//! # Product-grade contract
+//!
+//! `relay_uikit` is meant to be a production desktop UI toolkit, not a gallery
+//! of one-off demos. Exported components and patterns should converge on the
+//! same contract:
+//!
+//! - explicit ownership for value, selection, and open state;
+//! - pointer and keyboard parity for actionable controls;
+//! - correct focus and dismissal behavior;
+//! - accessibility semantics that match the rendered affordance;
+//! - resilience under long content, empty states, and host-driven mutations;
+//! - tests and gallery scenarios that encode the intended behavior.
+//!
+//! The long-form version of that contract lives in
+//! `docs/relay-uikit-guidelines.md` at the workspace root.
 
 pub(crate) mod component_prelude;
 pub mod components;
@@ -45,7 +61,9 @@ pub use input::{
     InputActionKind, InputValueKind, NumberInput, NumberInputLayout, SearchField, TextArea,
     TextInput, TextInputAction, TextInputState, ValidationState,
 };
-pub use list::{ForEach, ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView};
+pub use list::{
+    ForEach, ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView,
+};
 pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
 pub use patterns::overlay::{
     AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,
@@ -54,8 +72,8 @@ pub use patterns::overlay::{
 pub use patterns::{
     ActionsMenu, CommandMenu, CommandMenuItem, CommandMenuItemKind, DiffHunk, DiffLine,
     DiffLineKind, DiffView, FileKind, FileViewer, InputComposer, ItemPicker, MarkdownViewer,
-    OutputLine, OutputLineStyle, OutputLog, OutputSurface, PickerAction, PickerOption,
-    QuickAction, SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
+    OutputLine, OutputLineStyle, OutputLog, OutputSurface, PickerAction, PickerOption, QuickAction,
+    SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
 };
 pub use row::{NavRow, TreeRow};
 pub use scroll_surface::ScrollSurface;

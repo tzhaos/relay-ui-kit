@@ -109,20 +109,26 @@ impl RenderOnce for Slider {
             let binding = binding.clone();
             let handler = on_change.clone();
             let on_decrement = on_decrement;
-            Some(Box::new(move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
-                if let Some(binding) = &binding {
-                    binding.update(cx, |v| {
-                        *v = (*v - step).max(min);
-                        true
-                    });
-                }
-                if let Some(handler) = &handler {
-                    handler(binding.as_ref().map_or(value - step, |b| b.get(cx)), window, cx);
-                }
-                if let Some(h) = &on_decrement {
-                    h(event, window, cx);
-                }
-            }) as ClickHandler)
+            Some(Box::new(
+                move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |v| {
+                            *v = (*v - step).max(min);
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(
+                            binding.as_ref().map_or(value - step, |b| b.get(cx)),
+                            window,
+                            cx,
+                        );
+                    }
+                    if let Some(h) = &on_decrement {
+                        h(event, window, cx);
+                    }
+                },
+            ) as ClickHandler)
         } else {
             on_decrement
         };
@@ -131,20 +137,26 @@ impl RenderOnce for Slider {
             let binding = binding.clone();
             let handler = on_change.clone();
             let on_increment = on_increment;
-            Some(Box::new(move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
-                if let Some(binding) = &binding {
-                    binding.update(cx, |v| {
-                        *v = (*v + step).min(max);
-                        true
-                    });
-                }
-                if let Some(handler) = &handler {
-                    handler(binding.as_ref().map_or(value + step, |b| b.get(cx)), window, cx);
-                }
-                if let Some(h) = &on_increment {
-                    h(event, window, cx);
-                }
-            }) as ClickHandler)
+            Some(Box::new(
+                move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
+                    if let Some(binding) = &binding {
+                        binding.update(cx, |v| {
+                            *v = (*v + step).min(max);
+                            true
+                        });
+                    }
+                    if let Some(handler) = &handler {
+                        handler(
+                            binding.as_ref().map_or(value + step, |b| b.get(cx)),
+                            window,
+                            cx,
+                        );
+                    }
+                    if let Some(h) = &on_increment {
+                        h(event, window, cx);
+                    }
+                },
+            ) as ClickHandler)
         } else {
             on_increment
         };
@@ -156,7 +168,10 @@ impl RenderOnce for Slider {
             .items_center()
             .gap_2()
             .role(Role::Slider)
-            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(self.disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .child(step_button(
                 "slider-decrement",
                 IconName::Minus,
@@ -228,9 +243,7 @@ impl RenderOnce for Slider {
                         this.on_key_down(move |event: &KeyDownEvent, window, cx| {
                             let key = event.keystroke.key.as_str();
                             if key == "arrow-left" || key == "arrow-right" {
-                                let current = binding
-                                    .as_ref()
-                                    .map_or(value, |b| b.get(cx));
+                                let current = binding.as_ref().map_or(value, |b| b.get(cx));
                                 let new_value = if key == "arrow-left" {
                                     (current - step).max(min)
                                 } else {

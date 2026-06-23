@@ -1,28 +1,30 @@
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
-use relay::{Binding, Selector};
+use relay::{Binding, Selector, WindowSignalExt};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{SelectHandler, SelectionSource},
+    interaction::{ActionHandler, SelectionSource},
     theme::ActiveTheme,
 };
 
 /// One tab in a [`Tabs`] bar.
-pub struct Tab {
-    key: &'static str,
-    label: &'static str,
+pub struct Tab<K> {
+    key: K,
+    label: String,
     icon: Option<IconName>,
     count: Option<usize>,
 }
 
-impl Tab {
-    pub fn new(key: &'static str, label: &'static str) -> Self {
+impl<K> Tab<K> {
+    pub fn new(key: K, label: impl Into<String>) -> Self {
         Self {
             key,
-            label,
+            label: label.into(),
             icon: None,
             count: None,
         }
@@ -41,74 +43,89 @@ impl Tab {
 
 /// An underline tab bar.
 #[derive(IntoElement)]
-pub struct Tabs {
+pub struct Tabs<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
-    tabs: Vec<Tab>,
-    active: &'static str,
-    selection: Option<SelectionSource<&'static str>>,
-    on_select: Option<SelectHandler>,
+    tabs: Vec<Tab<K>>,
+    active: Option<K>,
+    selection: Option<SelectionSource<K>>,
+    on_select: Option<ActionHandler<K>>,
 }
 
-impl Tabs {
-    pub fn new(id: impl Into<ElementId>, tabs: Vec<Tab>) -> Self {
+impl<K> Tabs<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, tabs: Vec<Tab<K>>) -> Self {
         Self {
             id: id.into(),
             tabs,
-            active: "",
+            active: None,
             selection: None,
             on_select: None,
         }
     }
 
-    pub fn bound(
-        id: impl Into<ElementId>,
-        tabs: Vec<Tab>,
-        binding: Binding<&'static str>,
-    ) -> Self {
+    pub fn bound(id: impl Into<ElementId>, tabs: Vec<Tab<K>>, binding: Binding<K>) -> Self {
         Self {
             id: id.into(),
             tabs,
-            active: "",
+            active: None,
             selection: Some(SelectionSource::binding(binding)),
             on_select: None,
         }
     }
 
-    pub fn active(mut self, active: &'static str) -> Self {
-        self.active = active;
+    pub fn active(mut self, active: K) -> Self {
+        self.active = Some(active);
         self
     }
 
-    pub fn selected_with(mut self, selection: SelectionSource<&'static str>) -> Self {
+    pub fn selected_with(mut self, selection: SelectionSource<K>) -> Self {
         self.selection = Some(selection);
         self
     }
 
-    pub fn selected_by(mut self, selector: Selector<&'static str>) -> Self {
+    pub fn selected_by(mut self, selector: Selector<K>) -> Self {
         self.selection = Some(SelectionSource::selector(selector));
         self
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Box::new(handler));
         self
     }
 }
 
-impl RenderOnce for Tabs {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+impl<K> RenderOnce for Tabs<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selection = self.selection;
+        let Self {
+            id,
+            tabs,
+            active,
+            selection,
+            on_select,
+        } = self;
+        let selection = selection.or_else(|| {
+            active.clone().map(|active| {
+                SelectionSource::binding(
+                    window.use_binding((id.clone(), "active-tab"), cx, || active),
+                )
+            })
+        });
         let active = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
-            .unwrap_or(self.active);
-        let handler = self.on_select.map(std::rc::Rc::new);
+            .or(active);
+        let handler = on_select.map(std::rc::Rc::new);
         let mut row = div()
-            .id(self.id)
+            .id(id)
             .h(px(36.0))
             .w_full()
             .flex()
@@ -117,9 +134,9 @@ impl RenderOnce for Tabs {
             .border_b_1()
             .border_color(theme.border);
 
-        for (index, tab) in self.tabs.into_iter().enumerate() {
-            let is_active = tab.key == active;
-            let key = tab.key;
+        for (index, tab) in tabs.into_iter().enumerate() {
+            let is_active = active.as_ref().is_some_and(|active| tab.key == *active);
+            let key = tab.key.clone();
             let handler = handler.clone();
             let selection = selection.clone();
             let (fg, underline) = if is_active {
@@ -144,17 +161,17 @@ impl RenderOnce for Tabs {
                 .text_color(fg)
                 .border_b_2()
                 .border_color(underline)
-                .when(!is_active, |this| {
+                .when(clickable, |this| {
                     this.cursor_pointer()
                         .hover(move |s| s.text_color(theme.text_secondary))
                 })
                 .when_some(tab.icon, |this, icon| {
-                    let c = if is_active {
+                    let color = if is_active {
                         theme.accent
                     } else {
                         theme.text_muted
                     };
-                    this.child(Icon::new(icon).size(IconSize::Small).color(c))
+                    this.child(Icon::new(icon).size(IconSize::Small).color(color))
                 })
                 .child(tab.label)
                 .when_some(tab.count, |this, count| {
@@ -168,10 +185,10 @@ impl RenderOnce for Tabs {
                 .when(clickable, |this| {
                     this.on_click(move |_: &ClickEvent, window, cx| {
                         if let Some(selection) = &selection {
-                            selection.select(cx, key);
+                            selection.select(cx, key.clone());
                         }
                         if let Some(handler) = &handler {
-                            handler(key, window, cx);
+                            handler(key.clone(), window, cx);
                         }
                         cx.stop_propagation();
                     })
@@ -189,11 +206,14 @@ mod tests {
 
     use super::*;
 
-    fn current_active_key(tabs: &Tabs, cx: &App) -> &'static str {
+    fn current_active_key<K>(tabs: &Tabs<K>, cx: &App) -> Option<K>
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
         tabs.selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
-            .unwrap_or(tabs.active)
+            .or_else(|| tabs.active.clone())
     }
 
     #[test]
@@ -210,13 +230,13 @@ mod tests {
         .selected_with(SelectionSource::selection_model(selection.clone()));
 
         let initial = app.read(|cx| current_active_key(&tabs, cx));
-        assert_eq!(initial, "files");
+        assert_eq!(initial, Some("files"));
 
         app.update(|cx| {
             selection.select(cx, "review");
         });
 
         let updated = app.read(|cx| current_active_key(&tabs, cx));
-        assert_eq!(updated, "review");
+        assert_eq!(updated, Some("review"));
     }
 }

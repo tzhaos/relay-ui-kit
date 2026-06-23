@@ -5,4 +5,4 @@ pub mod picker_types;
 
 pub use actions_menu::ActionsMenu;
 pub use item_picker::ItemPicker;
-pub use picker_types::{PickerOption, PickerAction};
+pub use picker_types::{PickerAction, PickerOption};

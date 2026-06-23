@@ -1,24 +1,29 @@
-use gpui::{
-    div, prelude::FluentBuilder, px, App, ClickEvent, FontWeight, InteractiveElement, IntoElement,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window,
-};
+use std::hash::Hash;
+
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{SelectionSource, SharedSelectHandler},
+    interaction::{SelectionSource, SharedActionHandler},
     motion::{MotionDirection, MotionExt},
-    theme::{radius, space, ActiveTheme, BORDER_WIDTH},
+    theme::{ActiveTheme, BORDER_WIDTH, radius, space},
+};
+use gpui::{
+    App, ClickEvent, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use super::picker_types::{PickerAction, PickerOption};
 
-pub(super) fn branch_picker_panel(
-    selected_key: &'static str,
-    items: Vec<PickerOption>,
+pub(super) fn branch_picker_panel<K>(
+    selected_key: Option<K>,
+    items: Vec<PickerOption<K>>,
     actions: Vec<PickerAction>,
-    selection: Option<SelectionSource<&'static str>>,
-    select_handler: Option<SharedSelectHandler>,
-    action_handler: Option<SharedSelectHandler>,
-) -> impl IntoElement {
+    selection: Option<SelectionSource<K>>,
+    select_handler: Option<SharedActionHandler<K>>,
+    action_handler: Option<SharedActionHandler<String>>,
+) -> impl IntoElement
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     PickerPanel {
         selected_key,
         items,
@@ -30,23 +35,29 @@ pub(super) fn branch_picker_panel(
 }
 
 #[derive(IntoElement)]
-struct PickerPanel {
-    selected_key: &'static str,
-    items: Vec<PickerOption>,
+struct PickerPanel<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    selected_key: Option<K>,
+    items: Vec<PickerOption<K>>,
     actions: Vec<PickerAction>,
-    selection: Option<SelectionSource<&'static str>>,
-    select_handler: Option<SharedSelectHandler>,
-    action_handler: Option<SharedSelectHandler>,
+    selection: Option<SelectionSource<K>>,
+    select_handler: Option<SharedActionHandler<K>>,
+    action_handler: Option<SharedActionHandler<String>>,
 }
 
-impl RenderOnce for PickerPanel {
+impl<K> RenderOnce for PickerPanel<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let selection = self.selection;
         let selected_key = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
-            .unwrap_or(self.selected_key);
+            .or(self.selected_key);
         let select_handler = self.select_handler;
         let mut panel = div()
             .id("branch-picker-panel")
@@ -83,8 +94,10 @@ impl RenderOnce for PickerPanel {
             );
 
         for (index, item) in self.items.into_iter().enumerate() {
-            let selected = item.key == selected_key;
-            let key = item.key;
+            let selected = selected_key
+                .as_ref()
+                .is_some_and(|selected_key| item.key == *selected_key);
+            let key = item.key.clone();
             let handler = select_handler.clone();
             let selection = selection.clone();
             let row_fg = if selected {
@@ -155,10 +168,10 @@ impl RenderOnce for PickerPanel {
                     .when(clickable, |this| {
                         this.on_click(move |_event: &ClickEvent, window, cx| {
                             if let Some(selection) = &selection {
-                                selection.select(cx, key);
+                                selection.select(cx, key.clone());
                             }
                             if let Some(handler) = &handler {
-                                handler(key, window, cx);
+                                handler(key.clone(), window, cx);
                             }
                             cx.stop_propagation();
                         })
@@ -178,7 +191,7 @@ impl RenderOnce for PickerPanel {
 
         for (index, action) in self.actions.into_iter().enumerate() {
             let handler = self.action_handler.clone();
-            let key = action.key;
+            let key = action.key.clone();
             panel = panel.child(
                 div()
                     .id(("branch-picker-action", index))
@@ -200,7 +213,7 @@ impl RenderOnce for PickerPanel {
                     .child(div().flex_1().min_w_0().truncate().child(action.label))
                     .when_some(handler, |this, handler| {
                         this.on_click(move |_event: &ClickEvent, window, cx| {
-                            handler(key, window, cx);
+                            handler(key.clone(), window, cx);
                             cx.stop_propagation();
                         })
                     }),

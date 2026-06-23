@@ -1,6 +1,9 @@
-use gpui::{ClickEvent, DefiniteLength, KeyDownEvent, MouseButton, Role, SharedString, Toggled};
+use gpui::{
+    ClickEvent, DefiniteLength, FocusHandle, KeyDownEvent, MouseButton, Role, SharedString, Toggled,
+};
 
 use crate::component_prelude::*;
+use crate::theme::DISABLED_OPACITY;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListItemSpacing {
@@ -34,6 +37,7 @@ pub struct ListItem {
     role: Option<Role>,
     aria_label: Option<SharedString>,
     toggled: Option<bool>,
+    focus_handle: Option<FocusHandle>,
     tab_index: Option<isize>,
     on_click: Option<ClickHandler>,
     children: Vec<AnyElement>,
@@ -55,6 +59,7 @@ impl ListItem {
             role: None,
             aria_label: None,
             toggled: None,
+            focus_handle: None,
             tab_index: None,
             on_click: None,
             children: Vec::new(),
@@ -117,6 +122,11 @@ impl ListItem {
         self
     }
 
+    pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
+    }
+
     pub fn tab_index(mut self, tab_index: isize) -> Self {
         self.tab_index = Some(tab_index);
         self
@@ -129,7 +139,6 @@ impl ListItem {
         self.on_click = Some(Box::new(handler));
         self
     }
-
 }
 
 impl ParentElement for ListItem {
@@ -148,7 +157,11 @@ impl RenderOnce for ListItem {
         let selected = self.selected;
         let clickable = self.on_click.is_some() && !disabled;
         let selectable = self.selectable && !disabled;
-        let tab_index = self.tab_index.or_else(|| clickable.then_some(0));
+        let focus_handle = self.focus_handle;
+        let focusable = focus_handle.is_some() && !disabled;
+        let tab_index = self
+            .tab_index
+            .or_else(|| (clickable || focusable).then_some(0));
 
         div()
             .id(self.id)
@@ -169,6 +182,9 @@ impl RenderOnce for ListItem {
             })
             .aria_selected(selected)
             .when_some(tab_index, |this, tab_index| this.tab_index(tab_index))
+            .when_some(focus_handle, |this, focus_handle| {
+                this.track_focus(&focus_handle)
+            })
             .border_color(if selected {
                 theme.accent_border
             } else {
@@ -184,6 +200,15 @@ impl RenderOnce for ListItem {
             .when(selected, |this| this.bg(theme.selection))
             .when(selectable && !selected, |this| {
                 this.hover(move |style| style.bg(theme.hover))
+            })
+            .when(focusable, |this| {
+                this.focus_visible(move |style| {
+                    style.bg(theme.hover).border_color(theme.accent_border)
+                })
+            })
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
             })
             .when(clickable, |this| {
                 this.cursor_pointer()
@@ -230,5 +255,12 @@ mod tests {
         let item = ListItem::new("list-item");
 
         assert_eq!(item.spacing, ListItemSpacing::Dense);
+    }
+
+    #[test]
+    fn list_item_starts_without_focus_handle() {
+        let item = ListItem::new("list-item");
+
+        assert!(item.focus_handle.is_none());
     }
 }

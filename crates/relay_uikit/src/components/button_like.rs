@@ -193,7 +193,10 @@ impl RenderOnce for ButtonLike {
             .when_some(self.padding_x, |this, padding| this.px(px(padding)))
             .when_some(self.text_size, |this, size| this.text_size(px(size)))
             .when_some(self.font_weight, |this, weight| this.font_weight(weight))
-            .when(self.disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(self.disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .hover(move |style| {
@@ -208,9 +211,7 @@ impl RenderOnce for ButtonLike {
                             .border_color(colors.active_border)
                             .text_color(colors.active_foreground)
                     })
-                    .focus_visible(move |style| {
-                        style.border_color(colors.hover_border)
-                    })
+                    .focus_visible(move |style| style.border_color(colors.hover_border))
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                         window.prevent_default();
                     })

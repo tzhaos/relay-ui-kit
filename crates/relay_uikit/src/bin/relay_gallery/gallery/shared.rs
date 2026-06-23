@@ -1,17 +1,13 @@
 use gpui::{App, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
 use relay::Binding;
 use relay_uikit::{
-    ActiveTheme, Icon, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme, Tone, radius,
-    space,
+    ActiveTheme, Icon, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme, Tone,
+    radius, space,
 };
 
 use super::GalleryScenesApp;
 
-pub(super) fn section<T: IntoElement>(
-    cx: &App,
-    title: &str,
-    body: T,
-) -> impl IntoElement + use<T> {
+pub(super) fn section<T: IntoElement>(cx: &App, title: &str, body: T) -> impl IntoElement + use<T> {
     let theme = *cx.theme();
     div()
         .flex()

@@ -1,14 +1,19 @@
+use std::hash::Hash;
+
 use crate::{
     component_prelude::*,
     icon::{Icon, IconName, IconSize},
-    interaction::SharedSelectHandler,
+    interaction::SharedActionHandler,
 };
 
 use super::ListItem;
 
 #[derive(Clone, PartialEq)]
-pub struct TreeNode {
-    key: &'static str,
+pub struct TreeNode<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    key: K,
     icon: IconName,
     label: String,
     depth: usize,
@@ -16,8 +21,11 @@ pub struct TreeNode {
     selected: bool,
 }
 
-impl TreeNode {
-    pub fn new(key: &'static str, icon: IconName, label: impl Into<String>) -> Self {
+impl<K> TreeNode<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(key: K, icon: IconName, label: impl Into<String>) -> Self {
         Self {
             key,
             icon,
@@ -45,15 +53,21 @@ impl TreeNode {
 }
 
 #[derive(IntoElement)]
-pub struct TreeView {
+pub struct TreeView<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
-    nodes: Vec<TreeNode>,
-    on_select: Option<SharedSelectHandler>,
-    on_toggle: Option<SharedSelectHandler>,
+    nodes: Vec<TreeNode<K>>,
+    on_select: Option<SharedActionHandler<K>>,
+    on_toggle: Option<SharedActionHandler<K>>,
 }
 
-impl TreeView {
-    pub fn new(id: impl Into<ElementId>, nodes: Vec<TreeNode>) -> Self {
+impl<K> TreeView<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, nodes: Vec<TreeNode<K>>) -> Self {
         Self {
             id: id.into(),
             nodes,
@@ -62,24 +76,21 @@ impl TreeView {
         }
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 
-    pub fn on_toggle(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_toggle(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(std::rc::Rc::new(handler));
         self
     }
 }
 
-impl RenderOnce for TreeView {
+impl<K> RenderOnce for TreeView<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
 
@@ -89,9 +100,9 @@ impl RenderOnce for TreeView {
             .min_w_0()
             .flex()
             .flex_col()
-            .children(self.nodes.into_iter().map(|node| {
-                let key = node.key;
-                let mut row = ListItem::new(key)
+            .children(self.nodes.into_iter().enumerate().map(|(index, node)| {
+                let key = node.key.clone();
+                let mut row = ListItem::new(("tree-node", index))
                     .height(px(space::ROW_SM))
                     .indent(node.depth, 14.0)
                     .selected(node.selected)
@@ -113,11 +124,11 @@ impl RenderOnce for TreeView {
                 if let Some(on_toggle) = self.on_toggle.clone().filter(|_| node.expanded.is_some())
                 {
                     row = row.on_click(move |_event, window, cx| {
-                        on_toggle(key, window, cx);
+                        on_toggle(key.clone(), window, cx);
                     });
                 } else if let Some(on_select) = self.on_select.clone() {
                     row = row.on_click(move |_event, window, cx| {
-                        on_select(key, window, cx);
+                        on_select(key.clone(), window, cx);
                     });
                 }
 
@@ -169,7 +180,7 @@ mod tests {
 
     #[test]
     fn tree_view_starts_without_toggle_handler() {
-        let tree = TreeView::new("tree", vec![]);
+        let tree: TreeView<&'static str> = TreeView::new("tree", vec![]);
 
         assert!(tree.on_toggle.is_none());
     }

@@ -4,6 +4,8 @@
 //! inside them. This component renders the quick launcher without owning any
 //! runtime behavior; hosts map selected keys to their command layer.
 
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
@@ -11,7 +13,7 @@ use gpui::{
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::SelectHandler,
+    interaction::ActionHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, radius, space},
 };
@@ -35,8 +37,8 @@ impl CommandMenuItemKind {
 }
 
 /// One selectable command in a [`CommandMenu`].
-pub struct CommandMenuItem {
-    key: &'static str,
+pub struct CommandMenuItem<K> {
+    key: K,
     label: String,
     detail: Option<String>,
     icon: IconName,
@@ -44,8 +46,8 @@ pub struct CommandMenuItem {
     disabled: bool,
 }
 
-impl CommandMenuItem {
-    pub fn new(key: &'static str, label: impl Into<String>, icon: IconName) -> Self {
+impl<K> CommandMenuItem<K> {
+    pub fn new(key: K, label: impl Into<String>, icon: IconName) -> Self {
         Self {
             key,
             label: label.into(),
@@ -74,14 +76,20 @@ impl CommandMenuItem {
 
 /// A compact launcher panel for terminal profiles and CLI agents.
 #[derive(IntoElement)]
-pub struct CommandMenu {
+pub struct CommandMenu<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
-    items: Vec<CommandMenuItem>,
-    on_select: Option<SelectHandler>,
+    items: Vec<CommandMenuItem<K>>,
+    on_select: Option<ActionHandler<K>>,
 }
 
-impl CommandMenu {
-    pub fn new(id: impl Into<ElementId>, items: Vec<CommandMenuItem>) -> Self {
+impl<K> CommandMenu<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, items: Vec<CommandMenuItem<K>>) -> Self {
         Self {
             id: id.into(),
             items,
@@ -89,16 +97,16 @@ impl CommandMenu {
         }
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Box::new(handler));
         self
     }
 }
 
-impl RenderOnce for CommandMenu {
+impl<K> RenderOnce for CommandMenu<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let handler = self.on_select.map(std::rc::Rc::new);
@@ -118,7 +126,7 @@ impl RenderOnce for CommandMenu {
 
         for (index, item) in self.items.into_iter().enumerate() {
             let handler = handler.clone();
-            let key = item.key;
+            let key = item.key.clone();
             let disabled = item.disabled || handler.is_none();
             let kind_label = item.kind.label();
             let kind_color = match item.kind {
@@ -189,7 +197,7 @@ impl RenderOnce for CommandMenu {
                 )
                 .when_some(handler.filter(|_| !disabled), |this, handler| {
                     this.on_click(move |_: &ClickEvent, window, cx| {
-                        handler(key, window, cx);
+                        handler(key.clone(), window, cx);
                         cx.stop_propagation();
                     })
                 });

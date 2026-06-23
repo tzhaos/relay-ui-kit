@@ -108,8 +108,9 @@ mod tests {
         let (selection, row) = app.update(|cx| {
             init(cx);
             let selection = SelectionModel::new(cx, Some("open"));
-            let row = SessionRow::new("session", "codex", "relay/patterns")
-                .active_with(SelectionBinding::selection_model(selection.clone(), "close"));
+            let row = SessionRow::new("session", "codex", "relay/patterns").active_with(
+                SelectionBinding::selection_model(selection.clone(), "close"),
+            );
             (selection, row)
         });
 

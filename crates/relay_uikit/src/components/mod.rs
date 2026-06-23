@@ -1,4 +1,13 @@
-//! Core reusable components with no Relay product state.
+//! Core reusable components with no Relay product workflow state.
+//!
+//! These are the base primitives that higher-level patterns depend on.
+//! A component in this layer is expected to be product-grade before it is used
+//! as a foundation elsewhere, which means:
+//!
+//! - its ownership model is explicit;
+//! - keyboard and pointer interaction are intentionally defined;
+//! - accessibility semantics are present where the host cannot infer them;
+//! - constrained layout and disabled-state behavior are treated as first-class.
 
 pub mod button;
 pub(crate) mod button_like;

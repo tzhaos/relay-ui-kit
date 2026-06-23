@@ -97,8 +97,12 @@ impl RenderOnce for TreeRow {
         let theme = *cx.theme();
         let selected_binding = self.selected_binding;
         let expanded_binding = self.expanded_binding;
-        let selected = selected_binding.as_ref().map_or(self.selected, |b| b.get(cx));
-        let expanded = expanded_binding.as_ref().map_or(self.expanded, |b| b.get(cx));
+        let selected = selected_binding
+            .as_ref()
+            .map_or(self.selected, |b| b.get(cx));
+        let expanded = expanded_binding
+            .as_ref()
+            .map_or(self.expanded, |b| b.get(cx));
         let fg = if selected {
             theme.text
         } else {
@@ -153,7 +157,8 @@ impl RenderOnce for TreeRow {
                     .child(self.label),
             );
 
-        let has_click = selected_binding.is_some() || expanded_binding.is_some() || self.on_click.is_some();
+        let has_click =
+            selected_binding.is_some() || expanded_binding.is_some() || self.on_click.is_some();
         if has_click {
             let handler = self.on_click;
             row = row.on_click(move |event, window, cx| {

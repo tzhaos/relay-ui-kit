@@ -89,7 +89,11 @@ impl FilterChip {
         self
     }
 
-    pub fn bound(id: impl Into<ElementId>, label: impl Into<String>, binding: Binding<bool>) -> Self {
+    pub fn bound(
+        id: impl Into<ElementId>,
+        label: impl Into<String>,
+        binding: Binding<bool>,
+    ) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -175,7 +179,10 @@ impl RenderOnce for FilterChip {
             })
             .bg(if active { theme.panel_alt } else { theme.panel })
             .text_color(fg)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))

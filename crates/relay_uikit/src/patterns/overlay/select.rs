@@ -5,14 +5,12 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, WindowSignalExt};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{
-        ActionHandler, ClickHandler, DismissHandler, OpenState, SelectionSource,
-    },
-    theme::{ActiveTheme, radius},
+    interaction::{ActionHandler, ClickHandler, DismissHandler, OpenState, SelectionSource},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 use super::{AnchoredOverlay, Menu, MenuItem};
@@ -56,6 +54,7 @@ where
     selected_value: Option<T>,
     options: Vec<SelectOption<T>>,
     open: bool,
+    disabled: bool,
     placeholder: String,
     auto_dismiss: bool,
     source: Option<SelectionSource<T>>,
@@ -76,6 +75,7 @@ where
             selected_value: Some(selected_value),
             options,
             open: false,
+            disabled: false,
             placeholder: "Select".into(),
             auto_dismiss: true,
             source: None,
@@ -97,6 +97,7 @@ where
             selected_value: None,
             options,
             open: false,
+            disabled: false,
             placeholder: "Select".into(),
             auto_dismiss: true,
             source: Some(SelectionSource::binding(binding)),
@@ -110,6 +111,11 @@ where
 
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -141,10 +147,7 @@ where
         self
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(T, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_select(mut self, handler: impl Fn(T, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Box::new(handler));
         self
     }
@@ -170,32 +173,56 @@ impl<T> RenderOnce for Select<T>
 where
     T: Clone + Eq + Hash + PartialEq + 'static,
 {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         debug_assert!(
             !self.options.is_empty(),
             "Select `{}` must have at least one option",
             self.id
         );
         let theme = *cx.theme();
-        let source = self.source;
-        let open_state = self.open_state;
-        let selected_value = source
+        let Self {
+            id,
+            selected_value,
+            options,
+            open,
+            disabled,
+            placeholder,
+            auto_dismiss,
+            source,
+            open_state,
+            aria_label,
+            on_toggle,
+            on_select,
+            on_dismiss,
+        } = self;
+        let source = source.or_else(|| {
+            selected_value.map(|selected_value| {
+                SelectionSource::binding(window.use_binding(
+                    (id.clone(), "selected-value"),
+                    cx,
+                    || selected_value,
+                ))
+            })
+        });
+        let open_state = open_state.or_else(|| {
+            Some(OpenState::binding(window.use_binding(
+                (id.clone(), "open-state"),
+                cx,
+                || open,
+            )))
+        });
+        let selected_value = source.as_ref().and_then(|source| source.get(cx));
+        let open = open_state
             .as_ref()
-            .and_then(|source| source.get(cx))
-            .or(self.selected_value);
-        let open = open_state.as_ref().map_or(self.open, |open_state| open_state.get(cx));
-        let label =
-            selected_label(&self.options, selected_value.as_ref(), &self.placeholder).to_string();
-        let select_handler = self.on_select.map(Rc::new);
-        let dismiss_handler = self.on_dismiss;
-        let auto_dismiss = self.auto_dismiss;
-        let id = self.id.clone();
+            .is_some_and(|open_state| open_state.get(cx));
+        let label = selected_label(&options, selected_value.as_ref(), &placeholder).to_string();
+        let select_handler = on_select.map(Rc::new);
+        let dismiss_handler = on_dismiss;
         let toggle_handler: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>> =
-            self.on_toggle.map(Rc::from);
-        let trigger_clickable = open_state.is_some() || toggle_handler.is_some();
-        let aria_label = self
-            .aria_label
-            .unwrap_or_else(|| format!("{}: {}", self.placeholder, label));
+            on_toggle.map(Rc::from);
+        let can_select = source.is_some() || select_handler.is_some();
+        let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
+        let aria_label = aria_label.unwrap_or_else(|| format!("{}: {}", placeholder, label));
         let trigger = div()
             .id((id.clone(), "trigger"))
             .h(px(30.0))
@@ -208,7 +235,7 @@ where
             .role(Role::ComboBox)
             .aria_expanded(open)
             .aria_label(aria_label)
-            .tab_index(0)
+            .when(!disabled, |this| this.tab_index(0))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(if open {
@@ -216,12 +243,16 @@ where
             } else {
                 theme.border
             })
-            .bg(if open {
-                theme.panel_alt
+            .bg(if open { theme.panel_alt } else { theme.panel })
+            .text_color(if disabled {
+                theme.text_muted.opacity(0.55)
             } else {
-                theme.panel
+                theme.text
             })
-            .text_color(theme.text)
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(trigger_clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
@@ -274,6 +305,12 @@ where
                                 cx.stop_propagation();
                             }
                         }
+                        "up" => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.set(cx, true);
+                                cx.stop_propagation();
+                            }
+                        }
                         "escape" => {
                             if let Some(open_state) = &open_for_key {
                                 open_state.close(cx);
@@ -285,8 +322,8 @@ where
                 })
             });
 
-        let mut items = Vec::with_capacity(self.options.len());
-        for option in self.options {
+        let mut items = Vec::with_capacity(options.len());
+        for option in options {
             let value = option.value;
             let mut item = MenuItem::new(option.label).checked(
                 selected_value
@@ -299,7 +336,7 @@ where
             if let Some(icon) = option.icon {
                 item = item.icon(icon);
             }
-            if source.is_some() || select_handler.is_some() || open_state.is_some() {
+            if can_select {
                 let source = source.clone();
                 let open_state = open_state.clone();
                 let handler = select_handler.clone();
@@ -326,27 +363,21 @@ where
         .open(open);
 
         if auto_dismiss {
-            match (dismiss_handler, open_state.clone()) {
-                (Some(dismiss_handler), Some(open_state)) => {
+            let open_state = open_state.clone();
+            match dismiss_handler {
+                Some(dismiss_handler) => {
                     overlay = overlay.on_dismiss(move |window, cx| {
-                        open_state.close(cx);
+                        if let Some(open_state) = &open_state {
+                            open_state.close(cx);
+                        }
                         dismiss_handler(window, cx);
                     });
                 }
-                (Some(dismiss_handler), None) => {
-                    overlay = overlay.on_dismiss(dismiss_handler);
-                }
-                (None, Some(open_state)) => {
+                None => {
                     overlay = overlay.on_dismiss(move |_window, cx| {
-                        open_state.close(cx);
-                    });
-                }
-                (None, None) => {
-                    // Auto-dismiss without explicit handler is a no-op visually
-                    // but ensures the overlay has dismiss wiring
-                    let id_for_dismiss = id.clone();
-                    overlay = overlay.on_dismiss(move |_window, _cx| {
-                        let _ = &id_for_dismiss;
+                        if let Some(open_state) = &open_state {
+                            open_state.close(cx);
+                        }
                     });
                 }
             }
@@ -397,6 +428,24 @@ mod tests {
         });
 
         assert!(select.source.is_some());
+    }
+
+    #[test]
+    fn select_starts_enabled() {
+        let select = Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")]);
+
+        assert!(!select.disabled);
+    }
+
+    #[test]
+    fn open_bound_select_stores_open_state() {
+        let mut app = gpui::TestApp::new();
+        let select = app.update(|cx| {
+            Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")])
+                .open_bound(cx.binding(false))
+        });
+
+        assert!(select.open_state.is_some());
     }
 
     #[test]

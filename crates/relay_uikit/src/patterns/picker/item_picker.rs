@@ -1,15 +1,19 @@
+use std::hash::Hash;
+
 use gpui::{
-    div, prelude::FluentBuilder, px, App, ClickEvent, ElementId, FontWeight, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled,
-    Window,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
-use relay::{Binding, Selector};
+use relay::{Binding, Selector, WindowSignalExt};
 
 use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ClickHandler, SelectionSource, SharedDismissHandler, SharedSelectHandler},
-    theme::{radius, ActiveTheme},
+    interaction::{
+        ClickHandler, OpenState, SelectionSource, SharedActionHandler, SharedDismissHandler,
+    },
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
 use super::picker_panel::{branch_picker_panel, default_picker_actions};
@@ -17,34 +21,40 @@ use super::picker_types::{PickerAction, PickerOption};
 
 /// Compact branch selector for title bars and pane toolbars.
 #[derive(IntoElement)]
-pub struct ItemPicker {
+pub struct ItemPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + ToString + 'static,
+{
     id: ElementId,
-    selected_key: &'static str,
-    items: Vec<PickerOption>,
+    selected_key: Option<K>,
+    items: Vec<PickerOption<K>>,
     actions: Vec<PickerAction>,
     open: bool,
-    selection: Option<SelectionSource<&'static str>>,
-    open_binding: Option<Binding<bool>>,
+    disabled: bool,
+    selection: Option<SelectionSource<K>>,
+    open_state: Option<OpenState>,
+    aria_label: Option<String>,
     on_toggle: Option<ClickHandler>,
-    on_select: Option<SharedSelectHandler>,
-    on_action: Option<SharedSelectHandler>,
+    on_select: Option<SharedActionHandler<K>>,
+    on_action: Option<SharedActionHandler<String>>,
     on_dismiss: Option<SharedDismissHandler>,
 }
 
-impl ItemPicker {
-    pub fn new(
-        id: impl Into<ElementId>,
-        selected_key: &'static str,
-        items: Vec<PickerOption>,
-    ) -> Self {
+impl<K> ItemPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + ToString + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, selected_key: K, items: Vec<PickerOption<K>>) -> Self {
         Self {
             id: id.into(),
-            selected_key,
+            selected_key: Some(selected_key),
             items,
             actions: default_picker_actions(),
             open: false,
+            disabled: false,
             selection: None,
-            open_binding: None,
+            open_state: None,
+            aria_label: None,
             on_toggle: None,
             on_select: None,
             on_action: None,
@@ -54,17 +64,19 @@ impl ItemPicker {
 
     pub fn bound(
         id: impl Into<ElementId>,
-        items: Vec<PickerOption>,
-        selected: Binding<&'static str>,
+        items: Vec<PickerOption<K>>,
+        selected: Binding<K>,
     ) -> Self {
         Self {
             id: id.into(),
-            selected_key: "",
+            selected_key: None,
             items,
             actions: default_picker_actions(),
             open: false,
+            disabled: false,
             selection: Some(SelectionSource::binding(selected)),
-            open_binding: None,
+            open_state: None,
+            aria_label: None,
             on_toggle: None,
             on_select: None,
             on_action: None,
@@ -73,7 +85,7 @@ impl ItemPicker {
     }
 
     pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
-        self.open_binding = Some(binding);
+        self.open_state = Some(OpenState::binding(binding));
         self
     }
 
@@ -82,17 +94,27 @@ impl ItemPicker {
         self
     }
 
-    pub fn selected_with(mut self, selection: SelectionSource<&'static str>) -> Self {
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    pub fn selected_with(mut self, selection: SelectionSource<K>) -> Self {
         self.selection = Some(selection);
         self
     }
 
-    pub fn selected_by(self, selector: Selector<&'static str>) -> Self {
+    pub fn selected_by(self, selector: Selector<K>) -> Self {
         self.selected_with(SelectionSource::selector(selector))
     }
 
     pub fn actions(mut self, actions: Vec<PickerAction>) -> Self {
         self.actions = actions;
+        self
+    }
+
+    pub fn aria_label(mut self, label: impl Into<String>) -> Self {
+        self.aria_label = Some(label.into());
         self
     }
 
@@ -104,18 +126,12 @@ impl ItemPicker {
         self
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 
-    pub fn on_action(
-        mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
-    ) -> Self {
+    pub fn on_action(mut self, handler: impl Fn(String, &mut Window, &mut App) + 'static) -> Self {
         self.on_action = Some(std::rc::Rc::new(handler));
         self
     }
@@ -128,50 +144,96 @@ impl ItemPicker {
     /// Returns the display label for the currently selected branch.
     /// Reads from a selector or binding first, falls back to selected_key.
     pub fn selected_label(&self, cx: &App) -> String {
-        let key = self.current_selected_key(cx);
+        let Some(key) = self.current_selected_key(cx) else {
+            return String::new();
+        };
+
         self.items
             .iter()
             .find(|branch| branch.key == key)
-            .map_or(key.to_string(), |branch| branch.label.to_string())
+            .map_or_else(|| key.to_string(), |branch| branch.label.to_string())
     }
 
-    fn current_selected_key(&self, cx: &App) -> &'static str {
+    fn current_selected_key(&self, cx: &App) -> Option<K> {
         self.selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
-            .unwrap_or(self.selected_key)
+            .or_else(|| self.selected_key.clone())
     }
 }
 
-impl RenderOnce for ItemPicker {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+impl<K> RenderOnce for ItemPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + ToString + 'static,
+{
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selection = self.selection;
-        let open_binding = self.open_binding;
+        let Self {
+            id,
+            selected_key,
+            items,
+            actions,
+            open,
+            disabled,
+            selection,
+            open_state,
+            aria_label,
+            on_toggle,
+            on_select,
+            on_action,
+            on_dismiss,
+        } = self;
+        let selection = selection.or_else(|| {
+            selected_key.clone().map(|selected_key| {
+                SelectionSource::binding(window.use_binding(
+                    (id.clone(), "selected-key"),
+                    cx,
+                    || selected_key,
+                ))
+            })
+        });
+        let open_state = open_state.or_else(|| {
+            Some(OpenState::binding(window.use_binding(
+                (id.clone(), "open-state"),
+                cx,
+                || open,
+            )))
+        });
         let selected_key = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
-            .unwrap_or(self.selected_key);
-        let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
-        let selected_label = self
-            .items
-            .iter()
-            .find(|branch| branch.key == selected_key)
-            .map_or(selected_key, |branch| branch.label.as_str())
-            .to_string();
-        let select_handler = self.on_select;
-        let action_handler = self.on_action;
-        let dismiss_handler = self.on_dismiss;
-        let trigger_handler = self.on_toggle;
-        let trigger_clickable = open_binding.is_some() || trigger_handler.is_some();
+            .or(selected_key);
+        let open = open_state
+            .as_ref()
+            .is_some_and(|open_state| open_state.get(cx));
+        let selected_label = selected_key
+            .as_ref()
+            .map_or_else(String::new, |selected_key| {
+                items
+                    .iter()
+                    .find(|branch| branch.key == *selected_key)
+                    .map_or_else(|| selected_key.to_string(), |branch| branch.label.clone())
+            });
+        let select_handler = on_select;
+        let action_handler = on_action;
+        let dismiss_handler = on_dismiss;
+        let toggle_handler: Option<
+            std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>,
+        > = on_toggle.map(std::rc::Rc::from);
+        let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
+        let aria_label = aria_label.unwrap_or_else(|| format!("Select item: {selected_label}"));
         let trigger = div()
-            .id("branch-selector-trigger")
+            .id((id.clone(), "trigger"))
             .h(px(28.0))
             .max_w(px(260.0))
             .px_2()
             .flex()
             .items_center()
             .gap_1()
+            .role(Role::ComboBox)
+            .aria_expanded(open)
+            .aria_label(aria_label)
+            .when(!disabled, |this| this.tab_index(0))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(if open {
@@ -180,7 +242,15 @@ impl RenderOnce for ItemPicker {
                 theme.border
             })
             .bg(if open { theme.panel_alt } else { theme.panel })
-            .text_color(theme.text_secondary)
+            .text_color(if disabled {
+                theme.text_muted.opacity(0.55)
+            } else {
+                theme.text_secondary
+            })
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(trigger_clickable, |this| {
                 this.cursor_pointer()
                     .hover(move |style| style.bg(theme.hover).border_color(theme.border_strong))
@@ -207,28 +277,54 @@ impl RenderOnce for ItemPicker {
                     .color(theme.text_muted),
             )
             .when(trigger_clickable, |this| {
-                let open_binding = open_binding.clone();
+                let open_for_click = open_state.clone();
+                let open_for_key = open_state.clone();
+                let toggle_for_click = toggle_handler.clone();
+                let toggle_for_key = toggle_for_click.clone();
                 this.on_click(move |event, window, cx| {
-                    if let Some(binding) = &open_binding {
-                        binding.update(cx, |open| {
-                            *open = !*open;
-                            true
-                        });
+                    if let Some(open_state) = &open_for_click {
+                        open_state.toggle(cx);
                     }
-                    if let Some(handler) = &trigger_handler {
+                    if let Some(handler) = &toggle_for_click {
                         handler(event, window, cx);
                     }
                     cx.stop_propagation();
                 })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    match event.keystroke.key.as_str() {
+                        "enter" | " " => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.toggle(cx);
+                            }
+                            if let Some(handler) = &toggle_for_key {
+                                handler(&ClickEvent::default(), window, cx);
+                            }
+                            cx.stop_propagation();
+                        }
+                        "down" | "up" => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.set(cx, true);
+                                cx.stop_propagation();
+                            }
+                        }
+                        "escape" => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.close(cx);
+                                cx.stop_propagation();
+                            }
+                        }
+                        _ => {}
+                    }
+                })
             });
 
         let mut overlay = AnchoredOverlay::new(
-            self.id,
+            id,
             trigger,
             branch_picker_panel(
                 selected_key,
-                self.items,
-                self.actions,
+                items,
+                actions,
                 selection.clone(),
                 select_handler,
                 action_handler,
@@ -236,13 +332,18 @@ impl RenderOnce for ItemPicker {
         )
         .open(open);
 
+        let open_state = open_state.clone();
         if let Some(dismiss_handler) = dismiss_handler {
-            overlay = overlay.on_dismiss(move |window, cx| dismiss_handler(window, cx));
+            overlay = overlay.on_dismiss(move |window, cx| {
+                if let Some(open_state) = &open_state {
+                    open_state.close(cx);
+                }
+                dismiss_handler(window, cx);
+            });
         } else {
-            let dismiss_binding = open_binding.clone();
             overlay = overlay.on_dismiss(move |_window, cx| {
-                if let Some(binding) = &dismiss_binding {
-                    binding.set(cx, false);
+                if let Some(open_state) = &open_state {
+                    open_state.close(cx);
                 }
             });
         }
@@ -254,7 +355,7 @@ impl RenderOnce for ItemPicker {
 #[cfg(test)]
 mod tests {
     use gpui::TestApp;
-    use relay::{SelectionModel, ReactiveAppExt, init};
+    use relay::{ReactiveAppExt, SelectionModel, init};
 
     use super::*;
 
@@ -334,5 +435,22 @@ mod tests {
 
         let selected = app.read(|cx| picker.selected_label(cx));
         assert_eq!(selected, "main");
+    }
+
+    #[test]
+    fn item_picker_starts_enabled() {
+        let picker = ItemPicker::new("branch-selector", "main", vec![]);
+
+        assert!(!picker.disabled);
+    }
+
+    #[test]
+    fn open_bound_item_picker_stores_open_state() {
+        let mut app = TestApp::new();
+        let picker = app.update(|cx| {
+            ItemPicker::new("branch-selector", "main", vec![]).open_bound(cx.binding(false))
+        });
+
+        assert!(picker.open_state.is_some());
     }
 }

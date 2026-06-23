@@ -12,8 +12,8 @@ use gpui::{
     AnyElement, AppContext, AsyncApp, Context, Entity, FocusHandle, IntoElement, Render, Window,
 };
 use relay::{
-    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource,
-    SelectionReconcilePolicy, Signal, use_ordered_selection_model,
+    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource, SelectionReconcilePolicy,
+    Signal, use_ordered_selection_model,
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{
@@ -316,11 +316,11 @@ mod tests {
         );
 
         app.update_entity(&root, |app, cx| {
-            app.state
-                .tasks
-                .remove_selected_by(cx, app.state.active_task.selection().selector(), |task| {
-                    task.id
-                });
+            app.state.tasks.remove_selected_by(
+                cx,
+                app.state.active_task.selection().selector(),
+                |task| task.id,
+            );
         });
 
         let reselected = app.update_entity(&root, |app, cx| {

@@ -120,7 +120,10 @@ impl RenderOnce for Menu {
         // than before (e.g. dropdown reopened with different content).
         let item_count = self.items.len();
         {
-            let needs_reset = state.read(cx).open_submenu.is_some_and(|idx| idx >= item_count);
+            let needs_reset = state
+                .read(cx)
+                .open_submenu
+                .is_some_and(|idx| idx >= item_count);
             if needs_reset {
                 state.update(cx, |state, cx| {
                     if state.close_submenu() {

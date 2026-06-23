@@ -237,11 +237,10 @@ impl SessionListView {
     }
 
     fn remove_active(&self, cx: &mut App) {
-        self.sessions.remove_selected_by(
-            cx,
-            self.selection.selection().selector(),
-            |session| session.id,
-        );
+        self.sessions
+            .remove_selected_by(cx, self.selection.selection().selector(), |session| {
+                session.id
+            });
     }
 }
 

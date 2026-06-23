@@ -315,7 +315,10 @@ impl RenderOnce for NumberInput {
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .map(|this| match layout {
                 NumberInputLayout::ControlsAroundValue => {
                     this.child(decrement).child(value).child(increment)
@@ -464,8 +467,9 @@ fn editable_number_value(
         })
         .when(handle_key, |this| {
             this.on_key_down(move |event, window, cx| {
+                let mut consumed = false;
                 if let Some(binding) = &text_binding {
-                    handle_bound_integer_platform_key(
+                    consumed = handle_bound_integer_platform_key(
                         binding,
                         &value_binding,
                         &on_change,
@@ -481,7 +485,9 @@ fn editable_number_value(
                 if let Some(on_key) = &on_key {
                     on_key(event, window, cx);
                 }
-                cx.stop_propagation();
+                if consumed {
+                    cx.stop_propagation();
+                }
             })
         })
         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
@@ -566,12 +572,14 @@ fn handle_bound_integer_platform_key(
     allow_negative: bool,
     window: &mut Window,
     cx: &mut App,
-) {
+) -> bool {
     let _allow_negative = allow_negative;
+    let mut consumed = false;
     let mut should_parse = false;
     let mut should_sync_text = false;
     text_binding.update(cx, |state| {
         let action = state.handle_platform_key(event);
+        consumed = action.should_notify();
         match action.contract_kind_for(InputValueKind::Number) {
             InputActionKind::Changed(InputValueKind::Number) => {
                 should_parse = true;
@@ -603,6 +611,8 @@ fn handle_bound_integer_platform_key(
             cx,
         );
     }
+
+    consumed
 }
 
 #[expect(

@@ -245,10 +245,7 @@ pub(super) fn render(
         ))
 }
 
-fn theme_select(
-    state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement {
+fn theme_select(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement {
     let open_binding = state.settings_select_open.clone();
     let is_open = open_binding.get(cx);
 
@@ -284,10 +281,7 @@ fn theme_select(
     })
 }
 
-fn theme_controls(
-    state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
-) -> impl IntoElement {
+fn theme_controls(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement {
     div()
         .flex()
         .items_start()
@@ -320,13 +314,17 @@ fn accent_picker(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     let accent_choice = state.accent_choice.clone();
-    ColorPicker::new("settings-accent-picker", accent_choice.get(cx), vec![
-        ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
-        ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
-        ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
-        ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
-        ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
-    ])
+    ColorPicker::new(
+        "settings-accent-picker",
+        accent_choice.get(cx),
+        vec![
+            ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
+            ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
+            ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
+            ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
+            ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
+        ],
+    )
     .on_select({
         let accent_choice = accent_choice.clone();
         move |key, _hsla, _window, cx| {

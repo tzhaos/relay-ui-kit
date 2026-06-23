@@ -2,6 +2,12 @@
 //!
 //! This layer depends on core and provides reusable command, display, layout,
 //! navigation, overlay, scroll, and composite patterns.
+//!
+//! Patterns are where component correctness is tested against realistic product
+//! composition: selection churn, overlay lifecycle, async surfaces, retained row
+//! identity, and multi-pane workbench layouts. They should not reintroduce a
+//! second state model; instead they adapt Relay bindings, open state, and
+//! selection sources into reusable UI assemblies.
 
 pub mod command;
 pub mod display;
@@ -44,7 +50,6 @@ pub use shell::{
 };
 
 // Composite pattern exports
-pub use picker::actions_menu::ActionsMenu;
 pub use command_menu::{CommandMenu, CommandMenuItem, CommandMenuItemKind};
 pub use diff_view::{DiffHunk, DiffLine, DiffLineKind, DiffView};
 pub use file_viewer::{FileKind, FileViewer};
@@ -54,6 +59,7 @@ pub use output_line::{OutputLine, OutputLineStyle};
 pub use output_log::OutputLog;
 pub use output_resource::{OutputResourceSnapshot, output_resource_snapshot};
 pub use output_surface::OutputSurface;
+pub use picker::actions_menu::ActionsMenu;
 pub use picker::{ItemPicker, PickerAction, PickerOption};
 pub use quick_action::QuickAction;
 pub use session_row::SessionRow;

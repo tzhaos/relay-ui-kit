@@ -13,7 +13,7 @@
 
 use std::{hash::Hash, rc::Rc};
 
-use gpui::{App, ClickEvent, Hsla, KeyDownEvent, Window};
+use gpui::{App, ClickEvent, KeyDownEvent, Window};
 use relay::{Binding, MultiSelectionModel, OrderedSelectionModel, SelectionModel, Selector};
 
 // ---------------------------------------------------------------------------
@@ -90,11 +90,6 @@ impl OpenState {
 // Selection handlers
 // ---------------------------------------------------------------------------
 
-/// Fires when a value is selected from a list, menu, or picker.  Receives a
-/// compile-time string key identifying the selected item.
-pub type SelectHandler = Box<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
-pub type SharedSelectHandler = Rc<dyn Fn(&'static str, &mut Window, &mut App) + 'static>;
-
 /// Type-erased adapter from Relay's keyed [`Selector`] to boolean component
 /// selection state.
 #[derive(Clone)]
@@ -104,6 +99,20 @@ pub struct SelectionBinding {
 }
 
 impl SelectionBinding {
+    /// Bind one component instance to `key` in a Relay binding.
+    pub fn binding<K>(binding: Binding<K>, key: K) -> Self
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        let read_binding = binding.clone();
+        let read_key = key.clone();
+
+        Self {
+            is_selected: Rc::new(move |cx| read_binding.get(cx) == read_key.clone()),
+            select: Rc::new(move |cx| binding.set(cx, key.clone())),
+        }
+    }
+
     /// Bind one component instance to `key` in a Relay selector.
     pub fn selector<K>(selector: Selector<K>, key: K) -> Self
     where
@@ -254,16 +263,11 @@ pub type KeyCaptureHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) ->
 // Color picker handler
 // ---------------------------------------------------------------------------
 
-/// Fires when a color is selected from a color picker.  Receives the named
-/// key and the chosen [`Hsla`] value.
-pub type ColorSelectHandler = Box<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
-pub type SharedColorSelectHandler = Rc<dyn Fn(&'static str, Hsla, &mut Window, &mut App) + 'static>;
-
 #[cfg(test)]
 mod tests {
     use gpui::{AppContext, Context, TestApp};
     use relay::{
-        MultiSelectionModel, OrderedSelectionModel, SelectionModel, ReactiveAppExt,
+        MultiSelectionModel, OrderedSelectionModel, ReactiveAppExt, SelectionModel,
         SelectionReconcilePolicy, Signal, init, use_multi_selection_model,
         use_ordered_selection_model,
     };

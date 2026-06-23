@@ -1,6 +1,6 @@
 use gpui::{
     AnyElement, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    Role, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -27,6 +27,8 @@ impl DialogPanel {
             .id(self.id)
             .w(px(self.width))
             .max_w_full()
+            .role(Role::Dialog)
+            .aria_label(self.title.clone())
             .rounded(px(radius::LG))
             .bg(theme.panel)
             .border_1()

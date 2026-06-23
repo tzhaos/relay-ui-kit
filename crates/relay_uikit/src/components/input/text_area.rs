@@ -7,10 +7,13 @@ use relay::Binding;
 
 use crate::{
     interaction::KeyHandler,
-    theme::{ActiveTheme, DISABLED_OPACITY, radius, space},
+    theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
-use super::TextInputState;
+use super::{
+    TextInputState,
+    platform_input::{PointerSelectionState, SingleLineInputStyle, multiline_input},
+};
 
 /// A multi-line text area view. The host owns the editable state.
 #[derive(IntoElement)]
@@ -114,13 +117,26 @@ impl RenderOnce for TextArea {
         let theme = *cx.theme();
         let binding = self.binding;
         let is_focused = self.focus.is_focused(window) || self.focused;
+        let root_id = self.id.clone();
+        let placeholder = self.placeholder.clone();
+        let focus = self.focus.clone();
+        let pointer = binding.as_ref().map(|_| {
+            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+                PointerSelectionState::default()
+            })
+        });
         let (before, selection, after, _cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
                 let sel_range = state.selection_range();
                 let value = state.value().to_string();
                 if let Some((start, end)) = sel_range {
-                    (value[..start].to_string(), value[start..end].to_string(), value[end..].to_string(), false)
+                    (
+                        value[..start].to_string(),
+                        value[start..end].to_string(),
+                        value[end..].to_string(),
+                        false,
+                    )
                 } else {
                     let (before, after) = state.split();
                     (before.to_string(), String::new(), after.to_string(), true)
@@ -138,12 +154,13 @@ impl RenderOnce for TextArea {
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before.is_empty() && after.is_empty() && !has_selection && !is_focused;
+        let show_placeholder =
+            before.is_empty() && after.is_empty() && !has_selection && !is_focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
         let disabled = self.disabled;
 
         div()
-            .id(self.id)
+            .id(root_id.clone())
             .min_h(px(min_height))
             .w_full()
             .p_2()
@@ -155,7 +172,10 @@ impl RenderOnce for TextArea {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
                     .when(!is_focused, |this| {
@@ -166,34 +186,75 @@ impl RenderOnce for TextArea {
                 div()
                     .w_full()
                     .min_h_0()
-                    .flex()
-                    .flex_col()
-                    .gap(px(space::XXS))
+                    .relative()
                     .text_sm()
                     .line_height(px(20.0))
                     .when(show_placeholder, |this| {
-                        this.text_color(theme.text_muted).child(self.placeholder)
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(multiline_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                show_placeholder,
+                                disabled,
+                                self.min_rows,
+                            ))
+                        } else {
+                            this.text_color(theme.text_muted).child(placeholder.clone())
+                        }
                     })
                     .when(!show_placeholder, |this| {
-                        this.text_color(theme.text).children(text_area_lines(
-                            before,
-                            after,
-                            is_focused,
-                            theme.accent,
-                        ))
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(multiline_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                show_placeholder,
+                                disabled,
+                                self.min_rows,
+                            ))
+                        } else {
+                            this.text_color(theme.text).children(text_area_lines(
+                                before,
+                                after,
+                                is_focused,
+                                theme.accent,
+                            ))
+                        }
                     }),
             )
             .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
+                    let mut consumed = false;
                     if let Some(binding) = &binding {
                         binding.update(cx, |state| {
-                            state.handle_multiline_key(event).should_notify()
+                            let action = state.handle_platform_multiline_key(event);
+                            consumed = action.should_notify();
+                            consumed
                         });
                     }
                     if let Some(on_key) = &on_key {
                         on_key(event, window, cx);
                     }
-                    cx.stop_propagation();
+                    if consumed {
+                        cx.stop_propagation();
+                    }
                 })
             })
             .when(!disabled, |this| {

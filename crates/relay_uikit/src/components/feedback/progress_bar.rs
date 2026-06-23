@@ -3,11 +3,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px, relative,
 };
 
-use crate::{
-    motion::MotionExt,
-    theme::ActiveTheme,
-    tone::Tone,
-};
+use crate::{motion::MotionExt, theme::ActiveTheme, tone::Tone};
 
 use super::shared::progress_ratio;
 

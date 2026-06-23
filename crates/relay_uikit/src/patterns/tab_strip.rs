@@ -99,8 +99,9 @@ mod tests {
         let (selection, tab) = app.update(|cx| {
             init(cx);
             let selection = SelectionModel::new(cx, Some("terminal"));
-            let tab = TabStrip::new("preview-tab", "Preview")
-                .active_with(SelectionBinding::selection_model(selection.clone(), "preview"));
+            let tab = TabStrip::new("preview-tab", "Preview").active_with(
+                SelectionBinding::selection_model(selection.clone(), "preview"),
+            );
             (selection, tab)
         });
 

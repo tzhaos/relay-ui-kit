@@ -1,14 +1,14 @@
 use crate::icon::IconName;
 
 /// A selectable Git branch row in [`super::BranchSelector`].
-pub struct PickerOption {
-    pub(super) key: &'static str,
+pub struct PickerOption<K> {
+    pub(super) key: K,
     pub(super) label: String,
     pub(super) detail: Option<String>,
 }
 
-impl PickerOption {
-    pub fn new(key: &'static str, label: impl Into<String>) -> Self {
+impl<K> PickerOption<K> {
+    pub fn new(key: K, label: impl Into<String>) -> Self {
         Self {
             key,
             label: label.into(),
@@ -24,15 +24,15 @@ impl PickerOption {
 
 /// A non-destructive helper action shown at the bottom of a branch picker.
 pub struct PickerAction {
-    pub(super) key: &'static str,
+    pub(super) key: String,
     pub(super) label: String,
     pub(super) icon: IconName,
 }
 
 impl PickerAction {
-    pub fn new(key: &'static str, label: impl Into<String>, icon: IconName) -> Self {
+    pub fn new(key: impl Into<String>, label: impl Into<String>, icon: IconName) -> Self {
         Self {
-            key,
+            key: key.into(),
             label: label.into(),
             icon,
         }

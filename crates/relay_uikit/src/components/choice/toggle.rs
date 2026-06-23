@@ -100,7 +100,10 @@ impl RenderOnce for Toggle {
             .role(Role::Switch)
             .tab_index(0)
             .aria_toggled(Toggled::from(on))
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {

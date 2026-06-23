@@ -1,7 +1,6 @@
 pub(crate) use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 pub(crate) use crate::{

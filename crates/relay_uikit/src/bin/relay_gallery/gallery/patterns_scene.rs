@@ -3,24 +3,23 @@ use gpui::{
     Styled, Window, div, px,
 };
 use relay::{
-    KeyedSubViews, OrderedSelectionModel, ReactiveAppExt, ReactiveView, Selector, Signal,
-    SignalVecExt, SelectionReconcilePolicy, use_ordered_selection_model,
-    view::reactive_render,
+    KeyedSubViews, OrderedSelectionModel, ReactiveAppExt, ReactiveView, SelectionReconcilePolicy,
+    Selector, Signal, SignalVecExt, use_ordered_selection_model, view::reactive_render,
 };
 use relay_uikit::patterns::{
-    PaneToolbar, TopToolbar, WorkspaceBreadcrumb,
+    CommandPalette, CommandRow, ItemPicker, KeybindingShortcut, OutputLog, OutputSurface,
+    PaneToolbar, PickerAction, PickerOption, QuickAction, SessionRow, SourceView, TabStrip,
+    TaskRow, TaskRowData, TopToolbar, WorkspaceBreadcrumb,
     display::KeyValue,
     layout::ListSection,
     navigation::{Tab, Tabs},
+    output_resource_snapshot,
     overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
-    output_resource_snapshot, CommandPalette, CommandRow, ItemPicker, KeybindingShortcut,
-    OutputLog, OutputSurface, PickerAction, PickerOption, QuickAction, SessionRow, SourceView,
-    TabStrip, TaskRow, TaskRowData,
 };
 use relay_uikit::{
-    interaction::{SelectionBinding, SelectionSource},
     ActiveTheme, Button, IconButton, IconName, Label, ListItem, ListItemSpacing, StatusDot, Theme,
     Tone,
+    interaction::{SelectionBinding, SelectionSource},
 };
 
 use super::{
@@ -37,7 +36,11 @@ pub(super) fn render(
     let overlay_event_text = state.overlay_event.get(cx);
 
     let mut stack = scene_stack()
-        .child(section(cx, "Layout patterns", layout_patterns(state, theme)))
+        .child(section(
+            cx,
+            "Layout patterns",
+            layout_patterns(state, theme),
+        ))
         .child(section(
             cx,
             "Display patterns",
@@ -80,43 +83,75 @@ pub(super) fn render(
 
 // ── Composite pattern samples ─────────────────────────────────────────────
 
-fn row_patterns(state: &GalleryState, _cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    div().flex().flex_col().gap_2()
+fn row_patterns(
+    state: &GalleryState,
+    _cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
         .child(
-            TaskRow::new("pat-task", TaskRowData {
-                title: "Implement relay patterns".into(),
-                status_label: "ACTIVE".into(),
-                status_tone: Tone::Accent,
-                branch: Some("relay/patterns".into()),
-                changed: 5,
-                review: 2,
-            }).selected_by(state.pattern_row_selection.clone(), "task")
+            TaskRow::new(
+                "pat-task",
+                TaskRowData {
+                    title: "Implement relay patterns".into(),
+                    status_label: "ACTIVE".into(),
+                    status_tone: Tone::Accent,
+                    branch: Some("relay/patterns".into()),
+                    changed: 5,
+                    review: 2,
+                },
+            )
+            .selected_by(state.pattern_row_selection.clone(), "task"),
         )
         .child(
             SessionRow::new("pat-session", "codex", "relay/patterns")
                 .status(Tone::Accent)
-                .active_by(state.pattern_row_selection.clone(), "session")
+                .active_by(state.pattern_row_selection.clone(), "session"),
         )
 }
 
-fn tab_patterns(state: &GalleryState, _cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    div().flex().flex_col().gap_2()
-        .child(
-            div().flex().gap_1()
-                .child(TabStrip::new("pat-tab1", "Terminal")
+fn tab_patterns(
+    state: &GalleryState,
+    _cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    div().flex().flex_col().gap_2().child(
+        div()
+            .flex()
+            .gap_1()
+            .child(
+                TabStrip::new("pat-tab1", "Terminal")
                     .active_by(state.pattern_tab_selection.clone(), "terminal")
-                    .status(Tone::Accent))
-                .child(TabStrip::new("pat-tab2", "Preview")
+                    .status(Tone::Accent),
+            )
+            .child(
+                TabStrip::new("pat-tab2", "Preview")
                     .active_by(state.pattern_tab_selection.clone(), "preview")
-                    .status(Tone::Muted))
-                .child(TabStrip::new("pat-tab3", "Review")
-                    .active_by(state.pattern_tab_selection.clone(), "review"))
-        )
+                    .status(Tone::Muted),
+            )
+            .child(
+                TabStrip::new("pat-tab3", "Review")
+                    .active_by(state.pattern_tab_selection.clone(), "review"),
+            ),
+    )
 }
 
 fn composer_sample(_cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    div().h(px(40.0)).border_1().rounded(px(8.0)).border_color(gpui::rgb(0x333333)).px_2().flex().items_center()
-        .child(div().text_sm().text_color(gpui::rgb(0x666666)).child("Type a message..."))
+    div()
+        .h(px(40.0))
+        .border_1()
+        .rounded(px(8.0))
+        .border_color(gpui::rgb(0x333333))
+        .px_2()
+        .flex()
+        .items_center()
+        .child(
+            div()
+                .text_sm()
+                .text_color(gpui::rgb(0x666666))
+                .child("Type a message..."),
+        )
 }
 
 fn output_patterns(
@@ -140,18 +175,27 @@ fn output_patterns(
     let lines = output.lines;
     let refresh_host = host.clone();
 
-    div().flex().flex_col().gap_2()
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
         .child(
-            OutputSurface::new("pat-output",
-                OutputLog::new(lines).prompt("> "),
-            ).connected(connected)
+            OutputSurface::new("pat-output", OutputLog::new(lines).prompt("> "))
+                .connected(connected),
         )
         .child(
-            div().flex().items_center().gap_2()
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
                 .child(
                     Button::new(
                         "pat-output-refresh",
-                        if loading { "Refreshing" } else { "Refresh output" },
+                        if loading {
+                            "Refreshing"
+                        } else {
+                            "Refresh output"
+                        },
                     )
                     .icon(IconName::RefreshCw)
                     .ghost()
@@ -162,22 +206,36 @@ fn output_patterns(
                         });
                     }),
                 )
-                .child(div().text_xs().text_color(theme.text_muted).child(
-                    format!("{status_text} - connected: {connected}"),
-                )),
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(format!("{status_text} - connected: {connected}")),
+                ),
         )
 }
 
 fn quick_action_sample(state: &GalleryState) -> impl IntoElement {
     let log = state.overlay_event.clone();
-    div().flex().gap_2().flex_wrap()
-        .child(QuickAction::new("qa-codex", "Launch Codex", "codex").on_click({
-            let log = log.clone();
-            move |_, _, cx: &mut App| { log.set(cx, "QuickAction: Launch Codex".into()); }
-        }))
-        .child(QuickAction::new("qa-build", "Build", "cargo build").on_click({
-            move |_, _, cx: &mut App| { log.set(cx, "QuickAction: Build".into()); }
-        }))
+    div()
+        .flex()
+        .gap_2()
+        .flex_wrap()
+        .child(
+            QuickAction::new("qa-codex", "Launch Codex", "codex").on_click({
+                let log = log.clone();
+                move |_, _, cx: &mut App| {
+                    log.set(cx, "QuickAction: Launch Codex".into());
+                }
+            }),
+        )
+        .child(
+            QuickAction::new("qa-build", "Build", "cargo build").on_click({
+                move |_, _, cx: &mut App| {
+                    log.set(cx, "QuickAction: Build".into());
+                }
+            }),
+        )
 }
 
 fn command_picker_patterns(
@@ -188,9 +246,15 @@ fn command_picker_patterns(
     let selected_command = pattern_command_label(state.pattern_command_selection.get(cx));
     let selected_branch = pattern_branch_label(state.pattern_branch_selection.get(cx));
 
-    div().grid().grid_cols(2).gap_4()
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_4()
         .child(
-            div().flex().flex_col().gap_2()
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
                 .child(command_palette_sample(state))
                 .child(KeyValue::new("Selected command", selected_command)),
         )
@@ -284,7 +348,7 @@ fn pattern_command_event(
     }
 }
 
-fn pattern_branch_options() -> Vec<PickerOption> {
+fn pattern_branch_options() -> Vec<PickerOption<&'static str>> {
     vec![
         PickerOption::new("main", "main").detail("default workspace"),
         PickerOption::new("relay/runtime", "relay/runtime").detail("crates/relay"),
@@ -367,7 +431,13 @@ pub(super) struct PatternProjectPicker {
 impl PatternProjectPicker {
     pub(super) fn new(cx: &mut Context<Self>) -> Self {
         let projects = cx.signal(vec![
-            PatternProject::new(1, "relay-ui-kit", "workspace / main", Tone::Accent, "ACTIVE"),
+            PatternProject::new(
+                1,
+                "relay-ui-kit",
+                "workspace / main",
+                Tone::Accent,
+                "ACTIVE",
+            ),
             PatternProject::new(2, "relay", "crates / runtime", Tone::Info, "READY"),
             PatternProject::new(3, "gallery", "bin / relay_gallery", Tone::Warning, "REVIEW"),
         ]);
@@ -486,13 +556,11 @@ impl ReactiveView for PatternProjectPicker {
                                 this.rename_selected(cx);
                             })),
                     )
-                    .child(
-                        Button::new("pattern-project-add", "Add")
-                            .ghost()
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.add_project(cx);
-                            })),
-                    ),
+                    .child(Button::new("pattern-project-add", "Add").ghost().on_click(
+                        cx.listener(|this, _event, _window, cx| {
+                            this.add_project(cx);
+                        }),
+                    )),
             )
             .child(
                 div()
@@ -588,9 +656,13 @@ impl Render for PatternProjectRow {
 
 fn viewer_patterns(theme: Theme) -> impl IntoElement {
     div().flex().flex_col().gap_2().child(
-        div().h(px(120.0)).border_1().border_color(theme.border).rounded(px(8.0)).overflow_hidden().child(
-            SourceView::new(VIEWER_SAMPLE).language("rust")
-        )
+        div()
+            .h(px(120.0))
+            .border_1()
+            .border_color(theme.border)
+            .rounded(px(8.0))
+            .overflow_hidden()
+            .child(SourceView::new(VIEWER_SAMPLE).language("rust")),
     )
 }
 
@@ -693,19 +765,17 @@ fn display_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
 }
 
 fn navigation_patterns(state: &GalleryState) -> impl IntoElement {
-    div().max_w(px(640.0)).child(
-        Tabs::bound(
-            "patterns-navigation-tabs",
-            vec![
-                Tab::new("files", "Files").icon(IconName::FileText),
-                Tab::new("diff", "Diff").icon(IconName::FileDiff).count(12),
-                Tab::new("review", "Review")
-                    .icon(IconName::MessageSquareText)
-                    .count(3),
-            ],
-            state.seg_tab.clone(),
-        ),
-    )
+    div().max_w(px(640.0)).child(Tabs::bound(
+        "patterns-navigation-tabs",
+        vec![
+            Tab::new("files", "Files").icon(IconName::FileText),
+            Tab::new("diff", "Diff").icon(IconName::FileDiff).count(12),
+            Tab::new("review", "Review")
+                .icon(IconName::MessageSquareText)
+                .count(3),
+        ],
+        state.seg_tab.clone(),
+    ))
 }
 
 fn overlay_patterns(
@@ -721,19 +791,15 @@ fn overlay_patterns(
         .items_start()
         .gap_4()
         .flex_wrap()
-        .child(
-            div().w(px(260.0)).child(
-                Select::bound(
-                    "patterns-overlay-select",
-                    state.theme_choice.clone(),
-                    vec![
-                        SelectOption::new("system", "System").detail("Follow OS appearance"),
-                        SelectOption::new("light", "Light"),
-                        SelectOption::new("dark", "Dark"),
-                    ],
-                ),
-            ),
-        )
+        .child(div().w(px(260.0)).child(Select::bound(
+            "patterns-overlay-select",
+            state.theme_choice.clone(),
+            vec![
+                SelectOption::new("system", "System").detail("Follow OS appearance"),
+                SelectOption::new("light", "Light"),
+                SelectOption::new("dark", "Dark"),
+            ],
+        )))
         .child(
             div().w(px(220.0)).child(
                 DropdownMenu::new(
@@ -744,7 +810,10 @@ fn overlay_patterns(
                         .on_click({
                             let open = state.command_context_open.clone();
                             move |_event, _window, cx| {
-                                open.update(cx, |v| { *v = !*v; true });
+                                open.update(cx, |v| {
+                                    *v = !*v;
+                                    true
+                                });
                             }
                         }),
                     vec![
@@ -759,7 +828,9 @@ fn overlay_patterns(
                 .min_width(200.0)
                 .on_dismiss({
                     let open = state.command_context_open.clone();
-                    move |_window, cx| { open.set(cx, false); }
+                    move |_window, cx| {
+                        open.set(cx, false);
+                    }
                 }),
             ),
         )
@@ -995,7 +1066,10 @@ mod tests {
         assert_eq!(initial, ("New terminal", "main"));
 
         app.update_entity(&root, |gallery, cx| {
-            gallery.state.pattern_command_selection.select(cx, "review:open");
+            gallery
+                .state
+                .pattern_command_selection
+                .select(cx, "review:open");
             gallery
                 .state
                 .pattern_branch_selection

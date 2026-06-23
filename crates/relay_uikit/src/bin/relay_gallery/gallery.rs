@@ -6,12 +6,12 @@
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, App, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement,
-    Render, Styled, Window, div, px,
+    AnyElement, App, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
+    Styled, Window, div, px,
 };
 use relay::{
-    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource, Selector, Signal,
-    SignalVecExt, SelectionReconcilePolicy, use_ordered_selection_model,
+    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, Resource, SelectionReconcilePolicy,
+    Selector, Signal, SignalVecExt, use_ordered_selection_model,
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
@@ -98,7 +98,7 @@ pub struct GalleryState {
     pub core_tree_src_open: Binding<bool>,
     pub core_tree_components_open: Binding<bool>,
     pub core_tree_list_open: Binding<bool>,
-    pub core_tree_nodes: Memo<Vec<TreeNode>>,
+    pub core_tree_nodes: Memo<Vec<TreeNode<&'static str>>>,
     pub settings_dirty: Memo<bool>,
 }
 
@@ -110,7 +110,10 @@ pub struct FeedbackToast {
 
 impl FeedbackToast {
     fn new(id: u64, message: impl Into<String>) -> Self {
-        Self { id, message: message.into() }
+        Self {
+            id,
+            message: message.into(),
+        }
     }
 }
 
@@ -124,11 +127,7 @@ impl GalleryState {
             let components = core_tree_components_open.clone();
             let list = core_tree_list_open.clone();
             cx.derived(move |cx| {
-                build_core_tree_nodes(
-                    src.get(cx),
-                    components.get(cx),
-                    list.get(cx),
-                )
+                build_core_tree_nodes(src.get(cx), components.get(cx), list.get(cx))
             })
         };
 
@@ -220,7 +219,11 @@ fn refreshed_pattern_output_lines(revision: u64) -> Vec<OutputLine> {
     ]
 }
 
-fn build_core_tree_nodes(src_open: bool, components_open: bool, list_open: bool) -> Vec<TreeNode> {
+fn build_core_tree_nodes(
+    src_open: bool,
+    components_open: bool,
+    list_open: bool,
+) -> Vec<TreeNode<&'static str>> {
     use relay_uikit::IconName;
 
     let mut nodes = vec![TreeNode::new("tree:src", IconName::Folder, "src").expanded(src_open)];
@@ -269,7 +272,9 @@ impl GalleryScenesApp {
     pub fn add_feedback_toast(&mut self, cx: &mut Context<Self>, message: impl Into<String>) {
         self.state.feedback_toast_serial = self.state.feedback_toast_serial.wrapping_add(1);
         let id = self.state.feedback_toast_serial;
-        self.state.feedback_toasts.push(cx, FeedbackToast::new(id, message));
+        self.state
+            .feedback_toasts
+            .push(cx, FeedbackToast::new(id, message));
         let len = self.state.feedback_toasts.read(cx, |toasts| toasts.len());
         if len > FEEDBACK_TOAST_LIMIT {
             self.state.feedback_toasts.remove(cx, 0);

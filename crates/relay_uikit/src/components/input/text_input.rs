@@ -146,8 +146,10 @@ impl RenderOnce for TextInput {
         let focus_for_mousedown = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder =
-            before_str.is_empty() && after_str.is_empty() && selection_str.is_empty() && !is_focused;
+        let show_placeholder = before_str.is_empty()
+            && after_str.is_empty()
+            && selection_str.is_empty()
+            && !is_focused;
         let disabled = self.disabled;
 
         div()
@@ -166,10 +168,13 @@ impl RenderOnce for TextInput {
             .tab_index(0)
             .role(Role::TextInput)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
-                    .when(!disabled, |this| {
-                        this.cursor(gpui::CursorStyle::IBeam)
-                            .when(!is_focused, |this| {
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
+            .when(!disabled, |this| {
+                this.cursor(gpui::CursorStyle::IBeam)
+                    .when(!is_focused, |this| {
                         this.hover(move |s| s.border_color(theme.border_strong))
                     })
             })
@@ -251,13 +256,20 @@ impl RenderOnce for TextInput {
             .when(handle_key, |this| {
                 let binding_clone = binding.clone();
                 this.on_key_down(move |event, window, cx| {
+                    let mut consumed = false;
                     if let Some(binding) = &binding_clone {
-                        binding.update(cx, |state| state.handle_platform_key(event).should_notify());
+                        binding.update(cx, |state| {
+                            let action = state.handle_platform_key(event);
+                            consumed = action.should_notify();
+                            consumed
+                        });
                     }
                     if let Some(on_key) = &on_key {
                         on_key(event, window, cx);
                     }
-                    cx.stop_propagation();
+                    if consumed {
+                        cx.stop_propagation();
+                    }
                 })
             })
             .when(!disabled, |this| {

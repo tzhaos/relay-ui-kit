@@ -114,7 +114,10 @@ impl RenderOnce for Stepper {
             .flex()
             .items_center()
             .gap_1()
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .child(
                 div()
                     .h_full()
@@ -231,7 +234,8 @@ fn stepper_button(
         .items_center()
         .justify_center()
         .when(is_dimmed, |this| {
-            this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed)
+            this.opacity(DISABLED_OPACITY)
+                .cursor(gpui::CursorStyle::OperationNotAllowed)
         })
         .when(interactive, |this| {
             this.cursor_pointer()

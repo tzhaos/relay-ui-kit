@@ -149,8 +149,16 @@ impl RenderOnce for SearchField {
                 )
             }
         };
-        let placeholder_text = if is_empty { self.placeholder.clone() } else { String::new() };
-        let text_color = if is_empty { theme.text_muted } else { theme.text };
+        let placeholder_text = if is_empty {
+            self.placeholder.clone()
+        } else {
+            String::new()
+        };
+        let text_color = if is_empty {
+            theme.text_muted
+        } else {
+            theme.text
+        };
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
@@ -176,7 +184,10 @@ impl RenderOnce for SearchField {
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
                     .hover(move |style| style.border_color(theme.border_strong))
@@ -240,7 +251,12 @@ impl RenderOnce for SearchField {
                         } else {
                             this.child(div().child(before_str))
                                 .when(!sel_str.is_empty(), |this| {
-                                    this.child(div().bg(theme.selection).text_color(theme.text).child(sel_str))
+                                    this.child(
+                                        div()
+                                            .bg(theme.selection)
+                                            .text_color(theme.text)
+                                            .child(sel_str),
+                                    )
                                 })
                                 .when(cursor_visible, |this| {
                                     this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))

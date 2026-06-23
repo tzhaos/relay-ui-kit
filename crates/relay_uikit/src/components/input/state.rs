@@ -315,7 +315,8 @@ impl TextInputState {
             });
 
         self.value.replace_range(range.clone(), new_text);
-        self.marked_range = (!new_text.is_empty()).then_some(range.start..range.start + new_text.len());
+        self.marked_range =
+            (!new_text.is_empty()).then_some(range.start..range.start + new_text.len());
 
         if let Some(selected_range_utf16) = new_selected_range_utf16 {
             let selected_range = self.range_from_utf16_in_text(new_text, &selected_range_utf16);
@@ -981,7 +982,10 @@ mod tests {
     #[test]
     fn platform_key_mode_ignores_printable_text() {
         let mut s = TextInputState::with_text("x");
-        assert_eq!(s.handle_platform_key(&key("a", Some("a"))), TextInputAction::Ignored);
+        assert_eq!(
+            s.handle_platform_key(&key("a", Some("a"))),
+            TextInputAction::Ignored
+        );
         assert_eq!(s.value(), "x");
     }
 
@@ -1089,7 +1093,7 @@ mod tests {
     #[test]
     fn split_does_not_panic_on_invalid_cursor() {
         let mut s = TextInputState::with_text("héllo"); // é is 2 bytes
-                                                        // Set cursor to a non-char-boundary position (byte 2, inside é).
+        // Set cursor to a non-char-boundary position (byte 2, inside é).
         s.cursor = 2;
         // split() should clamp to the nearest boundary, not panic.
         let (before, after) = s.split();
@@ -1489,7 +1493,7 @@ mod tests {
         assert_eq!(s.cursor(), 5); // after "hello"
         s.handle_key(&ctrl_right);
         assert_eq!(s.cursor(), 6); // after ","
-                                   // Whitespace segment is skipped, so we jump to the end of "world"
+        // Whitespace segment is skipped, so we jump to the end of "world"
         s.handle_key(&ctrl_right);
         assert_eq!(s.cursor(), 12); // after "world" (skipped space)
         s.handle_key(&ctrl_right);

@@ -1,28 +1,28 @@
-use std::rc::Rc;
+use std::{hash::Hash, rc::Rc};
 
 use gpui::{
     App, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     StatefulInteractiveElement, Styled, Window, div, hsla, linear_color_stop, linear_gradient,
     prelude::FluentBuilder, px,
 };
-use relay::Binding;
+use relay::{Binding, WindowSignalExt};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ColorSelectHandler, SharedColorSelectHandler},
+    interaction::{ActionHandler, SelectionSource, SharedActionHandler},
     theme::{ActiveTheme, radius, space},
 };
 
 /// A selectable color preset for [`ColorPicker`].
 #[derive(Clone)]
-pub struct ColorPreset {
-    key: &'static str,
+pub struct ColorPreset<K> {
+    key: K,
     label: String,
     color: Hsla,
 }
 
-impl ColorPreset {
-    pub fn new(key: &'static str, label: impl Into<String>, color: Hsla) -> Self {
+impl<K> ColorPreset<K> {
+    pub fn new(key: K, label: impl Into<String>, color: Hsla) -> Self {
         Self {
             key,
             label: label.into(),
@@ -30,8 +30,8 @@ impl ColorPreset {
         }
     }
 
-    pub fn key(&self) -> &'static str {
-        self.key
+    pub fn key(&self) -> &K {
+        &self.key
     }
 
     pub fn color(&self) -> Hsla {
@@ -45,73 +45,96 @@ impl ColorPreset {
 
 /// A compact preset-based color picker.
 #[derive(IntoElement)]
-pub struct ColorPicker {
+pub struct ColorPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
-    selected_key: &'static str,
-    presets: Vec<ColorPreset>,
-    binding: Option<Binding<&'static str>>,
-    on_select: Option<ColorSelectHandler>,
+    selected_key: Option<K>,
+    presets: Vec<ColorPreset<K>>,
+    selection: Option<SelectionSource<K>>,
+    on_select: Option<ActionHandler<(K, Hsla)>>,
 }
 
-impl ColorPicker {
-    pub fn new(
-        id: impl Into<ElementId>,
-        selected_key: &'static str,
-        presets: Vec<ColorPreset>,
-    ) -> Self {
+impl<K> ColorPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, selected_key: K, presets: Vec<ColorPreset<K>>) -> Self {
         Self {
             id: id.into(),
-            selected_key,
+            selected_key: Some(selected_key),
             presets,
-            binding: None,
+            selection: None,
             on_select: None,
         }
     }
 
     pub fn bound(
         id: impl Into<ElementId>,
-        binding: Binding<&'static str>,
-        presets: Vec<ColorPreset>,
+        binding: Binding<K>,
+        presets: Vec<ColorPreset<K>>,
     ) -> Self {
         Self {
             id: id.into(),
-            selected_key: "",
+            selected_key: None,
             presets,
-            binding: Some(binding),
+            selection: Some(SelectionSource::binding(binding)),
             on_select: None,
         }
     }
 
-    pub fn selected_key(&self) -> &'static str {
-        self.selected_key
+    pub fn selected_key(&self) -> Option<&K> {
+        self.selected_key.as_ref()
     }
 
-    pub fn selected_preset(&self) -> Option<&ColorPreset> {
-        self.presets
-            .iter()
-            .find(|preset| preset.key == self.selected_key)
+    pub fn selected_preset(&self) -> Option<&ColorPreset<K>> {
+        self.selected_key.as_ref().and_then(|selected_key| {
+            self.presets
+                .iter()
+                .find(|preset| preset.key == *selected_key)
+        })
     }
 
-    pub fn on_select(
-        mut self,
-        handler: impl Fn(&'static str, Hsla, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.on_select = Some(Box::new(handler));
+    pub fn on_select(mut self, handler: impl Fn(K, Hsla, &mut Window, &mut App) + 'static) -> Self {
+        self.on_select = Some(Box::new(move |(key, color), window, cx| {
+            handler(key, color, window, cx);
+        }));
         self
     }
 }
 
-impl RenderOnce for ColorPicker {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+impl<K> RenderOnce for ColorPicker<K>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let binding = self.binding;
-        let selected_key = binding.as_ref().map_or(self.selected_key, |b| b.get(cx));
-        let selected = self
-            .presets
-            .iter()
-            .find(|p| p.key == selected_key)
+        let Self {
+            id,
+            selected_key,
+            presets,
+            selection,
+            on_select,
+        } = self;
+        let selection = selection.or_else(|| {
+            selected_key.clone().map(|selected_key| {
+                SelectionSource::binding(window.use_binding(
+                    (id.clone(), "selected-preset"),
+                    cx,
+                    || selected_key,
+                ))
+            })
+        });
+        let selected_key = selection
+            .as_ref()
+            .and_then(|selection| selection.get(cx))
+            .or(selected_key);
+        let selected = selected_key
+            .as_ref()
+            .and_then(|selected_key| presets.iter().find(|preset| preset.key == *selected_key))
             .cloned()
-            .or_else(|| self.presets.first().cloned());
+            .or_else(|| presets.first().cloned());
         let selected_color = selected
             .as_ref()
             .map_or(theme.accent, |preset| preset.color());
@@ -120,24 +143,26 @@ impl RenderOnce for ColorPicker {
             .map_or("Custom", |preset| preset.label.as_str())
             .to_string();
         let selected_value = color_to_hex(selected_color);
-        let select_handler: Option<SharedColorSelectHandler> = self.on_select.map(Rc::from);
+        let select_handler: Option<SharedActionHandler<(K, Hsla)>> = on_select.map(Rc::from);
         let mut grid = div().flex().flex_wrap().gap_2();
 
-        for preset in self.presets {
-            let is_selected = preset.key == selected_key;
-            let preset_binding = binding.clone();
+        for (index, preset) in presets.into_iter().enumerate() {
+            let is_selected = selected_key
+                .as_ref()
+                .is_some_and(|selected_key| preset.key == *selected_key);
+            let preset_selection = selection.clone();
             let preset_handler = select_handler.clone();
             grid = grid.child(preset_button(
-                (self.id.clone(), preset.key),
+                ("color-preset", index),
                 preset,
                 is_selected,
-                preset_binding,
+                preset_selection,
                 preset_handler,
             ));
         }
 
         div()
-            .id(self.id)
+            .id(id)
             .w(px(320.0))
             .p_2()
             .flex()
@@ -200,16 +225,19 @@ impl RenderOnce for ColorPicker {
     }
 }
 
-fn preset_button(
+fn preset_button<K>(
     id: impl Into<ElementId>,
-    preset: ColorPreset,
+    preset: ColorPreset<K>,
     selected: bool,
-    binding: Option<Binding<&'static str>>,
-    handler: Option<SharedColorSelectHandler>,
-) -> impl IntoElement {
-    let key = preset.key;
+    selection: Option<SelectionSource<K>>,
+    handler: Option<SharedActionHandler<(K, Hsla)>>,
+) -> impl IntoElement
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    let key = preset.key.clone();
     let color = preset.color;
-    let interactive = binding.is_some() || handler.is_some();
+    let interactive = selection.is_some() || handler.is_some();
 
     div()
         .id(id)
@@ -231,12 +259,11 @@ fn preset_button(
             gpui::transparent_black()
         })
         .when(interactive, |this| {
-            this.cursor_pointer()
-                .hover(move |style| {
-                    style
-                        .bg(color.opacity(0.12))
-                        .border_color(color.opacity(0.72))
-                })
+            this.cursor_pointer().hover(move |style| {
+                style
+                    .bg(color.opacity(0.12))
+                    .border_color(color.opacity(0.72))
+            })
         })
         .child(
             div()
@@ -261,11 +288,11 @@ fn preset_button(
         })
         .when(interactive, |this| {
             this.on_click(move |_event, window, cx| {
-                if let Some(binding) = &binding {
-                    binding.set(cx, key);
+                if let Some(selection) = &selection {
+                    selection.select(cx, key.clone());
                 }
                 if let Some(handler) = &handler {
-                    handler(key, color, window, cx);
+                    handler((key.clone(), color), window, cx);
                 }
                 cx.stop_propagation();
             })
@@ -322,6 +349,9 @@ mod tests {
             ],
         );
 
-        assert_eq!(picker.selected_preset().map(ColorPreset::key), Some("blue"));
+        assert_eq!(
+            picker.selected_preset().map(ColorPreset::key),
+            Some(&"blue")
+        );
     }
 }

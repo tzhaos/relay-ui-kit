@@ -1,7 +1,7 @@
-use gpui::{div, px, Context, IntoElement, ParentElement, Styled};
+use gpui::{Context, IntoElement, ParentElement, Styled, div, px};
 use relay_uikit::patterns::{
-    output_resource_snapshot, OutputLog, OutputSurface, Pane, PaneToolbar, TabStrip, TopToolbar,
-    WorkspaceBreadcrumb,
+    OutputLog, OutputSurface, Pane, PaneToolbar, TabStrip, TopToolbar, WorkspaceBreadcrumb,
+    output_resource_snapshot,
 };
 use relay_uikit::{IconButton, IconName, Theme};
 
@@ -45,7 +45,7 @@ pub(super) fn center_pane(
                         "workbench-output",
                         OutputLog::new(output_lines).prompt("> "),
                     )
-                        .connected(connected),
+                    .connected(connected),
                 ),
             ),
     )

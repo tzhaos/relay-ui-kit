@@ -102,12 +102,10 @@ impl RenderOnce for ThemePreviewCard {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx) == self.kind.key());
-        let border = if selected {
-            theme.accent
-        } else {
-            theme.border
-        };
+        let selected = binding
+            .as_ref()
+            .map_or(self.selected, |b| b.get(cx) == self.kind.key());
+        let border = if selected { theme.accent } else { theme.border };
         let id = self.id;
         let handler = self.on_click;
         let kind = self.kind;

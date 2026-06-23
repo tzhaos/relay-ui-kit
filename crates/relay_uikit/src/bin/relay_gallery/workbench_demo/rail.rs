@@ -127,11 +127,8 @@ impl TaskListView {
     }
 
     fn remove_active(&self, cx: &mut App) {
-        self.tasks.remove_selected_by(
-            cx,
-            self.selection.selection().selector(),
-            |task| task.id,
-        );
+        self.tasks
+            .remove_selected_by(cx, self.selection.selection().selector(), |task| task.id);
     }
 }
 
@@ -229,7 +226,9 @@ mod tests {
             let selection = relay::use_ordered_selection_model(
                 cx,
                 Some(1),
-                move |cx| tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect()),
+                move |cx| {
+                    tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect())
+                },
                 relay::SelectionReconcilePolicy::SelectFirst,
             );
             TaskListView::new(cx, tasks, selection)
@@ -260,7 +259,9 @@ mod tests {
             let selection = relay::use_ordered_selection_model(
                 cx,
                 Some(1),
-                move |cx| tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect()),
+                move |cx| {
+                    tasks_for_selection.read(cx, |tasks| tasks.iter().map(|task| task.id).collect())
+                },
                 relay::SelectionReconcilePolicy::SelectFirst,
             );
             TaskListView::new(cx, tasks, selection)
