@@ -30,7 +30,8 @@ pub struct Query<T, E> {
 /// GPUI entity's lifetime.
 pub struct SourceQuery<T, E> {
     query: Query<T, E>,
-    _effect: Effect,
+    _effect: Rc<Effect>,
+    reload_latest: Rc<dyn Fn(&mut App)>,
 }
 
 /// Create a pending query model.
@@ -233,17 +234,30 @@ impl<T: 'static, E: 'static> SourceQuery<T, E> {
         let latest_source_for_sources = latest_source.clone();
         let initialized = Cell::new(false);
         let query_for_effect = query.clone();
+        let source = Rc::new(source);
+        let build_load = Rc::new(build_load);
+        let source_for_watch = source.clone();
+        let source_for_reload = source.clone();
+        let build_load_for_effect = build_load.clone();
+        let build_load_for_reload = build_load.clone();
+        let query_for_reload = query.clone();
+
+        let reload_latest: Rc<dyn Fn(&mut App)> = Rc::new(move |cx| {
+            let source = source_for_reload(cx);
+            let load = build_load_for_reload(source);
+            query_for_reload.reload(cx, load);
+        });
 
         let effect = cx.watch(
             move |cx| {
-                *latest_source_for_sources.borrow_mut() = Some(source(cx));
+                *latest_source_for_sources.borrow_mut() = Some(source_for_watch(cx));
             },
             move |cx| {
                 let Some(source) = latest_source.borrow_mut().take() else {
                     return;
                 };
 
-                let load = build_load(source);
+                let load = build_load_for_effect(source);
                 if initialized.replace(true) {
                     query_for_effect.reload(cx, load);
                 } else {
@@ -254,13 +268,32 @@ impl<T: 'static, E: 'static> SourceQuery<T, E> {
 
         Self {
             query,
-            _effect: effect,
+            _effect: Rc::new(effect),
+            reload_latest,
         }
     }
 
     /// Return the underlying query model.
     pub fn query(&self) -> &Query<T, E> {
         &self.query
+    }
+
+    /// Reload the query from the current source snapshot.
+    ///
+    /// This re-evaluates the source closure on the GPUI app thread and then
+    /// uses [`Query::reload`] so the latest ready value remains visible while
+    /// refresh work is in flight.
+    pub fn reload(&self, cx: &mut App) {
+        (self.reload_latest)(cx);
+    }
+
+    /// Invalidate the query by immediately refreshing it from the latest source.
+    ///
+    /// Relay does not currently model a separate stale marker, so invalidation
+    /// is an eager reload. This is a semantic helper for mutation follow-up or
+    /// command handlers that conceptually "invalidate and refetch."
+    pub fn invalidate(&self, cx: &mut App) {
+        self.reload(cx);
     }
 }
 
@@ -329,6 +362,16 @@ impl<T, E> Clone for Query<T, E> {
             ready: self.ready.clone(),
             errored: self.errored.clone(),
             has_latest: self.has_latest.clone(),
+        }
+    }
+}
+
+impl<T, E> Clone for SourceQuery<T, E> {
+    fn clone(&self) -> Self {
+        Self {
+            query: self.query.clone(),
+            _effect: self._effect.clone(),
+            reload_latest: self.reload_latest.clone(),
         }
     }
 }
@@ -463,6 +506,69 @@ mod tests {
         assert_eq!(&*load_inputs.borrow(), &[1, 2]);
         cx.read_entity(&entity, |host, cx| {
             assert_eq!(host.query.query().get(cx), ResourceState::Reloading(10));
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Ready(20));
+        });
+    }
+
+    #[gpui::test]
+    fn source_query_manual_reload_uses_current_source_snapshot(cx: &mut TestAppContext) {
+        struct QueryHost {
+            source: crate::Signal<i32>,
+            query: SourceQuery<i32, &'static str>,
+        }
+
+        impl QueryHost {
+            fn new(cx: &mut Context<Self>, load_inputs: Rc<RefCell<Vec<i32>>>) -> Self {
+                init(cx);
+                let source = crate::Signal::new(cx, 1);
+                let source_for_query = source.clone();
+                let query = use_query_from_source(
+                    cx,
+                    move |cx| source_for_query.get(cx),
+                    move |value| {
+                        load_inputs.borrow_mut().push(value);
+                        move |cx| async move {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(20))
+                                .await;
+                            Ok(value * 10)
+                        }
+                    },
+                );
+
+                Self { source, query }
+            }
+        }
+
+        let load_inputs = Rc::new(RefCell::new(Vec::new()));
+        let entity = cx.update({
+            let load_inputs = load_inputs.clone();
+            move |cx| cx.new(|cx| QueryHost::new(cx, load_inputs))
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.update_entity(&entity, |host, cx| {
+            host.source.set(cx, 2);
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.update_entity(&entity, |host, cx| {
+            host.query.reload(cx);
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[1, 2, 2]);
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Reloading(20));
         });
 
         cx.executor().advance_clock(Duration::from_millis(20));

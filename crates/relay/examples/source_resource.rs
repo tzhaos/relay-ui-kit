@@ -55,10 +55,7 @@ impl SourceResourceDemo {
     }
 
     fn reload_current(&self, cx: &mut App) {
-        let task = self.selected_task.get(cx);
-        self.report
-            .query()
-            .reload(cx, move |cx| load_report(cx, task));
+        self.report.reload(cx);
     }
 }
 
@@ -92,7 +89,7 @@ impl ReactiveView for SourceResourceDemo {
             .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(if loading {
                 "The previous report remains visible while the selected task reloads."
             } else {
-                "Changing the selected task automatically reloads the report."
+                "Changing the selected task reloads automatically, and the query can also refresh itself from the latest source."
             }))
             .child(
                 div()
