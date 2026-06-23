@@ -28,6 +28,8 @@ First v2 composables are now implemented in `crates/relay/src/composables/`:
 - `use_mutation`
 - `SelectionModel` via `use_selection_model`
 - `OrderedSelectionModel` via `use_ordered_selection_model`
+- `MultiSelectionModel` via `use_multi_selection_model`
+- `TreeProjection` via `use_tree_projection`
 - `FormModel` via `use_form_model`
 - `FocusState` via `use_focus_state`
 
@@ -38,6 +40,8 @@ These are intentionally modest first steps:
 - `Mutation` standardizes write-side async state, stale completion suppression, retained last-success state, follow-up hooks, and optimistic rollback behavior.
 - `SelectionModel` packages `Selector<K>` with reusable selection-presence and item-projection helpers.
 - `OrderedSelectionModel` packages source-driven ordered keys, automatic reconcile, and latest-order navigation for picker/list surfaces.
+- `MultiSelectionModel` packages active selection plus marked keys, source-driven reconcile, range selection, and select-all helpers for tree/panel surfaces.
+- `TreeProjection` packages visible tree flattening, expansion state, visible key order, and ancestor reveal for tree/panel surfaces.
 - `FormModel` removes the awkward lifetime split between `Form` and its dirty memo, and adds submitted-state semantics.
 - `FocusState` keeps GPUI `FocusHandle` as the source of truth while making focus a composable signal-backed state source.
 
@@ -91,6 +95,8 @@ Status: started
 Progress so far:
 
 - `use_ordered_selection_model(...)` is landed for single-selection list/picker surfaces with source-driven reconcile and navigation.
+- `use_multi_selection_model(...)` is landed for active-plus-marked selection surfaces with source-driven reconcile, range selection, and select-all helpers.
+- `use_tree_projection(...)` is landed for visible tree projection, expansion state, and ancestor reveal.
 
 Targets:
 
@@ -136,6 +142,11 @@ Suggested migration order:
 Migration rule:
 
 Every migration should reduce controller glue or lifetime bookkeeping. If a composable does not clearly improve the surface, we should refine or remove it.
+
+Progress so far:
+
+- `examples/command_picker.rs` now uses `use_ordered_selection_model(...)` instead of host-side selection reconcile glue.
+- `examples/tree_projection.rs` now demonstrates `use_tree_projection(...)` and `use_multi_selection_model(...)` composed into a panel-like surface.
 
 ## Explicit non-goals
 

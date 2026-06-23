@@ -15,8 +15,8 @@ use gpui::{
 };
 use gpui_platform::application;
 use relay::{
-    Binding, Memo, ReactiveAppExt, ReactiveView, SelectedItemExt, Selector, Signal, init,
-    view::reactive_render,
+    Binding, Memo, OrderedSelectionModel, ReactiveAppExt, ReactiveView, SelectionReconcilePolicy,
+    Signal, init, use_ordered_selection_model, view::reactive_render,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,7 +48,7 @@ struct CommandPickerSurface {
     query: Binding<String>,
     visible_commands: Memo<Vec<CommandItem>>,
     selected_command: Memo<Option<CommandItem>>,
-    selection: Selector<&'static str>,
+    selection: OrderedSelectionModel<&'static str>,
     last_action: Signal<String>,
 }
 
@@ -58,15 +58,25 @@ impl CommandPickerSurface {
 
         let commands = cx.signal(default_commands());
         let query = cx.binding(String::new());
-        let selection = cx.selector(Some("open-workspace"));
         let commands_for_visible = commands.clone();
         let query_for_visible = query.clone();
         let visible_commands = cx.derived(move |cx| {
             let query = query_for_visible.get(cx);
             commands_for_visible.read(cx, |commands| visible_commands(commands, &query))
         });
+        let visible_commands_for_selection = visible_commands.clone();
+        let selection = use_ordered_selection_model(
+            cx,
+            Some("open-workspace"),
+            move |cx| {
+                visible_commands_for_selection.read(cx, |commands| {
+                    commands.iter().map(|command| command.id).collect()
+                })
+            },
+            SelectionReconcilePolicy::SelectFirst,
+        );
         let selected_command =
-            visible_commands.selected_by(cx, selection.clone(), |command| command.id);
+            selection.selected_from_memo(cx, &visible_commands, |command| command.id);
 
         Self {
             commands,
@@ -79,19 +89,15 @@ impl CommandPickerSurface {
     }
 
     fn set_query(&self, cx: &mut App, query: impl Into<String>) {
-        cx.batch(|cx| {
-            self.query.set(cx, query.into());
-            self.reconcile_selection(cx);
-        });
+        self.query.set(cx, query.into());
     }
 
     fn select_next(&self, cx: &mut App) -> bool {
-        self.selection.select_next(cx, self.visible_command_ids())
+        self.selection.select_next(cx)
     }
 
     fn select_previous(&self, cx: &mut App) -> bool {
-        self.selection
-            .select_previous(cx, self.visible_command_ids())
+        self.selection.select_previous(cx)
     }
 
     fn execute_selected(&self, cx: &mut App) -> bool {
@@ -107,13 +113,10 @@ impl CommandPickerSurface {
 
     #[cfg(test)]
     fn remove_command(&self, cx: &mut App, id: &'static str) {
-        cx.batch(|cx| {
-            self.commands.update(cx, |commands| {
-                let before = commands.len();
-                commands.retain(|command| command.id != id);
-                before != commands.len()
-            });
-            self.reconcile_selection(cx);
+        self.commands.update(cx, |commands| {
+            let before = commands.len();
+            commands.retain(|command| command.id != id);
+            before != commands.len()
         });
     }
 
@@ -125,31 +128,12 @@ impl CommandPickerSurface {
             _ => false,
         }
     }
-
-    fn reconcile_selection(&self, cx: &mut App) {
-        let ids = self.visible_command_ids();
-        self.selection
-            .reconcile_or_select_first(cx, ids.iter().copied());
-    }
-
-    fn visible_command_ids(&self) -> Vec<&'static str> {
-        let query = self.query.signal().get_untracked();
-        self.commands.peek(|commands| {
-            commands
-                .iter()
-                .filter(|command| command_matches(command, &query))
-                .map(|command| command.id)
-                .collect()
-        })
-    }
 }
 
 impl ReactiveView for CommandPickerSurface {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let commands = self.visible_commands.get(cx);
-        self.selection
-            .reconcile_or_select_first_by(cx, &commands, |command| command.id);
-
+        let total_commands = self.commands.read(cx, |commands| commands.len());
         let selected = self.selection.get(cx);
         let query = self.query.get(cx);
         let last_action = self.last_action.get(cx);
@@ -237,6 +221,12 @@ impl ReactiveView for CommandPickerSurface {
                     query.as_str()
                 }
             )))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(0xa1a1aa))
+                    .child(format!("Showing {} of {total_commands}", commands.len())),
+            )
             .child(
                 div().flex().flex_col().gap_1().children(
                     commands
