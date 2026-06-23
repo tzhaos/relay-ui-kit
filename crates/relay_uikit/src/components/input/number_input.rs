@@ -209,7 +209,7 @@ impl NumberInput {
 }
 
 impl RenderOnce for NumberInput {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let NumberInput {
             id,
             value: current_value,
@@ -235,6 +235,7 @@ impl RenderOnce for NumberInput {
         let value_id = format!("{id}-value");
         let value = match editable {
             Some(mut editable) => {
+                editable.focused = editable.focused || editable.focus.is_focused(window);
                 if let Some(binding) = &editable.binding {
                     let state = binding.get(cx);
                     let (before, after) = state.split();
@@ -365,10 +366,10 @@ fn editable_number_value(
 ) -> impl IntoElement {
     let focus_for_click = editable.focus.clone();
     let focus_for_mouse_down = editable.focus.clone();
+    let is_focused = editable.focused;
     let text_binding = editable.binding;
     let on_key = editable.on_key;
-    let show_fallback =
-        editable.before.is_empty() && editable.after.is_empty() && !editable.focused;
+    let show_fallback = editable.before.is_empty() && editable.after.is_empty() && !is_focused;
     let allow_negative = min.is_none_or(|min| min < 0);
     let handle_key = text_binding.is_some() || on_key.is_some();
 
@@ -390,7 +391,7 @@ fn editable_number_value(
         .tab_index(0)
         .key_context(editable.key_context)
         .cursor(gpui::CursorStyle::IBeam)
-        .when(editable.focused, |this| this.bg(theme.accent_bg))
+        .when(is_focused, |this| this.bg(theme.accent_bg))
         .when(show_fallback, |this| {
             this.text_color(theme.text_muted)
                 .child(fallback.to_string())
@@ -398,7 +399,7 @@ fn editable_number_value(
         .when(!show_fallback, |this| {
             this.text_color(theme.text)
                 .child(editable.before)
-                .when(editable.focused, |this| {
+                .when(is_focused, |this| {
                     this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
                 })
                 .child(editable.after)

@@ -44,6 +44,49 @@ pub type CancelHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 pub type SharedCancelHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
 // ---------------------------------------------------------------------------
+// Open / expanded state
+// ---------------------------------------------------------------------------
+
+/// Type-erased adapter for host-owned open/closed state.
+#[derive(Clone)]
+pub struct OpenState {
+    get: Rc<dyn Fn(&App) -> bool + 'static>,
+    set: Rc<dyn Fn(&mut App, bool) + 'static>,
+}
+
+impl OpenState {
+    /// Adapt a Relay boolean binding as an open-state source.
+    pub fn binding(binding: Binding<bool>) -> Self {
+        let read_binding = binding.clone();
+
+        Self {
+            get: Rc::new(move |cx| read_binding.get(cx)),
+            set: Rc::new(move |cx, open| binding.set(cx, open)),
+        }
+    }
+
+    /// Return whether the controlled surface is open.
+    pub fn get(&self, cx: &App) -> bool {
+        (self.get)(cx)
+    }
+
+    /// Set the controlled surface open state.
+    pub fn set(&self, cx: &mut App, open: bool) {
+        (self.set)(cx, open);
+    }
+
+    /// Toggle the controlled surface open state.
+    pub fn toggle(&self, cx: &mut App) {
+        self.set(cx, !self.get(cx));
+    }
+
+    /// Close the controlled surface.
+    pub fn close(&self, cx: &mut App) {
+        self.set(cx, false);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Selection handlers
 // ---------------------------------------------------------------------------
 
@@ -225,7 +268,7 @@ mod tests {
         use_ordered_selection_model,
     };
 
-    use super::{SelectionBinding, SelectionSource};
+    use super::{OpenState, SelectionBinding, SelectionSource};
 
     #[test]
     fn selection_binding_selects_selector_key() {
@@ -387,6 +430,27 @@ mod tests {
         app.read(|cx| {
             assert_eq!(selection.active(cx), Some("review"));
             assert_eq!(selection.selected_keys(cx), vec!["review"]);
+        });
+    }
+
+    #[test]
+    fn open_state_binding_reads_and_toggles_value() {
+        let mut app = TestApp::new();
+        let open = app.update(|cx| {
+            init(cx);
+            OpenState::binding(cx.binding(false))
+        });
+
+        app.read(|cx| {
+            assert!(!open.get(cx));
+        });
+
+        app.update(|cx| {
+            open.toggle(cx);
+            assert!(open.get(cx));
+
+            open.close(cx);
+            assert!(!open.get(cx));
         });
     }
 }

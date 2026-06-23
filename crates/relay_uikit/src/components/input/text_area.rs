@@ -110,9 +110,10 @@ impl TextArea {
 }
 
 impl RenderOnce for TextArea {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
+        let is_focused = self.focus.is_focused(window) || self.focused;
         let (before, selection, after, _cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
@@ -128,7 +129,7 @@ impl RenderOnce for TextArea {
             None => (self.before, String::new(), self.after, false),
         };
         let has_selection = !selection.is_empty();
-        let border = if self.focused {
+        let border = if is_focused {
             theme.accent
         } else {
             theme.border_strong
@@ -137,7 +138,7 @@ impl RenderOnce for TextArea {
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before.is_empty() && after.is_empty() && !has_selection && !self.focused;
+        let show_placeholder = before.is_empty() && after.is_empty() && !has_selection && !is_focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
         let disabled = self.disabled;
 
@@ -157,7 +158,7 @@ impl RenderOnce for TextArea {
             .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
             .when(!disabled, |this| {
                 this.cursor(gpui::CursorStyle::IBeam)
-                    .when(!self.focused, |this| {
+                    .when(!is_focused, |this| {
                         this.hover(move |s| s.border_color(theme.border_strong))
                     })
             })
@@ -177,7 +178,7 @@ impl RenderOnce for TextArea {
                         this.text_color(theme.text).children(text_area_lines(
                             before,
                             after,
-                            self.focused,
+                            is_focused,
                             theme.accent,
                         ))
                     }),

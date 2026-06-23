@@ -99,10 +99,11 @@ impl SearchField {
 }
 
 impl RenderOnce for SearchField {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
-        let (display_text, before_str, sel_str, after_str, cursor_visible, is_empty) = match binding.as_ref() {
+        let is_focused = self.focus.is_focused(window);
+        let (before_str, sel_str, after_str, cursor_visible, is_empty) = match binding.as_ref() {
             Some(b) => {
                 let state = b.get(cx);
                 let val = state.value().to_string();
@@ -112,15 +113,27 @@ impl RenderOnce for SearchField {
                     let before = val[..start].to_string();
                     let selected = val[start..end].to_string();
                     let after = val[end..].to_string();
-                    (val.clone(), before, selected, after, false, is_empty)
+                    (before, selected, after, false, is_empty)
                 } else {
                     let (before, after) = state.split();
-                    (val.clone(), before.to_string(), String::new(), after.to_string(), false, is_empty)
+                    (
+                        before.to_string(),
+                        String::new(),
+                        after.to_string(),
+                        is_focused,
+                        is_empty,
+                    )
                 }
             }
             None => {
                 let val = self.value.clone();
-                (val.clone(), String::new(), String::new(), String::new(), false, val.is_empty())
+                (
+                    val,
+                    String::new(),
+                    String::new(),
+                    is_focused,
+                    self.value.is_empty(),
+                )
             }
         };
         let placeholder_text = if is_empty { self.placeholder.clone() } else { String::new() };
@@ -142,7 +155,11 @@ impl RenderOnce for SearchField {
             .rounded(px(radius::MD))
             .bg(theme.panel)
             .border_1()
-            .border_color(theme.border)
+            .border_color(if is_focused {
+                theme.accent
+            } else {
+                theme.border
+            })
             .track_focus(&self.focus)
             .tab_index(0)
             .key_context(self.key_context)

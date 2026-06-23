@@ -1,4 +1,4 @@
-use gpui::{DefiniteLength, MouseButton};
+use gpui::{ClickEvent, DefiniteLength, KeyDownEvent, MouseButton, Role, SharedString, Toggled};
 
 use crate::component_prelude::*;
 
@@ -31,6 +31,10 @@ pub struct ListItem {
     indent_step: f32,
     start_slot: Option<AnyElement>,
     end_slot: Option<AnyElement>,
+    role: Option<Role>,
+    aria_label: Option<SharedString>,
+    toggled: Option<bool>,
+    tab_index: Option<isize>,
     on_click: Option<ClickHandler>,
     children: Vec<AnyElement>,
 }
@@ -48,6 +52,10 @@ impl ListItem {
             indent_step: 14.0,
             start_slot: None,
             end_slot: None,
+            role: None,
+            aria_label: None,
+            toggled: None,
+            tab_index: None,
             on_click: None,
             children: Vec::new(),
         }
@@ -94,6 +102,26 @@ impl ListItem {
         self
     }
 
+    pub fn role(mut self, role: Role) -> Self {
+        self.role = Some(role);
+        self
+    }
+
+    pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = Some(label.into());
+        self
+    }
+
+    pub fn toggled(mut self, toggled: bool) -> Self {
+        self.toggled = Some(toggled);
+        self
+    }
+
+    pub fn tab_index(mut self, tab_index: isize) -> Self {
+        self.tab_index = Some(tab_index);
+        self
+    }
+
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -120,6 +148,7 @@ impl RenderOnce for ListItem {
         let selected = self.selected;
         let clickable = self.on_click.is_some() && !disabled;
         let selectable = self.selectable && !disabled;
+        let tab_index = self.tab_index.or_else(|| clickable.then_some(0));
 
         div()
             .id(self.id)
@@ -133,6 +162,13 @@ impl RenderOnce for ListItem {
             .gap_2()
             .rounded(px(radius::MD))
             .border_1()
+            .when_some(self.role, |this, role| this.role(role))
+            .when_some(self.aria_label, |this, label| this.aria_label(label))
+            .when_some(self.toggled, |this, toggled| {
+                this.aria_toggled(Toggled::from(toggled))
+            })
+            .aria_selected(selected)
+            .when_some(tab_index, |this, tab_index| this.tab_index(tab_index))
             .border_color(if selected {
                 theme.accent_border
             } else {
@@ -167,9 +203,19 @@ impl RenderOnce for ListItem {
             )
             .children(self.end_slot)
             .when_some(self.on_click.filter(|_| clickable), |this, handler| {
+                let handler = std::rc::Rc::new(handler);
+                let handler_for_key = handler.clone();
                 this.on_click(move |event, window, cx| {
                     handler(event, window, cx);
                     cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    if event.keystroke.key.as_str() == " "
+                        || event.keystroke.key.as_str() == "enter"
+                    {
+                        handler_for_key(&ClickEvent::default(), window, cx);
+                        cx.stop_propagation();
+                    }
                 })
             })
     }

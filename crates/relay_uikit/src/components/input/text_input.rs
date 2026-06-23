@@ -103,15 +103,15 @@ impl TextInput {
 }
 
 impl RenderOnce for TextInput {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let binding = self.binding;
+        let is_focused = self.focus.is_focused(window) || self.focused;
         let (before_str, selection_str, after_str, cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
                 let sel_range = state.selection_range();
                 let value = state.value().to_string();
-                let cursor = state.cursor();
                 if let Some((start, end)) = sel_range {
                     let before = value[..start].to_string();
                     let selected = value[start..end].to_string();
@@ -124,7 +124,7 @@ impl RenderOnce for TextInput {
             }
             None => (self.before, String::new(), self.after, false),
         };
-        let border = if self.focused {
+        let border = if is_focused {
             theme.accent
         } else {
             theme.border_strong
@@ -133,9 +133,9 @@ impl RenderOnce for TextInput {
         let focus_for_mousedown = self.focus.clone();
         let on_key = self.on_key;
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before_str.is_empty() && after_str.is_empty() && selection_str.is_empty() && !self.focused;
+        let show_placeholder =
+            before_str.is_empty() && after_str.is_empty() && selection_str.is_empty() && !is_focused;
         let disabled = self.disabled;
-        let is_focused = self.focused;
 
         div()
             .id(self.id)
@@ -154,9 +154,9 @@ impl RenderOnce for TextInput {
             .role(Role::TextInput)
             .key_context(self.key_context)
             .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
-            .when(!disabled, |this| {
-                this.cursor(gpui::CursorStyle::IBeam)
-                    .when(!is_focused, |this| {
+                    .when(!disabled, |this| {
+                        this.cursor(gpui::CursorStyle::IBeam)
+                            .when(!is_focused, |this| {
                         this.hover(move |s| s.border_color(theme.border_strong))
                     })
             })

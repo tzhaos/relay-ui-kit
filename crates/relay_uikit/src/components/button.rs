@@ -139,6 +139,7 @@ impl RenderOnce for Button {
         .gap(4.0)
         .text_size(12.0)
         .font_weight(FontWeight::MEDIUM)
+        .aria_label(self.label.clone())
         .disabled(self.disabled)
         .on_click(self.on_click);
 
@@ -158,6 +159,7 @@ pub struct IconButton {
     size: IconSize,
     active: bool,
     disabled: bool,
+    aria_label: Option<String>,
     on_click: Option<ClickHandler>,
 }
 
@@ -169,6 +171,7 @@ impl IconButton {
             size: IconSize::Small,
             active: false,
             disabled: false,
+            aria_label: None,
             on_click: None,
         }
     }
@@ -186,6 +189,11 @@ impl IconButton {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    pub fn aria_label(mut self, label: impl Into<String>) -> Self {
+        self.aria_label = Some(label.into());
         self
     }
 
@@ -207,7 +215,7 @@ impl RenderOnce for IconButton {
             theme.text_muted
         };
 
-        ButtonLike::new(
+        let mut button = ButtonLike::new(
             self.id,
             ButtonLikeColors::new(
                 gpui::transparent_black(),
@@ -219,8 +227,14 @@ impl RenderOnce for IconButton {
             ),
         )
         .size(26.0)
+        .toggled(self.active)
         .disabled(self.disabled)
-        .on_click(self.on_click)
-        .child(Icon::new(self.icon).size(self.size).color(fg))
+        .on_click(self.on_click);
+
+        if let Some(label) = self.aria_label {
+            button = button.aria_label(label);
+        }
+
+        button.child(Icon::new(self.icon).size(self.size).color(fg))
     }
 }

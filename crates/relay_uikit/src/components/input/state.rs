@@ -1,4 +1,6 @@
-use gpui::KeyDownEvent;
+use std::ops::Range;
+
+use gpui::{KeyDownEvent, UTF16Selection};
 use unicode_segmentation::UnicodeSegmentation;
 
 // ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ pub struct TextInputState {
     value: String,
     cursor: usize,
     selection_anchor: Option<usize>,
+    marked_range: Option<Range<usize>>,
 }
 
 /// What a keystroke did to the model.
@@ -116,6 +119,7 @@ impl TextInputState {
             value,
             cursor,
             selection_anchor: None,
+            marked_range: None,
         }
     }
 
@@ -129,6 +133,11 @@ impl TextInputState {
 
     pub fn is_empty(&self) -> bool {
         self.value.is_empty()
+    }
+
+    /// Returns the IME/composition range in UTF-8 byte offsets.
+    pub fn marked_range(&self) -> Option<Range<usize>> {
+        self.marked_range.clone()
     }
 
     // ------------------------------------------------------------------
@@ -164,6 +173,31 @@ impl TextInputState {
         self.selection_anchor = None;
     }
 
+    /// Returns the current selection in UTF-16 code unit offsets.
+    pub fn selected_text_range_utf16(&self) -> UTF16Selection {
+        let range = self
+            .selection_range()
+            .map(|(start, end)| start..end)
+            .unwrap_or_else(|| {
+                let cursor = self.safe_cursor();
+                cursor..cursor
+            });
+
+        UTF16Selection {
+            range: self.range_to_utf16(&range),
+            reversed: self
+                .selection_anchor
+                .is_some_and(|anchor| self.clamp_to_boundary(anchor) > self.safe_cursor()),
+        }
+    }
+
+    /// Returns the current marked/composition range in UTF-16 code units.
+    pub fn marked_text_range_utf16(&self) -> Option<Range<usize>> {
+        self.marked_range
+            .as_ref()
+            .map(|range| self.range_to_utf16(range))
+    }
+
     /// Removes the selected text. Returns `true` if a non-empty selection
     /// was removed.
     pub fn delete_selection(&mut self) -> bool {
@@ -171,6 +205,7 @@ impl TextInputState {
             self.value.replace_range(start..end, "");
             self.cursor = start;
             self.selection_anchor = None;
+            self.marked_range = None;
             true
         } else {
             false
@@ -195,8 +230,7 @@ impl TextInputState {
 
     /// Inserts `text` at the cursor, replacing any active selection first.
     pub fn paste(&mut self, text: &str) {
-        self.delete_selection();
-        self.insert(text);
+        self.replace_text_in_range_utf16(None, text);
     }
 
     // ------------------------------------------------------------------
@@ -207,12 +241,77 @@ impl TextInputState {
         self.value = text.into();
         self.cursor = self.value.len();
         self.selection_anchor = None;
+        self.marked_range = None;
     }
 
     pub fn clear(&mut self) {
         self.value.clear();
         self.cursor = 0;
         self.selection_anchor = None;
+        self.marked_range = None;
+    }
+
+    /// Returns the substring for a platform-provided UTF-16 range, plus the
+    /// actual clamped range if the request landed on non-boundary offsets.
+    pub fn text_for_range_utf16(
+        &self,
+        range_utf16: Range<usize>,
+        adjusted_range: &mut Option<Range<usize>>,
+    ) -> Option<String> {
+        let range = self.range_from_utf16(&range_utf16);
+        *adjusted_range = Some(self.range_to_utf16(&range));
+        self.value.get(range).map(ToOwned::to_owned)
+    }
+
+    /// Replace a UTF-16 range, or the active marked/selected range when no
+    /// explicit range is provided.
+    pub fn replace_text_in_range_utf16(&mut self, range_utf16: Option<Range<usize>>, text: &str) {
+        let range = self
+            .resolve_replacement_range(range_utf16)
+            .unwrap_or_else(|| {
+                let cursor = self.safe_cursor();
+                cursor..cursor
+            });
+
+        self.value.replace_range(range.clone(), text);
+        self.cursor = range.start + text.len();
+        self.selection_anchor = None;
+        self.marked_range = None;
+    }
+
+    /// Replace text and update IME marked/selection ranges from UTF-16 input.
+    pub fn replace_and_mark_text_in_range_utf16(
+        &mut self,
+        range_utf16: Option<Range<usize>>,
+        new_text: &str,
+        new_selected_range_utf16: Option<Range<usize>>,
+    ) {
+        let range = self
+            .resolve_replacement_range(range_utf16)
+            .unwrap_or_else(|| {
+                let cursor = self.safe_cursor();
+                cursor..cursor
+            });
+
+        self.value.replace_range(range.clone(), new_text);
+        self.marked_range = (!new_text.is_empty()).then_some(range.start..range.start + new_text.len());
+
+        if let Some(selected_range_utf16) = new_selected_range_utf16 {
+            let selected_range = self.range_from_utf16_in_text(new_text, &selected_range_utf16);
+            let start = range.start + selected_range.start;
+            let end = range.start + selected_range.end;
+            self.selection_anchor = Some(start);
+            self.cursor = end;
+        } else {
+            self.selection_anchor = None;
+            self.cursor = range.start + new_text.len();
+        }
+    }
+
+    /// Clears the active IME/composition range while preserving the current
+    /// text and selection.
+    pub fn unmark_text(&mut self) {
+        self.marked_range = None;
     }
 
     // ------------------------------------------------------------------
@@ -467,6 +566,7 @@ impl TextInputState {
     /// if replacing active selection is desired).
     fn insert(&mut self, text: &str) {
         self.clear_selection();
+        self.marked_range = None;
         self.value.insert_str(self.cursor, text);
         self.cursor += text.len();
     }
@@ -479,6 +579,7 @@ impl TextInputState {
         let prev = self.prev_boundary(self.cursor);
         self.value.replace_range(prev..self.cursor, "");
         self.cursor = prev;
+        self.marked_range = None;
         true
     }
 
@@ -489,6 +590,7 @@ impl TextInputState {
         self.clear_selection();
         let next = self.next_boundary(self.cursor);
         self.value.replace_range(self.cursor..next, "");
+        self.marked_range = None;
         true
     }
 
@@ -601,6 +703,7 @@ impl TextInputState {
             .unwrap_or(0);
         self.value.replace_range(start..self.cursor, "");
         self.cursor = start;
+        self.marked_range = None;
         true
     }
 
@@ -629,7 +732,16 @@ impl TextInputState {
             .copied()
             .unwrap_or(self.value.len());
         self.value.replace_range(self.cursor..end, "");
+        self.marked_range = None;
         true
+    }
+
+    fn resolve_replacement_range(&self, range_utf16: Option<Range<usize>>) -> Option<Range<usize>> {
+        range_utf16
+            .as_ref()
+            .map(|range| self.range_from_utf16(range))
+            .or_else(|| self.marked_range.clone())
+            .or_else(|| self.selection_range().map(|(start, end)| start..end))
     }
 
     // ------------------------------------------------------------------
@@ -672,6 +784,54 @@ impl TextInputState {
             byte -= 1;
         }
         byte
+    }
+
+    fn offset_from_utf16_in_text(&self, text: &str, offset: usize) -> usize {
+        let mut utf8_offset = 0;
+        let mut utf16_count = 0;
+
+        for ch in text.chars() {
+            if utf16_count >= offset {
+                break;
+            }
+            utf16_count += ch.len_utf16();
+            utf8_offset += ch.len_utf8();
+        }
+
+        utf8_offset.min(text.len())
+    }
+
+    fn offset_from_utf16(&self, offset: usize) -> usize {
+        self.offset_from_utf16_in_text(&self.value, offset)
+    }
+
+    fn offset_to_utf16(&self, offset: usize) -> usize {
+        let mut utf16_offset = 0;
+        let mut utf8_count = 0;
+        let offset = self.clamp_to_boundary(offset);
+
+        for ch in self.value.chars() {
+            if utf8_count >= offset {
+                break;
+            }
+            utf8_count += ch.len_utf8();
+            utf16_offset += ch.len_utf16();
+        }
+
+        utf16_offset
+    }
+
+    fn range_to_utf16(&self, range: &Range<usize>) -> Range<usize> {
+        self.offset_to_utf16(range.start)..self.offset_to_utf16(range.end)
+    }
+
+    fn range_from_utf16(&self, range_utf16: &Range<usize>) -> Range<usize> {
+        self.offset_from_utf16(range_utf16.start)..self.offset_from_utf16(range_utf16.end)
+    }
+
+    fn range_from_utf16_in_text(&self, text: &str, range_utf16: &Range<usize>) -> Range<usize> {
+        self.offset_from_utf16_in_text(text, range_utf16.start)
+            ..self.offset_from_utf16_in_text(text, range_utf16.end)
     }
 }
 
@@ -1322,5 +1482,62 @@ mod tests {
         );
         assert_eq!(s.value(), "\n");
         assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn selected_text_range_utf16_tracks_reversed_selection() {
+        let mut s = TextInputState::with_text("a😀b");
+        s.selection_anchor = Some("a😀".len());
+        s.cursor = "a".len();
+
+        let selection = s.selected_text_range_utf16();
+        assert_eq!(selection.range, 1..3);
+        assert!(selection.reversed);
+    }
+
+    #[test]
+    fn text_for_range_utf16_adjusts_to_unicode_boundaries() {
+        let s = TextInputState::with_text("a😀b");
+        let mut adjusted = None;
+
+        let text = s.text_for_range_utf16(1..3, &mut adjusted);
+
+        assert_eq!(text.as_deref(), Some("😀"));
+        assert_eq!(adjusted, Some(1..3));
+    }
+
+    #[test]
+    fn replace_text_in_range_utf16_replaces_active_selection() {
+        let mut s = TextInputState::with_text("a😀b");
+        s.selection_anchor = Some("a".len());
+        s.cursor = "a😀".len();
+
+        s.replace_text_in_range_utf16(None, "x");
+
+        assert_eq!(s.value(), "axb");
+        assert_eq!(s.cursor(), 2);
+        assert!(s.selection_range().is_none());
+    }
+
+    #[test]
+    fn replace_and_mark_text_in_range_utf16_sets_marked_and_selected_ranges() {
+        let mut s = TextInputState::new();
+
+        s.replace_and_mark_text_in_range_utf16(None, "你好", Some(1..2));
+
+        assert_eq!(s.value(), "你好");
+        assert_eq!(s.marked_range(), Some(0.."你好".len()));
+        assert_eq!(s.selected_text_range_utf16().range, 1..2);
+    }
+
+    #[test]
+    fn unmark_text_clears_marked_range_without_touching_text() {
+        let mut s = TextInputState::new();
+        s.replace_and_mark_text_in_range_utf16(None, "relay", Some(0..5));
+
+        s.unmark_text();
+
+        assert_eq!(s.value(), "relay");
+        assert_eq!(s.marked_range(), None);
     }
 }

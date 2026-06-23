@@ -1,32 +1,34 @@
-use std::rc::Rc;
+use std::{hash::Hash, rc::Rc};
 
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ClickHandler, DismissHandler, SelectHandler},
+    interaction::{
+        ActionHandler, ClickHandler, DismissHandler, OpenState, SelectionSource,
+    },
     theme::{ActiveTheme, radius},
 };
 
 use super::{AnchoredOverlay, Menu, MenuItem};
 
 /// One option in a [`Select`].
-pub struct SelectOption {
-    key: &'static str,
+pub struct SelectOption<T> {
+    value: T,
     label: String,
     detail: Option<String>,
     icon: Option<IconName>,
 }
 
-impl SelectOption {
-    pub fn new(key: &'static str, label: impl Into<String>) -> Self {
+impl<T> SelectOption<T> {
+    pub fn new(value: T, label: impl Into<String>) -> Self {
         Self {
-            key,
+            value,
             label: label.into(),
             detail: None,
             icon: None,
@@ -46,33 +48,39 @@ impl SelectOption {
 
 /// A compact select trigger plus optional dropdown menu.
 #[derive(IntoElement)]
-pub struct Select {
+pub struct Select<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
-    selected_key: &'static str,
-    options: Vec<SelectOption>,
+    selected_value: Option<T>,
+    options: Vec<SelectOption<T>>,
     open: bool,
     placeholder: String,
     auto_dismiss: bool,
-    binding: Option<Binding<&'static str>>,
+    source: Option<SelectionSource<T>>,
+    open_state: Option<OpenState>,
+    aria_label: Option<String>,
     on_toggle: Option<ClickHandler>,
-    on_select: Option<SelectHandler>,
+    on_select: Option<ActionHandler<T>>,
     on_dismiss: Option<DismissHandler>,
 }
 
-impl Select {
-    pub fn new(
-        id: impl Into<ElementId>,
-        selected_key: &'static str,
-        options: Vec<SelectOption>,
-    ) -> Self {
+impl<T> Select<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
+    pub fn new(id: impl Into<ElementId>, selected_value: T, options: Vec<SelectOption<T>>) -> Self {
         Self {
             id: id.into(),
-            selected_key,
+            selected_value: Some(selected_value),
             options,
             open: false,
             placeholder: "Select".into(),
             auto_dismiss: true,
-            binding: None,
+            source: None,
+            open_state: None,
+            aria_label: None,
             on_toggle: None,
             on_select: None,
             on_dismiss: None,
@@ -81,17 +89,19 @@ impl Select {
 
     pub fn bound(
         id: impl Into<ElementId>,
-        binding: Binding<&'static str>,
-        options: Vec<SelectOption>,
+        binding: Binding<T>,
+        options: Vec<SelectOption<T>>,
     ) -> Self {
         Self {
             id: id.into(),
-            selected_key: "",
+            selected_value: None,
             options,
             open: false,
             placeholder: "Select".into(),
             auto_dismiss: true,
-            binding: Some(binding),
+            source: Some(SelectionSource::binding(binding)),
+            open_state: None,
+            aria_label: None,
             on_toggle: None,
             on_select: None,
             on_dismiss: None,
@@ -103,8 +113,18 @@ impl Select {
         self
     }
 
+    pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
+        self.open_state = Some(OpenState::binding(binding));
+        self
+    }
+
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
+        self
+    }
+
+    pub fn aria_label(mut self, label: impl Into<String>) -> Self {
+        self.aria_label = Some(label.into());
         self
     }
 
@@ -123,7 +143,7 @@ impl Select {
 
     pub fn on_select(
         mut self,
-        handler: impl Fn(&'static str, &mut Window, &mut App) + 'static,
+        handler: impl Fn(T, &mut Window, &mut App) + 'static,
     ) -> Self {
         self.on_select = Some(Box::new(handler));
         self
@@ -137,12 +157,19 @@ impl Select {
     pub fn selected_label(&self) -> &str {
         self.options
             .iter()
-            .find(|option| option.key == self.selected_key)
+            .find(|option| {
+                self.selected_value
+                    .as_ref()
+                    .is_some_and(|selected| selected == &option.value)
+            })
             .map_or(self.placeholder.as_str(), |option| option.label.as_str())
     }
 }
 
-impl RenderOnce for Select {
+impl<T> RenderOnce for Select<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         debug_assert!(
             !self.options.is_empty(),
@@ -150,17 +177,25 @@ impl RenderOnce for Select {
             self.id
         );
         let theme = *cx.theme();
-        let binding = self.binding;
-        let selected_key = binding
+        let source = self.source;
+        let open_state = self.open_state;
+        let selected_value = source
             .as_ref()
-            .map_or(self.selected_key, |binding| binding.get(cx));
-        let label = selected_label(&self.options, selected_key, &self.placeholder).to_string();
+            .and_then(|source| source.get(cx))
+            .or(self.selected_value);
+        let open = open_state.as_ref().map_or(self.open, |open_state| open_state.get(cx));
+        let label =
+            selected_label(&self.options, selected_value.as_ref(), &self.placeholder).to_string();
         let select_handler = self.on_select.map(Rc::new);
         let dismiss_handler = self.on_dismiss;
         let auto_dismiss = self.auto_dismiss;
         let id = self.id.clone();
-        let toggle_handler = self.on_toggle;
-        let trigger_clickable = toggle_handler.is_some();
+        let toggle_handler: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>> =
+            self.on_toggle.map(Rc::from);
+        let trigger_clickable = open_state.is_some() || toggle_handler.is_some();
+        let aria_label = self
+            .aria_label
+            .unwrap_or_else(|| format!("{}: {}", self.placeholder, label));
         let trigger = div()
             .id((id.clone(), "trigger"))
             .h(px(30.0))
@@ -170,14 +205,18 @@ impl RenderOnce for Select {
             .flex()
             .items_center()
             .gap_2()
+            .role(Role::ComboBox)
+            .aria_expanded(open)
+            .aria_label(aria_label)
+            .tab_index(0)
             .rounded(px(radius::MD))
             .border_1()
-            .border_color(if self.open {
+            .border_color(if open {
                 theme.border_strong
             } else {
                 theme.border
             })
-            .bg(if self.open {
+            .bg(if open {
                 theme.panel_alt
             } else {
                 theme.panel
@@ -204,35 +243,75 @@ impl RenderOnce for Select {
                     .size(IconSize::XSmall)
                     .color(theme.text_muted),
             )
-            .when_some(
-                toggle_handler.filter(|_| trigger_clickable),
-                |this, handler| {
-                    this.on_click(move |event, window, cx| {
+            .when(trigger_clickable, |this| {
+                let open_for_click = open_state.clone();
+                let open_for_key = open_state.clone();
+                let toggle_for_click = toggle_handler.clone();
+                let toggle_for_key = toggle_for_click.clone();
+                this.on_click(move |event, window, cx| {
+                    if let Some(open_state) = &open_for_click {
+                        open_state.toggle(cx);
+                    }
+                    if let Some(handler) = &toggle_for_click {
                         handler(event, window, cx);
-                        cx.stop_propagation();
-                    })
-                },
-            );
+                    }
+                    cx.stop_propagation();
+                })
+                .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                    match event.keystroke.key.as_str() {
+                        "enter" | " " => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.toggle(cx);
+                            }
+                            if let Some(handler) = &toggle_for_key {
+                                handler(&ClickEvent::default(), window, cx);
+                            }
+                            cx.stop_propagation();
+                        }
+                        "down" => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.set(cx, true);
+                                cx.stop_propagation();
+                            }
+                        }
+                        "escape" => {
+                            if let Some(open_state) = &open_for_key {
+                                open_state.close(cx);
+                                cx.stop_propagation();
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+            });
 
         let mut items = Vec::with_capacity(self.options.len());
         for option in self.options {
-            let key = option.key;
-            let mut item = MenuItem::new(option.label).checked(key == selected_key);
+            let value = option.value;
+            let mut item = MenuItem::new(option.label).checked(
+                selected_value
+                    .as_ref()
+                    .is_some_and(|selected| selected == &value),
+            );
             if let Some(detail) = option.detail {
                 item = item.detail(detail);
             }
             if let Some(icon) = option.icon {
                 item = item.icon(icon);
             }
-            if binding.is_some() || select_handler.is_some() {
-                let binding = binding.clone();
+            if source.is_some() || select_handler.is_some() || open_state.is_some() {
+                let source = source.clone();
+                let open_state = open_state.clone();
                 let handler = select_handler.clone();
                 item = item.on_click(move |_event, window, cx| {
-                    if let Some(binding) = &binding {
-                        binding.set(cx, key);
+                    if let Some(source) = &source {
+                        source.select(cx, value.clone());
+                    }
+                    if let Some(open_state) = &open_state {
+                        open_state.close(cx);
                     }
                     if let Some(handler) = &handler {
-                        handler(key, window, cx);
+                        handler(value.clone(), window, cx);
                     }
                 });
             }
@@ -244,24 +323,32 @@ impl RenderOnce for Select {
             trigger,
             Menu::new((id.clone(), "menu"), items).min_width(220.0),
         )
-        .open(self.open);
+        .open(open);
 
         if auto_dismiss {
-            if let Some(dismiss_handler) = dismiss_handler {
-                overlay = overlay.on_dismiss(dismiss_handler);
-            } else if let Some(binding) = binding {
-                let binding_clone = binding.clone();
-                overlay = overlay.on_dismiss(move |_window, cx| {
-                    binding_clone.set(cx, selected_key);
-                });
-            } else {
-                // Auto-dismiss without explicit handler is a no-op visually
-                // but ensures the overlay has dismiss wiring
-                let id_for_dismiss = id.clone();
-                overlay = overlay.on_dismiss(move |_window, _cx| {
-                    // no-op: overlay dismissed but no state to update
-                    let _ = &id_for_dismiss;
-                });
+            match (dismiss_handler, open_state.clone()) {
+                (Some(dismiss_handler), Some(open_state)) => {
+                    overlay = overlay.on_dismiss(move |window, cx| {
+                        open_state.close(cx);
+                        dismiss_handler(window, cx);
+                    });
+                }
+                (Some(dismiss_handler), None) => {
+                    overlay = overlay.on_dismiss(dismiss_handler);
+                }
+                (None, Some(open_state)) => {
+                    overlay = overlay.on_dismiss(move |_window, cx| {
+                        open_state.close(cx);
+                    });
+                }
+                (None, None) => {
+                    // Auto-dismiss without explicit handler is a no-op visually
+                    // but ensures the overlay has dismiss wiring
+                    let id_for_dismiss = id.clone();
+                    overlay = overlay.on_dismiss(move |_window, _cx| {
+                        let _ = &id_for_dismiss;
+                    });
+                }
             }
         } else if let Some(dismiss_handler) = dismiss_handler {
             overlay = overlay.on_dismiss(dismiss_handler);
@@ -271,14 +358,17 @@ impl RenderOnce for Select {
     }
 }
 
-fn selected_label<'a>(
-    options: &'a [SelectOption],
-    selected_key: &'static str,
+fn selected_label<'a, T>(
+    options: &'a [SelectOption<T>],
+    selected_value: Option<&T>,
     placeholder: &'a str,
-) -> &'a str {
+) -> &'a str
+where
+    T: Eq + Hash + PartialEq,
+{
     options
         .iter()
-        .find(|option| option.key == selected_key)
+        .find(|option| selected_value.is_some_and(|selected| selected == &option.value))
         .map_or(placeholder, |option| option.label.as_str())
 }
 
@@ -306,7 +396,7 @@ mod tests {
             )
         });
 
-        assert!(select.binding.is_some());
+        assert!(select.source.is_some());
     }
 
     #[test]

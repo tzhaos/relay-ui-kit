@@ -1,7 +1,7 @@
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement,
-    KeyDownEvent, MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled,
-    Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement,
+    IntoElement, KeyDownEvent, MouseButton, ParentElement, RenderOnce, Role, SharedString,
+    StatefulInteractiveElement, Styled, Toggled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -58,6 +58,10 @@ pub(crate) struct ButtonLike {
     font_weight: Option<FontWeight>,
     disabled: bool,
     role: Role,
+    aria_label: Option<SharedString>,
+    aria_expanded: Option<bool>,
+    toggled: Option<bool>,
+    focus_handle: Option<FocusHandle>,
     on_click: Option<ClickHandler>,
     children: Vec<AnyElement>,
 }
@@ -75,6 +79,10 @@ impl ButtonLike {
             font_weight: None,
             disabled: false,
             role: Role::Button,
+            aria_label: None,
+            aria_expanded: None,
+            toggled: None,
+            focus_handle: None,
             on_click: None,
             children: Vec::new(),
         }
@@ -116,6 +124,26 @@ impl ButtonLike {
         self
     }
 
+    pub(crate) fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.aria_label = Some(label.into());
+        self
+    }
+
+    pub(crate) fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.aria_expanded = Some(expanded);
+        self
+    }
+
+    pub(crate) fn toggled(mut self, toggled: bool) -> Self {
+        self.toggled = Some(toggled);
+        self
+    }
+
+    pub(crate) fn track_focus(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
+    }
+
     pub(crate) fn on_click(mut self, handler: Option<ClickHandler>) -> Self {
         self.on_click = handler;
         self
@@ -149,7 +177,17 @@ impl RenderOnce for ButtonLike {
             .gap(px(self.gap))
             .text_color(colors.foreground)
             .role(self.role)
-            .tab_index(0)
+            .when_some(self.aria_label, |this, label| this.aria_label(label))
+            .when_some(self.aria_expanded, |this, expanded| {
+                this.aria_expanded(expanded)
+            })
+            .when_some(self.toggled, |this, toggled| {
+                this.aria_toggled(Toggled::from(toggled))
+            })
+            .when_some(self.focus_handle, |this, focus_handle| {
+                this.track_focus(&focus_handle)
+            })
+            .when(interactive, |this| this.tab_index(0))
             .when_some(self.width, |this, width| this.w(px(width)))
             .when_some(self.height, |this, height| this.h(px(height)))
             .when_some(self.padding_x, |this, padding| this.px(px(padding)))
@@ -169,6 +207,9 @@ impl RenderOnce for ButtonLike {
                             .bg(colors.active_background)
                             .border_color(colors.active_border)
                             .text_color(colors.active_foreground)
+                    })
+                    .focus_visible(move |style| {
+                        style.border_color(colors.hover_border)
                     })
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                         window.prevent_default();

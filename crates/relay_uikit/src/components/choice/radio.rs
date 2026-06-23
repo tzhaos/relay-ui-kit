@@ -1,35 +1,43 @@
+use std::hash::Hash;
+
 use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
-    prelude::FluentBuilder, px,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Toggled,
+    Window, div, prelude::FluentBuilder, px,
 };
 use relay::Binding;
 
 use crate::{
-    interaction::ClickHandler,
+    interaction::{ClickHandler, SelectionSource},
     theme::{ActiveTheme, DISABLED_OPACITY},
 };
 
 /// A labelled radio option. The host renders a group and tracks the selection.
 #[derive(IntoElement)]
-pub struct Radio {
+pub struct Radio<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
     id: ElementId,
     selected: bool,
     label: String,
     disabled: bool,
-    binding: Option<Binding<&'static str>>,
-    value: Option<&'static str>,
+    source: Option<SelectionSource<T>>,
+    value: Option<T>,
     on_click: Option<ClickHandler>,
 }
 
-impl Radio {
+impl<T> Radio<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
     pub fn new(id: impl Into<ElementId>, selected: bool, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             selected,
             label: label.into(),
             disabled: false,
-            binding: None,
+            source: None,
             value: None,
             on_click: None,
         }
@@ -37,8 +45,8 @@ impl Radio {
 
     pub fn bound(
         id: impl Into<ElementId>,
-        binding: Binding<&'static str>,
-        value: &'static str,
+        binding: Binding<T>,
+        value: T,
         label: impl Into<String>,
     ) -> Self {
         Self {
@@ -46,7 +54,7 @@ impl Radio {
             selected: false,
             label: label.into(),
             disabled: false,
-            binding: Some(binding),
+            source: Some(SelectionSource::binding(binding)),
             value: Some(value),
             on_click: None,
         }
@@ -66,15 +74,19 @@ impl Radio {
     }
 }
 
-impl RenderOnce for Radio {
+impl<T> RenderOnce for Radio<T>
+where
+    T: Clone + Eq + Hash + PartialEq + 'static,
+{
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let binding = self.binding;
+        let source = self.source;
         let value = self.value;
-        let selected = binding
+        let selected = source
             .as_ref()
-            .zip(value)
-            .map_or(self.selected, |(binding, value)| binding.get(cx) == value);
+            .zip(value.as_ref())
+            .and_then(|(source, value)| source.get(cx).map(|selected| selected == value.clone()))
+            .unwrap_or(self.selected);
         let border = if selected {
             theme.accent
         } else {
@@ -82,7 +94,7 @@ impl RenderOnce for Radio {
         };
         let disabled = self.disabled;
         let handler = self.on_click;
-        let interactive = !disabled && (binding.is_some() || handler.is_some());
+        let interactive = !disabled && (source.is_some() || handler.is_some());
 
         div()
             .id(self.id)
@@ -90,9 +102,14 @@ impl RenderOnce for Radio {
             .items_center()
             .gap_2()
             .role(Role::RadioButton)
-            .tab_index(0)
+            .aria_label(self.label.clone())
             .aria_selected(selected)
-            .when(disabled, |this| this.opacity(DISABLED_OPACITY).cursor(gpui::CursorStyle::OperationNotAllowed))
+            .aria_toggled(Toggled::from(selected))
+            .when(interactive, |this| this.tab_index(0))
+            .when(disabled, |this| {
+                this.opacity(DISABLED_OPACITY)
+                    .cursor(gpui::CursorStyle::OperationNotAllowed)
+            })
             .when(interactive, |this| {
                 this.cursor_pointer()
                     .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
@@ -122,14 +139,17 @@ impl RenderOnce for Radio {
                     .child(self.label),
             )
             .when(interactive, |this| {
-                let binding_for_click = binding.clone();
-                let binding_for_key = binding;
-                let value = value;
+                let source_for_click = source.clone();
+                let source_for_key = source;
+                let value_for_click = value.clone();
+                let value_for_key = value;
                 let handler_for_click = handler.map(std::rc::Rc::new);
                 let handler_for_key = handler_for_click.clone();
                 this.on_click(move |event, window, cx| {
-                    if let Some((binding, value)) = binding_for_click.as_ref().zip(value) {
-                        binding.set(cx, value);
+                    if let Some((source, value)) =
+                        source_for_click.as_ref().zip(value_for_click.as_ref())
+                    {
+                        source.select(cx, value.clone());
                     }
                     if let Some(handler) = &handler_for_click {
                         handler(event, window, cx);
@@ -140,8 +160,10 @@ impl RenderOnce for Radio {
                     if event.keystroke.key.as_str() == " "
                         || event.keystroke.key.as_str() == "enter"
                     {
-                        if let Some((binding, value)) = binding_for_key.as_ref().zip(value) {
-                            binding.set(cx, value);
+                        if let Some((source, value)) =
+                            source_for_key.as_ref().zip(value_for_key.as_ref())
+                        {
+                            source.select(cx, value.clone());
                         }
                         if let Some(handler) = &handler_for_key {
                             handler(&ClickEvent::default(), window, cx);
@@ -165,7 +187,7 @@ mod tests {
         let mut app = TestApp::new();
         let radio = app.update(|cx| Radio::bound("radio", cx.binding("light"), "dark", "Dark"));
 
-        assert!(radio.binding.is_some());
+        assert!(radio.source.is_some());
         assert_eq!(radio.value, Some("dark"));
     }
 }
