@@ -9,12 +9,12 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
 use gpui::{
-    div, prelude::*, px, rgb, size, AnyElement, App, Bounds, Context, Div, FontWeight,
-    InteractiveElement, IntoElement, ParentElement, Render, Stateful, Styled, Window, WindowBounds,
-    WindowOptions,
+    AnyElement, App, Bounds, Context, Div, FontWeight, InteractiveElement, IntoElement,
+    ParentElement, Render, Stateful, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
+    px, rgb, size,
 };
 use gpui_platform::application;
-use relay::{init, view::reactive_render, ReactiveAppExt, ReactiveView, Signal, SubView};
+use relay::{ReactiveAppExt, ReactiveView, Signal, SubView, init, view::reactive_render};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BranchKey {

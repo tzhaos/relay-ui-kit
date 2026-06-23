@@ -11,8 +11,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{Effect, ReactiveAppExt, ReactiveContextExt, Signal, effect_in, init};
@@ -92,7 +92,10 @@ impl Render for EffectDemo {
                 .child(
                     div()
                         .id("increment")
-                        .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .bg(rgb(0x3b82f6))
+                        .rounded(px(6.0))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0x2563eb)))
                         .child("Increment (triggers effect)")
@@ -100,7 +103,12 @@ impl Render for EffectDemo {
                             this.increment(cx);
                         })),
                 )
-                .child(div().text_sm().text_color(rgb(0xa1a1aa)).child("Effect log (last 5):"))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0xa1a1aa))
+                        .child("Effect log (last 5):"),
+                )
                 .child(log_view)
         })
     }

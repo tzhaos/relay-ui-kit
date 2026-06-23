@@ -10,8 +10,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{Memo, ReactiveAppExt, ReactiveContextExt, Signal, init};
@@ -47,10 +47,18 @@ impl DerivedDemo {
         let description = {
             let a = a.clone();
             let b = b.clone();
-            cx.derived(move |cx| format!("{} + {} = {}", a.get(cx), b.get(cx), a.get(cx) + b.get(cx)))
+            cx.derived(move |cx| {
+                format!("{} + {} = {}", a.get(cx), b.get(cx), a.get(cx) + b.get(cx))
+            })
         };
 
-        Self { a, b, sum, product, description }
+        Self {
+            a,
+            b,
+            sum,
+            product,
+            description,
+        }
     }
 }
 
@@ -73,31 +81,60 @@ impl Render for DerivedDemo {
                 .text_color(rgb(0xf4f4f5))
                 .child(div().text_lg().child("Derived values"))
                 .child(div().text_sm().child(format!("a = {a}, b = {b}")))
-                .child(div().text_sm().text_color(rgb(0x4ade80)).child(format!("sum (derived) = {sum}")))
-                .child(div().text_sm().text_color(rgb(0x60a5fa)).child(format!("product (derived) = {product}")))
-                .child(div().text_sm().text_color(rgb(0xa1a1aa)).child(format!("description (derived) = \"{description}\"")))
                 .child(
-                    div().flex().gap_2()
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0x4ade80))
+                        .child(format!("sum (derived) = {sum}")),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0x60a5fa))
+                        .child(format!("product (derived) = {product}")),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0xa1a1aa))
+                        .child(format!("description (derived) = \"{description}\"")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
                         .child(
                             div()
                                 .id("inc-a")
-                                .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x3b82f6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
                                 .child("a + 1")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.a.update(cx, |v| { *v += 1; true });
+                                    this.a.update(cx, |v| {
+                                        *v += 1;
+                                        true
+                                    });
                                 })),
                         )
                         .child(
                             div()
                                 .id("inc-b")
-                                .px_3().py_2().bg(rgb(0x8b5cf6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x8b5cf6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x7c3aed)))
                                 .child("b + 1")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.b.update(cx, |v| { *v += 1; true });
+                                    this.b.update(cx, |v| {
+                                        *v += 1;
+                                        true
+                                    });
                                 })),
                         ),
                 )

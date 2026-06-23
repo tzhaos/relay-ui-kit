@@ -15,8 +15,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{ReactiveContextExt, WindowSignalExt, init};
@@ -85,15 +85,10 @@ impl Render for HooksDemo {
                 .bg(rgb(0x202124))
                 .text_color(rgb(0xf4f4f5))
                 .child(div().text_lg().child("Component-internal hooks"))
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(0xa1a1aa))
-                        .child(
-                            "Each counter owns its state via window.use_signal. \
+                .child(div().text_sm().text_color(rgb(0xa1a1aa)).child(
+                    "Each counter owns its state via window.use_signal. \
                              No Binding or host callback needed — click to increment.",
-                        ),
-                )
+                ))
                 .child(counter_a)
                 .child(counter_b)
         })
@@ -109,10 +104,12 @@ fn run_example() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| cx.new(|cx| {
-                init(cx);
-                HooksDemo
-            }),
+            |_, cx| {
+                cx.new(|cx| {
+                    init(cx);
+                    HooksDemo
+                })
+            },
         );
         cx.activate(true);
     });

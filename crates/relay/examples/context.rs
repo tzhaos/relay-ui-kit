@@ -11,13 +11,11 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
-use relay::{
-    ContextHandle, ReactiveContextExt, init, provide_context, use_context,
-};
+use relay::{ContextHandle, ReactiveContextExt, init, provide_context, use_context};
 
 /// The shared theme value provided via context.
 #[derive(Clone, PartialEq)]
@@ -66,15 +64,22 @@ impl Render for ContextDemo {
                 .bg(bg)
                 .text_color(text)
                 .child(div().text_lg().child("Context demo"))
-                .child(div().text_sm().child(format!("Current theme (from context): {label}")))
+                .child(
+                    div()
+                        .text_sm()
+                        .child(format!("Current theme (from context): {label}")),
+                )
                 .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(
                     "The theme is provided via provide_context and read via use_context. \
-                     No prop drilling — any child view can read it."
+                     No prop drilling — any child view can read it.",
                 ))
                 .child(
                     div()
                         .id("toggle")
-                        .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .bg(rgb(0x3b82f6))
+                        .rounded(px(6.0))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0x2563eb)))
                         .text_color(rgb(0xf4f4f5))

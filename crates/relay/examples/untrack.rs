@@ -10,8 +10,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{ReactiveAppExt, ReactiveContextExt, Signal, init, untrack};
@@ -56,45 +56,68 @@ impl Render for UntrackDemo {
                 .size_full()
                 .bg(rgb(0x202124))
                 .text_color(rgb(0xf4f4f5))
-                .child(div().text_sm().child(format!("Tracked (subscribed): {tracked_val}")))
+                .child(
+                    div()
+                        .text_sm()
+                        .child(format!("Tracked (subscribed): {tracked_val}")),
+                )
                 .child(div().text_sm().text_color(rgb(0xa1a1aa)).child(format!(
                     "Snapshot (untracked, stale until other signal changes): {snapshot_val}"
                 )))
-                .child(div().text_sm().text_color(rgb(0xfbbf24)).child(format!(
-                    "Silent count (writes don't notify): {silent_val}"
-                )))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0xfbbf24))
+                        .child(format!("Silent count (writes don't notify): {silent_val}")),
+                )
                 .child(
                     div()
                         .id("inc-tracked")
-                        .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .bg(rgb(0x3b82f6))
+                        .rounded(px(6.0))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0x2563eb)))
                         .child("Inc tracked (refreshes view)")
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.tracked.update(cx, |v| { *v += 1; true });
+                            this.tracked.update(cx, |v| {
+                                *v += 1;
+                                true
+                            });
                         })),
                 )
                 .child(
                     div()
                         .id("inc-snapshot")
-                        .px_3().py_2().bg(rgb(0x27272a)).rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .bg(rgb(0x27272a))
+                        .rounded(px(6.0))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0x3f3f46)))
                         .child("Inc snapshot (no refresh — use Inc tracked to see updated value)")
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.snapshot.update(cx, |v| { *v += 1; true });
+                            this.snapshot.update(cx, |v| {
+                                *v += 1;
+                                true
+                            });
                         })),
                 )
                 .child(
                     div()
                         .id("inc-silent")
-                        .px_3().py_2().bg(rgb(0x27272a)).rounded(px(6.0))
+                        .px_3()
+                        .py_2()
+                        .bg(rgb(0x27272a))
+                        .rounded(px(6.0))
                         .cursor_pointer()
                         .hover(|s| s.bg(rgb(0x3f3f46)))
                         .child("Inc silent (no refresh — use Inc tracked to see updated value)")
                         .on_click(cx.listener(|this, _, _, _cx| {
                             // set_silent writes without notifying dependents.
-                            this.silent_count.set_silent(this.silent_count.get_untracked() + 1);
+                            this.silent_count
+                                .set_silent(this.silent_count.get_untracked() + 1);
                         })),
                 )
         })

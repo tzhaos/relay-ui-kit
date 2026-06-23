@@ -8,8 +8,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{Binding, ReactiveAppExt, ReactiveContextExt, init};
@@ -50,22 +50,29 @@ impl Render for BindingDemo {
                         .items_center()
                         .gap_2()
                         .cursor_pointer()
-                        .child(div().w(px(32.0)).h(px(18.0)).rounded(px(9.0)).bg(if enabled {
-                            rgb(0x3b82f6)
-                        } else {
-                            rgb(0x52525b)
-                        }).child(
+                        .child(
                             div()
-                                .size(px(14.0))
-                                .ml(px(1.0))
-                                .rounded_full()
-                                .bg(rgb(0xf4f4f5)),
-                        ))
-                        .child(div().text_sm().child(if enabled {
-                            "Enabled"
-                        } else {
-                            "Disabled"
-                        }))
+                                .w(px(32.0))
+                                .h(px(18.0))
+                                .rounded(px(9.0))
+                                .bg(if enabled {
+                                    rgb(0x3b82f6)
+                                } else {
+                                    rgb(0x52525b)
+                                })
+                                .child(
+                                    div()
+                                        .size(px(14.0))
+                                        .ml(px(1.0))
+                                        .rounded_full()
+                                        .bg(rgb(0xf4f4f5)),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .child(if enabled { "Enabled" } else { "Disabled" }),
+                        )
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.enabled.update(cx, |v| {
                                 *v = !*v;

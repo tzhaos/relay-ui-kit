@@ -11,8 +11,8 @@
 
 use gpui::{
     App, Bounds, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*,
-    px, rgb, size,
+    StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div, prelude::*, px,
+    rgb, size,
 };
 use gpui_platform::application;
 use relay::{ReactiveAppExt, ReactiveContextExt, Signal, init};
@@ -38,7 +38,9 @@ impl WatchDemo {
             let name_for_react = name.clone();
             let greeting = greeting.clone();
             let _ = cx.watch(
-                move |cx| { let _ = name.get(cx); },
+                move |cx| {
+                    let _ = name.get(cx);
+                },
                 move |cx| {
                     let n = name_for_react.get(cx);
                     greeting.set(cx, format!("Hello, {n}!"));
@@ -52,7 +54,9 @@ impl WatchDemo {
             let age_for_react = age.clone();
             let age_log = age_log.clone();
             let _ = cx.watch(
-                move |cx| { let _ = age.get(cx); },
+                move |cx| {
+                    let _ = age.get(cx);
+                },
                 move |cx| {
                     let a = age_for_react.get(cx);
                     age_log.set(cx, format!("Age changed to {a}"));
@@ -63,7 +67,12 @@ impl WatchDemo {
         // Seed the initial greeting.
         greeting.set(cx, format!("Hello, {}!", name.get_untracked()));
 
-        Self { name, age, greeting, age_log }
+        Self {
+            name,
+            age,
+            greeting,
+            age_log,
+        }
     }
 }
 
@@ -86,14 +95,29 @@ impl Render for WatchDemo {
                 .child(div().text_lg().child("Watch demo"))
                 .child(div().text_sm().child(format!("Name: {name}")))
                 .child(div().text_sm().child(format!("Age: {age}")))
-                .child(div().text_sm().text_color(rgb(0x4ade80)).child(format!("Greeting (derived by watch): \"{greeting}\"")))
-                .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(format!("Age log (derived by watch): {age_log}")))
                 .child(
-                    div().flex().gap_2()
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0x4ade80))
+                        .child(format!("Greeting (derived by watch): \"{greeting}\"")),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb(0xa1a1aa))
+                        .child(format!("Age log (derived by watch): {age_log}")),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
                         .child(
                             div()
                                 .id("change-name")
-                                .px_3().py_2().bg(rgb(0x3b82f6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x3b82f6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x2563eb)))
                                 .child("Change name")
@@ -108,12 +132,18 @@ impl Render for WatchDemo {
                         .child(
                             div()
                                 .id("inc-age")
-                                .px_3().py_2().bg(rgb(0x8b5cf6)).rounded(px(6.0))
+                                .px_3()
+                                .py_2()
+                                .bg(rgb(0x8b5cf6))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
                                 .hover(|s| s.bg(rgb(0x7c3aed)))
                                 .child("Age + 1")
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.age.update(cx, |v| { *v += 1; true });
+                                    this.age.update(cx, |v| {
+                                        *v += 1;
+                                        true
+                                    });
                                 })),
                         ),
                 )
