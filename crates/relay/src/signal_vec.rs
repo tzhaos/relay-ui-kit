@@ -33,7 +33,10 @@ pub trait SignalVecExt<T: 'static> {
     fn extend(&self, cx: &mut App, values: impl IntoIterator<Item = T>);
 
     /// Insert a value at `index`, shifting later elements right.
-    fn insert(&self, cx: &mut App, index: usize, value: T);
+    ///
+    /// Returns `true` when the insert succeeded. Out-of-bounds indexes are
+    /// ignored and return `false`.
+    fn insert(&self, cx: &mut App, index: usize, value: T) -> bool;
 
     /// Remove the value at `index` and return it.
     fn remove(&self, cx: &mut App, index: usize) -> Option<T>;
@@ -99,11 +102,18 @@ impl<T: 'static> SignalVecExt<T> for Signal<Vec<T>> {
         });
     }
 
-    fn insert(&self, cx: &mut App, index: usize, value: T) {
+    fn insert(&self, cx: &mut App, index: usize, value: T) -> bool {
+        let mut inserted = false;
         self.update(cx, |list| {
-            list.insert(index, value);
-            true
+            if index <= list.len() {
+                list.insert(index, value);
+                inserted = true;
+                true
+            } else {
+                false
+            }
         });
+        inserted
     }
 
     fn remove(&self, cx: &mut App, index: usize) -> Option<T> {
@@ -325,6 +335,26 @@ mod tests {
     }
 
     #[test]
+    fn insert_returns_true_when_index_is_in_bounds() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ListView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        app.update_entity(&root, |view, cx| {
+            view.items.push(cx, 10);
+            view.items.push(cx, 30);
+        });
+
+        let inserted = app.update_entity(&root, |view, cx| view.items.insert(cx, 1, 20));
+        assert!(inserted);
+
+        app.update_entity(&root, |view, _cx| {
+            assert_eq!(view.items.get_untracked(), vec![10, 20, 30]);
+        });
+    }
+
+    #[test]
     fn remove_selected_by_removes_item_and_clears_selection() {
         let mut app = TestApp::new();
         let signal = app.update(|cx| {
@@ -460,6 +490,29 @@ mod tests {
 
         let removed = app.update_entity(&root, |view, cx| view.items.remove(cx, 5));
         assert_eq!(removed, None);
+        assert_eq!(notifications.get(), 0);
+    }
+
+    #[test]
+    fn insert_out_of_bounds_returns_false_and_does_not_notify() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| ListView::new(cx));
+        let root = window.root();
+        window.draw();
+
+        let notifications = Rc::new(Cell::new(0));
+        let _sub = app.update({
+            let notifications = notifications.clone();
+            let root = root.clone();
+            move |cx| {
+                cx.observe(&root, move |_, _| {
+                    notifications.set(notifications.get() + 1);
+                })
+            }
+        });
+
+        let inserted = app.update_entity(&root, |view, cx| view.items.insert(cx, 1, 20));
+        assert!(!inserted);
         assert_eq!(notifications.get(), 0);
     }
 

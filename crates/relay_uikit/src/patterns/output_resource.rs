@@ -1,4 +1,4 @@
-use relay::Resource;
+use relay::{Resource, ResourceState};
 
 use crate::patterns::{OutputLine, OutputLineStyle};
 
@@ -24,28 +24,43 @@ pub fn output_resource_snapshot<E>(
     let refreshing_text = refreshing_text.into();
     let error_status = error_status.into();
 
-    resource.fold_latest(
-        cx,
-        || OutputResourceSnapshot {
+    resource.read(cx, |state| match state {
+        ResourceState::Pending => OutputResourceSnapshot {
             lines: vec![OutputLine::new(pending_text.clone()).style(OutputLineStyle::Muted)],
             loading: true,
             status_text: pending_text,
         },
-        |lines, loading| OutputResourceSnapshot {
+        ResourceState::Reloading(lines) => OutputResourceSnapshot {
             lines: lines.clone(),
-            loading,
-            status_text: if loading {
-                refreshing_text
-            } else {
-                ready_text(lines.len())
-            },
+            loading: true,
+            status_text: refreshing_text,
         },
-        |error| OutputResourceSnapshot {
+        ResourceState::Ready(lines) => OutputResourceSnapshot {
+            lines: lines.clone(),
+            loading: false,
+            status_text: ready_text(lines.len()),
+        },
+        ResourceState::Error {
+            latest: Some(lines),
+            error,
+        } => {
+            let mut lines = lines.clone();
+            lines.push(OutputLine::new(error_line(error)).style(OutputLineStyle::Error));
+            OutputResourceSnapshot {
+                lines,
+                loading: false,
+                status_text: error_status,
+            }
+        }
+        ResourceState::Error {
+            latest: None,
+            error,
+        } => OutputResourceSnapshot {
             lines: vec![OutputLine::new(error_line(error)).style(OutputLineStyle::Error)],
             loading: false,
             status_text: error_status,
         },
-    )
+    })
 }
 
 #[cfg(test)]
@@ -91,5 +106,36 @@ mod tests {
         );
         assert!(snapshot.loading);
         assert_eq!(snapshot.status_text, "Refreshing output");
+    }
+
+    #[test]
+    fn output_resource_snapshot_keeps_latest_lines_when_refresh_fails() {
+        let mut app = TestApp::new();
+        let resource = app.update(|cx| {
+            relay::init(cx);
+            Resource::<Vec<OutputLine>, String>::ready(cx, vec![OutputLine::new("ready")])
+        });
+
+        app.update(|cx| {
+            resource.reload(cx, |_| async move { Err("failed".to_string()) });
+        });
+
+        app.read(|cx| {
+            let snapshot = output_resource_snapshot(
+                &resource,
+                cx,
+                "Loading output",
+                "Refreshing output",
+                |line_count| format!("{line_count} lines ready"),
+                "Refresh failed",
+                |error| format!("refresh failed: {error}"),
+            );
+
+            assert_eq!(snapshot.lines.len(), 2);
+            assert_eq!(snapshot.lines[0].text, "ready");
+            assert_eq!(snapshot.lines[1].text, "refresh failed: failed");
+            assert_eq!(snapshot.status_text, "Refresh failed");
+            assert!(!snapshot.loading);
+        });
     }
 }

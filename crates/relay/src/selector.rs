@@ -22,6 +22,15 @@ pub struct Selector<K> {
     keyed: Rc<RefCell<HashMap<K, Signal<bool>>>>,
 }
 
+/// Navigation behavior for relative selection movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionNavigation {
+    /// Move past the end by wrapping to the opposite edge.
+    Wrap,
+    /// Stop at the nearest edge instead of wrapping.
+    Clamp,
+}
+
 impl<K> Selector<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
@@ -94,7 +103,17 @@ where
     /// first key. When `keys` is empty, this clears the selection. Returns
     /// whether the selected key changed.
     pub fn select_next(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
-        self.select_relative(cx, keys, SelectionStep::Next)
+        self.select_next_with(cx, keys, SelectionNavigation::Wrap)
+    }
+
+    /// Select the next key from the current ordered key set with explicit navigation behavior.
+    pub fn select_next_with(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.select_relative(cx, keys, SelectionStep::Next, navigation)
     }
 
     /// Select the next key from an ordered item collection.
@@ -110,13 +129,34 @@ where
         self.select_next(cx, items.into_iter().map(key))
     }
 
+    /// Select the next key from an ordered item collection with explicit navigation behavior.
+    pub fn select_next_by_with<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.select_next_with(cx, items.into_iter().map(key), navigation)
+    }
+
     /// Select the previous key from the current ordered key set.
     ///
     /// When the current selection is missing from `keys`, this selects the
     /// last key. When `keys` is empty, this clears the selection. Returns
     /// whether the selected key changed.
     pub fn select_previous(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
-        self.select_relative(cx, keys, SelectionStep::Previous)
+        self.select_previous_with(cx, keys, SelectionNavigation::Wrap)
+    }
+
+    /// Select the previous key from the current ordered key set with explicit navigation behavior.
+    pub fn select_previous_with(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.select_relative(cx, keys, SelectionStep::Previous, navigation)
     }
 
     /// Select the previous key from an ordered item collection.
@@ -130,6 +170,17 @@ where
         key: impl FnMut(T) -> K,
     ) -> bool {
         self.select_previous(cx, items.into_iter().map(key))
+    }
+
+    /// Select the previous key from an ordered item collection with explicit navigation behavior.
+    pub fn select_previous_by_with<T>(
+        &self,
+        cx: &mut App,
+        items: impl IntoIterator<Item = T>,
+        key: impl FnMut(T) -> K,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.select_previous_with(cx, items.into_iter().map(key), navigation)
     }
 
     /// Select the first key from the current ordered key set.
@@ -283,6 +334,7 @@ where
         cx: &mut App,
         keys: impl IntoIterator<Item = K>,
         step: SelectionStep,
+        navigation: SelectionNavigation,
     ) -> bool {
         let keys = keys.into_iter().collect::<Vec<_>>();
         if keys.is_empty() {
@@ -295,12 +347,18 @@ where
         let selected_index = current
             .as_ref()
             .and_then(|current| keys.iter().position(|key| key == current));
-        let next_index = match (selected_index, step) {
-            (Some(index), SelectionStep::Next) => (index + 1) % keys.len(),
-            (Some(0), SelectionStep::Previous) => keys.len() - 1,
-            (Some(index), SelectionStep::Previous) => index - 1,
-            (None, SelectionStep::Next) => 0,
-            (None, SelectionStep::Previous) => keys.len() - 1,
+        let next_index = match (selected_index, step, navigation) {
+            (Some(index), SelectionStep::Next, SelectionNavigation::Wrap) => {
+                (index + 1) % keys.len()
+            }
+            (Some(index), SelectionStep::Next, SelectionNavigation::Clamp) => {
+                (index + 1).min(keys.len() - 1)
+            }
+            (Some(0), SelectionStep::Previous, SelectionNavigation::Wrap) => keys.len() - 1,
+            (Some(0), SelectionStep::Previous, SelectionNavigation::Clamp) => 0,
+            (Some(index), SelectionStep::Previous, _) => index - 1,
+            (None, SelectionStep::Next, _) => 0,
+            (None, SelectionStep::Previous, _) => keys.len() - 1,
         };
         let selected = keys[next_index].clone();
         let changed = current.as_ref() != Some(&selected);
@@ -353,7 +411,7 @@ mod tests {
 
     use gpui::TestApp;
 
-    use crate::{Selector, effect, init};
+    use crate::{SelectionNavigation, Selector, effect, init};
 
     #[derive(Clone, Copy)]
     struct Item {
@@ -571,6 +629,37 @@ mod tests {
 
         assert!(changed);
         assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_next_with_clamp_stops_at_last_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(3_u64))
+        });
+
+        let changed = app
+            .update(|cx| selector.select_next_with(cx, [1_u64, 2, 3], SelectionNavigation::Clamp));
+
+        assert!(!changed);
+        assert_eq!(selector.get_untracked(), Some(3));
+    }
+
+    #[test]
+    fn selector_select_previous_with_clamp_stops_at_first_key() {
+        let mut app = TestApp::new();
+        let selector = app.update(|cx| {
+            init(cx);
+            Selector::new(cx, Some(1_u64))
+        });
+
+        let changed = app.update(|cx| {
+            selector.select_previous_with(cx, [1_u64, 2, 3], SelectionNavigation::Clamp)
+        });
+
+        assert!(!changed);
+        assert_eq!(selector.get_untracked(), Some(1));
     }
 
     #[test]
