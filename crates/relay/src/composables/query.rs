@@ -141,6 +141,17 @@ impl<T: 'static, E: 'static> Query<T, E> {
         self.resource.read_latest(cx, f)
     }
 
+    /// Fold the query state into pending, latest-value, and error branches.
+    pub fn fold_latest<R>(
+        &self,
+        cx: &App,
+        pending: impl FnOnce() -> R,
+        latest: impl FnOnce(&T, bool) -> R,
+        error: impl FnOnce(&E) -> R,
+    ) -> R {
+        self.resource.fold_latest(cx, pending, latest, error)
+    }
+
     /// Read the current error with dependency tracking.
     pub fn read_error<R>(&self, cx: &App, f: impl FnOnce(Option<&E>) -> R) -> R {
         self.resource.read_error(cx, f)

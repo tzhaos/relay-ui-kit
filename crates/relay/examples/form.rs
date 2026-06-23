@@ -1,8 +1,7 @@
-//! Form — aggregate bound fields with derived dirty-checking, reset, and commit.
+//! Form model — aggregate bound fields with derived dirty-checking, reset, and commit.
 //!
-//! `Form` collects multiple `Binding<T>` fields and derives `is_dirty` as a
-//! `Memo<bool>`. It also provides `reset` (restore initial values) and
-//! `commit` (snapshot current values as the new clean baseline).
+//! `use_form_model(...)` collects multiple `Binding<T>` fields into a
+//! higher-level model that exposes dirty state plus reset and commit helpers.
 //!
 //! Run with `cargo run -p relay --example form`.
 
@@ -14,14 +13,13 @@ use gpui::{
     rgb, size,
 };
 use gpui_platform::application;
-use relay::{Binding, Form, Memo, ReactiveAppExt, ReactiveContextExt, init};
+use relay::{Binding, FormModel, ReactiveAppExt, ReactiveContextExt, init, use_form_model};
 
 struct FormDemo {
     name: Binding<String>,
     enabled: Binding<bool>,
     count: Binding<i32>,
-    is_dirty: Memo<bool>,
-    form: Form,
+    form: FormModel,
 }
 
 impl FormDemo {
@@ -31,17 +29,16 @@ impl FormDemo {
         let enabled: Binding<bool> = cx.binding(true);
         let count: Binding<i32> = cx.binding(42);
 
-        let mut form = Form::new();
-        form.field("name", name.clone(), cx);
-        form.field("enabled", enabled.clone(), cx);
-        form.field("count", count.clone(), cx);
-        let is_dirty = form.build_is_dirty(cx);
+        let form = use_form_model(cx, |form, cx| {
+            form.field("name", name.clone(), cx);
+            form.field("enabled", enabled.clone(), cx);
+            form.field("count", count.clone(), cx);
+        });
 
         Self {
             name,
             enabled,
             count,
-            is_dirty,
             form,
         }
     }
@@ -53,7 +50,7 @@ impl Render for FormDemo {
             let name = self.name.get(cx);
             let enabled = self.enabled.get(cx);
             let count = self.count.get(cx);
-            let dirty = self.is_dirty.get(cx);
+            let dirty = self.form.dirty().get(cx);
 
             div()
                 .flex()
@@ -73,7 +70,7 @@ impl Render for FormDemo {
                         .text_color(if dirty { rgb(0x202124) } else { rgb(0xa1a1aa) })
                         .text_sm()
                         .child(if dirty {
-                            "Unsaved changes (derived via Form::is_dirty)"
+                            "Unsaved changes (derived via FormModel::dirty)"
                         } else {
                             "No changes (clean)"
                         }),

@@ -1,9 +1,8 @@
-//! Source resource - entity-scoped resource reloads from reactive sources.
+//! Source query - entity-scoped query reloads from reactive sources.
 //!
-//! `StateScope::load_resource_from_source` wires a tracked source snapshot to
-//! an initial `Resource::load`, then to `Resource::reload` after source changes.
-//! Use it when a GPUI entity owns both the source tracking lifetime and the
-//! resource.
+//! `use_query_from_source(...)` wires a tracked source snapshot to an initial
+//! load, then to a reload after source changes. Use it when a GPUI entity owns
+//! both the source tracking lifetime and the async view-model state.
 //!
 //! Run with `cargo run -p relay --example source_resource`.
 
@@ -18,26 +17,23 @@ use gpui::{
 };
 use gpui_platform::application;
 use relay::{
-    ReactiveAppExt, ReactiveView, Resource, Signal, StateScope, init, view::reactive_render,
+    ReactiveAppExt, ReactiveView, Signal, SourceQuery, init, use_query_from_source,
+    view::reactive_render,
 };
 
 struct SourceResourceDemo {
     selected_task: Signal<&'static str>,
-    report: Resource<String, String>,
-    _scope: StateScope,
+    report: SourceQuery<String, String>,
 }
 
 impl SourceResourceDemo {
     fn new(cx: &mut Context<Self>) -> Self {
         init(cx);
-        let mut scope = StateScope::new();
         let selected_task = cx.signal("relay/runtime");
-        let report = cx.pending_resource::<String, String>();
 
         let task_for_source = selected_task.clone();
-        scope.load_resource_from_source(
+        let report = use_query_from_source(
             cx,
-            report.clone(),
             move |cx| task_for_source.get(cx),
             move |task| move |cx| load_report(cx, task),
         );
@@ -45,7 +41,6 @@ impl SourceResourceDemo {
         Self {
             selected_task,
             report,
-            _scope: scope,
         }
     }
 
@@ -61,14 +56,16 @@ impl SourceResourceDemo {
 
     fn reload_current(&self, cx: &mut App) {
         let task = self.selected_task.get(cx);
-        self.report.reload(cx, move |cx| load_report(cx, task));
+        self.report
+            .query()
+            .reload(cx, move |cx| load_report(cx, task));
     }
 }
 
 impl ReactiveView for SourceResourceDemo {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let task = self.selected_task.get(cx);
-        let (headline, loading, tone) = self.report.fold_latest(
+        let (headline, loading, tone) = self.report.query().fold_latest(
             cx,
             || ("Preparing report...".to_string(), true, 0xfbbf24),
             |report, loading| {
@@ -89,7 +86,7 @@ impl ReactiveView for SourceResourceDemo {
             .gap_3()
             .bg(rgb(0x202124))
             .text_color(rgb(0xf4f4f5))
-            .child(div().text_lg().child("Source resource demo"))
+            .child(div().text_lg().child("Source query demo"))
             .child(div().text_sm().child(format!("Selected task: {task}")))
             .child(div().text_sm().text_color(rgb(tone)).child(headline))
             .child(div().text_xs().text_color(rgb(0xa1a1aa)).child(if loading {
@@ -191,7 +188,7 @@ mod tests {
         window.draw();
 
         let initial = app.update_entity(&root, |demo, cx| {
-            demo.report.fold_latest(
+            demo.report.query().fold_latest(
                 cx,
                 || ("pending".to_string(), true),
                 |report, loading| (report.clone(), loading),
@@ -201,12 +198,14 @@ mod tests {
         assert_eq!(initial, ("pending".to_string(), true));
 
         app.update_entity(&root, |demo, cx| {
-            demo.report.set_ready(cx, report_for_task("relay/runtime"));
+            demo.report
+                .query()
+                .set_ready(cx, report_for_task("relay/runtime"));
             demo.selected_task.set(cx, "relay/uikit");
         });
 
         let reloading = app.update_entity(&root, |demo, cx| {
-            demo.report.fold_latest(
+            demo.report.query().fold_latest(
                 cx,
                 || ("pending".to_string(), true),
                 |report, loading| (report.clone(), loading),
