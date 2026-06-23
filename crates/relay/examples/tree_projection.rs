@@ -1,11 +1,13 @@
-//! Tree projection - visible tree flattening plus multi-selection.
+//! Tree projection - visible tree flattening plus retained rows.
 //!
-//! This demo shows how `use_tree_projection(...)` and
-//! `use_multi_selection_model(...)` compose into a panel-like GPUI surface:
+//! This demo shows how `use_tree_projection(...)`,
+//! `use_multi_selection_model(...)`, and `KeyedSubViews` compose into a
+//! panel-like GPUI surface:
 //!
 //! - tree expansion is source-driven and explicit;
 //! - visible key order feeds multi-selection automatically;
-//! - active and marked rows stay aligned with the latest visible tree.
+//! - active and marked rows stay aligned with the latest visible tree;
+//! - retained row entities keep local state while sibling branches change.
 //!
 //! Run with `cargo run -p relay --example tree_projection`.
 
@@ -17,8 +19,9 @@ use gpui::{
 };
 use gpui_platform::application;
 use relay::{
-    Memo, MultiSelectionModel, ProjectedTreeNode, ReactiveView, SelectionReconcilePolicy, Signal,
-    TreeProjection, init, use_multi_selection_model, use_tree_projection, view::reactive_render,
+    KeyedSubViews, Memo, MultiSelectionModel, ProjectedTreeNode, ReactiveView,
+    SelectionReconcilePolicy, Signal, TreeProjection, init, use_multi_selection_model,
+    use_tree_projection, view::reactive_render,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,6 +55,7 @@ struct TreeProjectionDemo {
     selection: MultiSelectionModel<u64>,
     active_node: Memo<Option<ProjectedTreeNode<FileNode, u64>>>,
     selected_nodes: Memo<Vec<ProjectedTreeNode<FileNode, u64>>>,
+    rows: KeyedSubViews<u64, TreeRow>,
     last_action: Signal<String>,
 }
 
@@ -89,6 +93,7 @@ impl TreeProjectionDemo {
             selection,
             active_node,
             selected_nodes,
+            rows: KeyedSubViews::new(),
             last_action: Signal::new(cx, "ready".to_string()),
         }
     }
@@ -161,12 +166,18 @@ impl TreeProjectionDemo {
         }
         let _ = self.selection.select_only(cx, 10);
     }
+
+    #[cfg(test)]
+    fn visible_keys(&self, cx: &App) -> Vec<u64> {
+        self.projection.visible_keys(cx)
+    }
 }
 
 impl ReactiveView for TreeProjectionDemo {
     fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let tree_roots = self.tree.get(cx).len();
         let visible_nodes = self.projection.visible_nodes(cx);
+        let row_count = visible_nodes.len();
         let selected_labels = self.selected_nodes.read(cx, |nodes| {
             nodes
                 .iter()
@@ -182,6 +193,23 @@ impl ReactiveView for TreeProjectionDemo {
         let marked_count = self.selection.selection_count().get(cx);
         let visible_count = self.projection.visible_count().get(cx);
         let last_action = self.last_action.get(cx);
+        let selection_for_rows = self.selection.clone();
+        let projection_for_rows = self.projection.clone();
+
+        self.rows.sync(
+            cx,
+            visible_nodes,
+            |node| *node.key(),
+            move |node, cx| {
+                TreeRow::new(
+                    node,
+                    selection_for_rows.clone(),
+                    projection_for_rows.clone(),
+                    cx,
+                )
+            },
+            |node, row, _cx| row.update_node(node),
+        );
 
         div()
             .id("tree-projection-demo")
@@ -215,6 +243,12 @@ impl ReactiveView for TreeProjectionDemo {
                         div()
                             .text_xs()
                             .text_color(rgb(0xa1a1aa))
+                            .child(format!("Rows: {row_count}")),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(0xa1a1aa))
                             .child(format!("Marked: {marked_count}")),
                     ),
             )
@@ -223,57 +257,53 @@ impl ReactiveView for TreeProjectionDemo {
                     .flex()
                     .flex_wrap()
                     .gap_2()
-                    .child(toolbar_button("previous", "Previous").on_click(cx.listener(
+                    .child(button_pill("previous", "Previous").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.select_previous(cx);
                         },
                     )))
-                    .child(toolbar_button("next", "Next").on_click(cx.listener(
-                        |this, _, _, cx| {
+                    .child(
+                        button_pill("next", "Next").on_click(cx.listener(|this, _, _, cx| {
                             this.select_next(cx);
-                        },
-                    )))
-                    .child(toolbar_button("extend", "Extend").on_click(cx.listener(
+                        })),
+                    )
+                    .child(button_pill("extend", "Extend").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.extend_next(cx);
                         },
                     )))
-                    .child(toolbar_button("mark", "Toggle mark").on_click(cx.listener(
+                    .child(button_pill("mark", "Toggle mark").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.toggle_active_mark(cx);
                         },
                     )))
-                    .child(
-                        toolbar_button("toggle", "Toggle folder").on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.toggle_active_expansion(cx);
-                            },
-                        )),
-                    )
-                    .child(toolbar_button("all", "Select all").on_click(cx.listener(
+                    .child(button_pill("toggle", "Toggle folder").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.toggle_active_expansion(cx);
+                        },
+                    )))
+                    .child(button_pill("all", "Select all").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.select_all_visible(cx);
                         },
                     )))
-                    .child(toolbar_button("expand", "Expand all").on_click(cx.listener(
+                    .child(button_pill("expand", "Expand all").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.expand_all(cx);
                         },
                     )))
                     .child(
-                        toolbar_button("collapse", "Collapse all").on_click(cx.listener(
+                        button_pill("collapse", "Collapse all").on_click(cx.listener(
                             |this, _, _, cx| {
                                 this.collapse_all(cx);
                             },
                         )),
                     )
-                    .child(
-                        toolbar_button("reveal", "Reveal leaf").on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.reveal_deep_leaf(cx);
-                            },
-                        )),
-                    ),
+                    .child(button_pill("reveal", "Reveal leaf").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.reveal_deep_leaf(cx);
+                        },
+                    ))),
             )
             .child(
                 div()
@@ -300,93 +330,7 @@ impl ReactiveView for TreeProjectionDemo {
                     .flex()
                     .flex_col()
                     .gap_1()
-                    .children(visible_nodes.into_iter().map(|node| {
-                        let id = *node.key();
-                        let label = node.item().label;
-                        let depth = node.depth();
-                        let has_children = node.has_children();
-                        let is_expanded = node.is_expanded();
-                        let is_active = self.selection.is_active(cx, id);
-                        let is_selected = self.selection.is_selected(cx, id);
-                        let selection = self.selection.clone();
-                        let projection = self.projection.clone();
-
-                        div()
-                            .id(format!("tree-row-{id}"))
-                            .px_2()
-                            .py_2()
-                            .rounded(px(6.0))
-                            .border_1()
-                            .border_color(if is_active {
-                                rgb(0x60a5fa)
-                            } else if is_selected {
-                                rgb(0x38bdf8)
-                            } else {
-                                rgb(0x3f3f46)
-                            })
-                            .bg(if is_active {
-                                rgb(0x1e3a8a)
-                            } else if is_selected {
-                                rgb(0x164e63)
-                            } else {
-                                rgb(0x27272a)
-                            })
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .pl(px(10.0 + depth as f32 * 18.0))
-                            .cursor_pointer()
-                            .hover(|style| style.bg(rgb(0x334155)))
-                            .on_click(move |_, _, cx| {
-                                let _ = selection.select_only(cx, id);
-                                cx.stop_propagation();
-                            })
-                            .child(if has_children {
-                                div()
-                                    .id(format!("toggle-{id}"))
-                                    .w(px(18.0))
-                                    .text_xs()
-                                    .text_color(rgb(0xcbd5e1))
-                                    .cursor_pointer()
-                                    .child(if is_expanded { "v" } else { ">" })
-                                    .on_click(move |_, _, cx| {
-                                        let _ = projection.toggle(cx, id);
-                                        cx.stop_propagation();
-                                    })
-                                    .into_any_element()
-                            } else {
-                                div()
-                                    .w(px(18.0))
-                                    .text_xs()
-                                    .text_color(rgb(0x64748b))
-                                    .child("-")
-                                    .into_any_element()
-                            })
-                            .child(
-                                div()
-                                    .min_w_0()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(div().truncate().child(label))
-                                    .when(is_active, |this| {
-                                        this.child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(rgb(0x93c5fd))
-                                                .child("active"),
-                                        )
-                                    })
-                                    .when(is_selected && !is_active, |this| {
-                                        this.child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(rgb(0x67e8f9))
-                                                .child("marked"),
-                                        )
-                                    }),
-                            )
-                    })),
+                    .children(self.rows.cached(gpui::StyleRefinement::default().w_full())),
             )
             .into_any_element()
     }
@@ -398,7 +342,168 @@ impl Render for TreeProjectionDemo {
     }
 }
 
-fn toolbar_button(id: &'static str, label: &'static str) -> Stateful<Div> {
+struct TreeRow {
+    node: ProjectedTreeNode<FileNode, u64>,
+    selection: MultiSelectionModel<u64>,
+    projection: TreeProjection<FileNode, u64>,
+    details_open: Signal<bool>,
+}
+
+impl TreeRow {
+    fn new(
+        node: &ProjectedTreeNode<FileNode, u64>,
+        selection: MultiSelectionModel<u64>,
+        projection: TreeProjection<FileNode, u64>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self {
+            node: node.clone(),
+            selection,
+            projection,
+            details_open: Signal::new(cx, false),
+        }
+    }
+
+    fn update_node(&mut self, node: &ProjectedTreeNode<FileNode, u64>) -> bool {
+        if self.node == *node {
+            false
+        } else {
+            self.node = node.clone();
+            true
+        }
+    }
+
+    #[cfg(test)]
+    fn toggle_details(&self, cx: &mut App) {
+        self.details_open.update(cx, |details_open| {
+            *details_open = !*details_open;
+            true
+        });
+    }
+}
+
+impl ReactiveView for TreeRow {
+    fn render_state(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let id = *self.node.key();
+        let label = self.node.item().label;
+        let depth = self.node.depth();
+        let has_children = self.node.has_children();
+        let is_expanded = self.node.is_expanded();
+        let details_open = self.details_open.get(cx);
+        let is_active = self.selection.is_active(cx, id);
+        let is_selected = self.selection.is_selected(cx, id);
+        let selection = self.selection.clone();
+        let projection = self.projection.clone();
+        let details_signal = self.details_open.clone();
+
+        div()
+            .id(format!("tree-row-{id}"))
+            .px_2()
+            .py_2()
+            .rounded(px(6.0))
+            .border_1()
+            .border_color(if is_active {
+                rgb(0x60a5fa)
+            } else if is_selected {
+                rgb(0x38bdf8)
+            } else {
+                rgb(0x3f3f46)
+            })
+            .bg(if is_active {
+                rgb(0x1e3a8a)
+            } else if is_selected {
+                rgb(0x164e63)
+            } else {
+                rgb(0x27272a)
+            })
+            .flex()
+            .flex_col()
+            .gap_2()
+            .cursor_pointer()
+            .hover(|style| style.bg(rgb(0x334155)))
+            .on_click(move |_, _, cx| {
+                let _ = selection.select_only(cx, id);
+                cx.stop_propagation();
+            })
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .pl(px(10.0 + depth as f32 * 18.0))
+                    .child(if has_children {
+                        div()
+                            .id(format!("toggle-{id}"))
+                            .w(px(18.0))
+                            .text_xs()
+                            .text_color(rgb(0xcbd5e1))
+                            .cursor_pointer()
+                            .child(if is_expanded { "v" } else { ">" })
+                            .on_click(move |_, _, cx| {
+                                let _ = projection.toggle(cx, id);
+                                cx.stop_propagation();
+                            })
+                            .into_any_element()
+                    } else {
+                        div()
+                            .w(px(18.0))
+                            .text_xs()
+                            .text_color(rgb(0x64748b))
+                            .child("-")
+                            .into_any_element()
+                    })
+                    .child(
+                        div()
+                            .min_w_0()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(div().truncate().child(label))
+                            .when(is_active, |this| {
+                                this.child(
+                                    div().text_xs().text_color(rgb(0x93c5fd)).child("active"),
+                                )
+                            })
+                            .when(is_selected && !is_active, |this| {
+                                this.child(
+                                    div().text_xs().text_color(rgb(0x67e8f9)).child("marked"),
+                                )
+                            }),
+                    )
+                    .child(
+                        button_pill("details", if details_open { "Hide" } else { "Details" })
+                            .on_click(move |_, _, cx| {
+                                details_signal.update(cx, |details_open| {
+                                    *details_open = !*details_open;
+                                    true
+                                });
+                                cx.stop_propagation();
+                            }),
+                    ),
+            )
+            .when(details_open, |this| {
+                this.child(
+                    div()
+                        .pl(px(28.0 + depth as f32 * 18.0))
+                        .text_xs()
+                        .text_color(rgb(0xcbd5e1))
+                        .child(format!(
+                            "id: {id}, depth: {depth}, kind: {}",
+                            if has_children { "dir" } else { "file" }
+                        )),
+                )
+            })
+            .into_any_element()
+    }
+}
+
+impl Render for TreeRow {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        reactive_render(self, window, cx)
+    }
+}
+
+fn button_pill(id: &'static str, label: &'static str) -> Stateful<Div> {
     div()
         .id(id)
         .px_2()
@@ -477,4 +582,103 @@ fn main() {
 pub fn start() {
     gpui_platform::web_init();
     run_example();
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use gpui::{Entity, EntityId, TestApp};
+
+    use super::*;
+
+    fn row_ids(rows: &KeyedSubViews<u64, TreeRow>) -> Vec<(u64, EntityId)> {
+        rows.keyed_iter()
+            .map(|(key, view)| (*key, view.entity().entity_id()))
+            .collect()
+    }
+
+    fn row_entity(surface: &TreeProjectionDemo, key: u64) -> Entity<TreeRow> {
+        match surface.rows.get(&key) {
+            Some(row) => row.clone_entity(),
+            None => panic!("missing tree row {key}"),
+        }
+    }
+
+    #[test]
+    fn tree_projection_demo_reuses_existing_rows_when_branch_expands() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| TreeProjectionDemo::new(cx));
+        let root = window.root();
+
+        window.draw();
+        let initial_rows = app.update_entity(&root, |surface, _cx| row_ids(&surface.rows));
+        let initial_by_key = initial_rows.into_iter().collect::<HashMap<_, _>>();
+
+        app.update_entity(&root, |surface, cx| {
+            assert!(surface.projection.toggle(cx, 11));
+        });
+        window.draw();
+
+        let updated_rows = app.update_entity(&root, |surface, _cx| row_ids(&surface.rows));
+        assert_eq!(
+            updated_rows.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            vec![1, 2, 3, 4, 8, 11, 12, 13]
+        );
+
+        for key in [1_u64, 2, 3, 4, 8, 11] {
+            let entity_id = updated_rows
+                .iter()
+                .find_map(|(row_key, entity_id)| (*row_key == key).then_some(*entity_id))
+                .unwrap_or_else(|| panic!("missing row id for {key}"));
+            assert_eq!(entity_id, initial_by_key[&key]);
+        }
+    }
+
+    #[test]
+    fn tree_projection_demo_row_state_survives_sibling_branch_expansion() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| TreeProjectionDemo::new(cx));
+        let root = window.root();
+
+        window.draw();
+        let row = app.update_entity(&root, |surface, _cx| row_entity(surface, 3));
+        app.update_entity(&row, |row, cx| {
+            row.toggle_details(cx);
+        });
+
+        app.update_entity(&root, |surface, cx| {
+            assert!(surface.projection.toggle(cx, 11));
+        });
+        window.draw();
+
+        let row_after = app.update_entity(&root, |surface, _cx| row_entity(surface, 3));
+        let details_open =
+            app.update_entity(&row_after, |row, _cx| row.details_open.get_untracked());
+        assert_eq!(row.entity_id(), row_after.entity_id());
+        assert!(details_open);
+    }
+
+    #[test]
+    fn tree_projection_demo_reveal_selects_deep_leaf_and_expands_ancestors() {
+        let mut app = TestApp::new();
+        let window = app.open_window(|_, cx| TreeProjectionDemo::new(cx));
+        let root = window.root();
+
+        app.update_entity(&root, |surface, cx| {
+            surface.reveal_deep_leaf(cx);
+        });
+
+        let (active, selected, visible_keys) = app.update_entity(&root, |surface, cx| {
+            (
+                surface.selection.active_untracked(),
+                surface.selection.selected_keys_untracked(),
+                surface.visible_keys(cx),
+            )
+        });
+
+        assert_eq!(active, Some(10));
+        assert_eq!(selected, vec![10]);
+        assert_eq!(visible_keys, vec![1, 2, 3, 4, 8, 9, 10, 11]);
+    }
 }

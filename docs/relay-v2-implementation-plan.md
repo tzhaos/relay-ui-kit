@@ -147,7 +147,8 @@ Progress so far:
 
 - `examples/command_picker.rs` now uses `use_ordered_selection_model(...)` instead of host-side selection reconcile glue.
 - `examples/session_surface.rs` now uses `use_ordered_selection_model(...)` while keeping retained row entities and host-level keyboard orchestration.
-- `examples/tree_projection.rs` now demonstrates `use_tree_projection(...)` and `use_multi_selection_model(...)` composed into a panel-like surface.
+- `examples/tree_projection.rs` now demonstrates `use_tree_projection(...)`, `use_multi_selection_model(...)`, and `KeyedSubViews` composed into a retained-row panel surface.
+- `examples/tree_projection.rs` now has focused tests proving sibling branch expansion reuses existing row entities, preserves row-local state, and reveals deep leaves by expanding ancestors first.
 
 ## Explicit non-goals
 
