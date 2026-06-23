@@ -7,7 +7,9 @@ use std::{
 
 use gpui::{App, Context};
 
-use crate::{Effect, Memo, ReactiveContextExt, SelectedItemExt, Selector, Signal, batch};
+use crate::{
+    Effect, Memo, ReactiveContextExt, SelectedItemExt, SelectionNavigation, Selector, Signal, batch,
+};
 
 /// A higher-level single-selection model built on top of [`Selector`].
 pub struct SelectionModel<K> {
@@ -38,6 +40,7 @@ pub struct OrderedSelectionModel<K> {
     selection: SelectionModel<K>,
     ordered_keys: Signal<Vec<K>>,
     policy: SelectionReconcilePolicy,
+    navigation: SelectionNavigation,
     _effect: Rc<Effect>,
 }
 
@@ -88,6 +91,22 @@ where
     KeysFn: Fn(&App) -> Vec<K> + 'static,
 {
     OrderedSelectionModel::new(cx, selected, ordered_keys, policy)
+}
+
+/// Create a source-driven ordered selection model with explicit navigation behavior.
+pub fn use_ordered_selection_model_with_navigation<K, Owner, KeysFn>(
+    cx: &mut Context<Owner>,
+    selected: Option<K>,
+    ordered_keys: KeysFn,
+    policy: SelectionReconcilePolicy,
+    navigation: SelectionNavigation,
+) -> OrderedSelectionModel<K>
+where
+    Owner: 'static,
+    K: Clone + Eq + Hash + PartialEq + 'static,
+    KeysFn: Fn(&App) -> Vec<K> + 'static,
+{
+    OrderedSelectionModel::new_with_navigation(cx, selected, ordered_keys, policy, navigation)
 }
 
 /// Create a source-driven multi-selection model.
@@ -172,9 +191,29 @@ where
         self.selector.select_next(cx, keys)
     }
 
+    /// Select the next key from an ordered key set with explicit navigation behavior.
+    pub fn select_next_with(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.selector.select_next_with(cx, keys, navigation)
+    }
+
     /// Select the previous key from an ordered key set.
     pub fn select_previous(&self, cx: &mut App, keys: impl IntoIterator<Item = K>) -> bool {
         self.selector.select_previous(cx, keys)
+    }
+
+    /// Select the previous key from an ordered key set with explicit navigation behavior.
+    pub fn select_previous_with(
+        &self,
+        cx: &mut App,
+        keys: impl IntoIterator<Item = K>,
+        navigation: SelectionNavigation,
+    ) -> bool {
+        self.selector.select_previous_with(cx, keys, navigation)
     }
 
     /// Select the first key from an ordered key set.
@@ -269,6 +308,27 @@ where
         Owner: 'static,
         KeysFn: Fn(&App) -> Vec<K> + 'static,
     {
+        Self::new_with_navigation(
+            cx,
+            selected,
+            ordered_keys,
+            policy,
+            SelectionNavigation::Wrap,
+        )
+    }
+
+    /// Create a source-driven ordered selection model with explicit navigation behavior.
+    pub fn new_with_navigation<Owner, KeysFn>(
+        cx: &mut Context<Owner>,
+        selected: Option<K>,
+        ordered_keys: KeysFn,
+        policy: SelectionReconcilePolicy,
+        navigation: SelectionNavigation,
+    ) -> Self
+    where
+        Owner: 'static,
+        KeysFn: Fn(&App) -> Vec<K> + 'static,
+    {
         let selection = SelectionModel::new(cx, selected);
         let ordered_keys_signal = Signal::new(cx, Vec::new());
         let latest_keys: Rc<RefCell<Option<Vec<K>>>> = Rc::new(RefCell::new(None));
@@ -296,6 +356,7 @@ where
             selection,
             ordered_keys: ordered_keys_signal,
             policy,
+            navigation,
             _effect: Rc::new(effect),
         }
     }
@@ -308,6 +369,11 @@ where
     /// Return the current reconcile policy.
     pub fn policy(&self) -> SelectionReconcilePolicy {
         self.policy
+    }
+
+    /// Return the relative navigation behavior.
+    pub fn navigation(&self) -> SelectionNavigation {
+        self.navigation
     }
 
     /// Return the signal holding the latest ordered keys.
@@ -374,14 +440,18 @@ where
 
     /// Select the next key from the latest ordered keys snapshot.
     pub fn select_next(&self, cx: &mut App) -> bool {
-        self.ordered_keys
-            .peek(|keys| self.selection.select_next(cx, keys.iter().cloned()))
+        self.ordered_keys.peek(|keys| {
+            self.selection
+                .select_next_with(cx, keys.iter().cloned(), self.navigation)
+        })
     }
 
     /// Select the previous key from the latest ordered keys snapshot.
     pub fn select_previous(&self, cx: &mut App) -> bool {
-        self.ordered_keys
-            .peek(|keys| self.selection.select_previous(cx, keys.iter().cloned()))
+        self.ordered_keys.peek(|keys| {
+            self.selection
+                .select_previous_with(cx, keys.iter().cloned(), self.navigation)
+        })
     }
 
     /// Select the first key from the latest ordered keys snapshot.
@@ -917,6 +987,7 @@ where
             selection: self.selection.clone(),
             ordered_keys: self.ordered_keys.clone(),
             policy: self.policy,
+            navigation: self.navigation,
             _effect: self._effect.clone(),
         }
     }
@@ -1416,6 +1487,43 @@ mod tests {
 
         cx.read_entity(&entity, |host, cx| {
             assert_eq!(host.selection.get(cx), Some(2));
+        });
+    }
+
+    #[gpui::test]
+    fn ordered_selection_model_can_clamp_navigation_at_edges(cx: &mut TestAppContext) {
+        struct Host {
+            selection: OrderedSelectionModel<u64>,
+        }
+
+        impl Host {
+            fn new(cx: &mut Context<Self>) -> Self {
+                init(cx);
+                let keys = Signal::new(cx, vec![1, 2, 3]);
+                let keys_for_selection = keys.clone();
+                let selection = use_ordered_selection_model_with_navigation(
+                    cx,
+                    Some(3),
+                    move |cx| keys_for_selection.get(cx),
+                    SelectionReconcilePolicy::Clear,
+                    SelectionNavigation::Clamp,
+                );
+
+                Self { selection }
+            }
+        }
+
+        let entity = cx.update(|cx| cx.new(Host::new));
+
+        cx.update_entity(&entity, |host, cx| {
+            assert!(!host.selection.select_next(cx));
+            host.selection.select(cx, 1);
+            assert!(!host.selection.select_previous(cx));
+        });
+
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.selection.get(cx), Some(1));
+            assert_eq!(host.selection.navigation(), SelectionNavigation::Clamp);
         });
     }
 

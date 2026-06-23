@@ -13,8 +13,8 @@ pub enum ResourceState<T, E> {
     Reloading(T),
     /// The value is available.
     Ready(T),
-    /// Loading failed.
-    Error(E),
+    /// Loading failed, optionally while retaining the latest usable value.
+    Error { latest: Option<T>, error: E },
 }
 
 impl<T, E> ResourceState<T, E> {
@@ -40,26 +40,49 @@ impl<T, E> ResourceState<T, E> {
 
     /// Return whether the resource has a latest usable value.
     pub fn has_latest(&self) -> bool {
-        matches!(self, Self::Reloading(_) | Self::Ready(_))
+        matches!(
+            self,
+            Self::Reloading(_)
+                | Self::Ready(_)
+                | Self::Error {
+                    latest: Some(_),
+                    ..
+                }
+        )
     }
 
     /// Return whether the resource has an error.
     pub fn is_error(&self) -> bool {
-        matches!(self, Self::Error(_))
+        matches!(self, Self::Error { .. })
+    }
+
+    /// Return whether the resource retains a stale value alongside an error.
+    pub fn is_stale(&self) -> bool {
+        matches!(
+            self,
+            Self::Error {
+                latest: Some(_),
+                ..
+            }
+        )
     }
 
     /// Borrow the latest available value, including retained values while reloading.
     pub fn latest(&self) -> Option<&T> {
         match self {
             Self::Reloading(value) | Self::Ready(value) => Some(value),
-            Self::Pending | Self::Error(_) => None,
+            Self::Error {
+                latest: Some(value),
+                ..
+            } => Some(value),
+            Self::Pending | Self::Error { latest: None, .. } => None,
         }
     }
 
     /// Borrow the current error, if any.
     pub fn error(&self) -> Option<&E> {
         match self {
-            Self::Error(error) => Some(error),
+            Self::Error { error, .. } => Some(error),
             Self::Pending | Self::Reloading(_) | Self::Ready(_) => None,
         }
     }
@@ -78,7 +101,14 @@ impl<T, E> ResourceState<T, E> {
             Self::Pending => pending(),
             Self::Reloading(value) => latest(value, true),
             Self::Ready(value) => latest(value, false),
-            Self::Error(err) => error(err),
+            Self::Error {
+                latest: Some(value),
+                ..
+            } => latest(value, false),
+            Self::Error {
+                latest: None,
+                error: err,
+            } => error(err),
         }
     }
 }
@@ -117,7 +147,13 @@ impl<T, E> Resource<T, E> {
     /// Create a failed resource.
     pub fn error(cx: &mut App, error: E) -> Self {
         Self {
-            state: Signal::new(cx, ResourceState::Error(error)),
+            state: Signal::new(
+                cx,
+                ResourceState::Error {
+                    latest: None,
+                    error,
+                },
+            ),
             control: Rc::default(),
         }
     }
@@ -167,6 +203,11 @@ impl<T, E> Resource<T, E> {
         self.read(cx, ResourceState::has_latest)
     }
 
+    /// Return whether the resource retains a stale latest value alongside an error.
+    pub fn is_stale(&self, cx: &App) -> bool {
+        self.read(cx, ResourceState::is_stale)
+    }
+
     /// Return whether the resource has an error.
     pub fn is_error(&self, cx: &App) -> bool {
         self.read(cx, ResourceState::is_error)
@@ -211,7 +252,10 @@ impl<T, E> Resource<T, E> {
     /// Store an error value.
     pub fn set_error(&self, cx: &mut App, error: E) {
         self.state.update(cx, |state| {
-            *state = ResourceState::Error(error);
+            *state = ResourceState::Error {
+                latest: None,
+                error,
+            };
             true
         });
     }
@@ -307,7 +351,14 @@ where
                     }
                     Err(error) => {
                         state.update(cx, |state| {
-                            *state = ResourceState::Error(error);
+                            let latest = match std::mem::replace(state, ResourceState::Pending) {
+                                ResourceState::Reloading(value) | ResourceState::Ready(value) => {
+                                    Some(value)
+                                }
+                                ResourceState::Error { latest, .. } => latest,
+                                ResourceState::Pending => None,
+                            };
+                            *state = ResourceState::Error { latest, error };
                             true
                         });
                     }
@@ -344,7 +395,14 @@ where
                         false
                     }
                     ResourceState::Pending => false,
-                    ResourceState::Error(_) => true,
+                    ResourceState::Error {
+                        latest: Some(value),
+                        ..
+                    } => {
+                        *state = ResourceState::Reloading(value);
+                        true
+                    }
+                    ResourceState::Error { latest: None, .. } => true,
                 }
             }
         });
@@ -439,7 +497,13 @@ mod tests {
         });
 
         app.read(|cx| {
-            assert_eq!(resource.get(cx), ResourceState::Error("failed"));
+            assert_eq!(
+                resource.get(cx),
+                ResourceState::Error {
+                    latest: None,
+                    error: "failed",
+                }
+            );
         });
     }
 
@@ -460,6 +524,13 @@ mod tests {
         let reloading = ResourceState::<_, &'static str>::Reloading(8);
         assert!(reloading.has_latest());
 
+        let stale = ResourceState::<_, &'static str>::Error {
+            latest: Some(9),
+            error: "failed",
+        };
+        assert!(stale.has_latest());
+        assert!(stale.is_stale());
+
         let pending = ResourceState::<i32, &'static str>::Pending;
         assert!(!pending.has_latest());
     }
@@ -468,6 +539,10 @@ mod tests {
     fn resource_state_fold_latest_collapses_ready_and_reloading() {
         let ready = ResourceState::<_, &'static str>::Ready(7);
         let reloading = ResourceState::<_, &'static str>::Reloading(8);
+        let stale = ResourceState::<_, &'static str>::Error {
+            latest: Some(9),
+            error: "failed",
+        };
 
         let ready_result = ready.fold_latest(
             || "pending".to_string(),
@@ -479,9 +554,15 @@ mod tests {
             |value, loading| format!("{value}:{loading}"),
             |error| error.to_string(),
         );
+        let stale_result = stale.fold_latest(
+            || "pending".to_string(),
+            |value, loading| format!("{value}:{loading}"),
+            |error| error.to_string(),
+        );
 
         assert_eq!(ready_result, "7:false");
         assert_eq!(reloading_result, "8:true");
+        assert_eq!(stale_result, "9:false");
     }
 
     #[test]
@@ -706,7 +787,67 @@ mod tests {
         cx.run_until_parked();
 
         cx.read(|cx| {
-            assert_eq!(resource.get(cx), ResourceState::Error("failed"));
+            assert_eq!(
+                resource.get(cx),
+                ResourceState::Error {
+                    latest: None,
+                    error: "failed",
+                }
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn resource_reload_error_retains_latest_value(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 1)
+        });
+
+        cx.update(|cx| {
+            resource.reload(cx, |_| async move { Err("failed") });
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(
+                resource.get(cx),
+                ResourceState::Error {
+                    latest: Some(1),
+                    error: "failed",
+                }
+            );
+            assert_eq!(resource.latest(cx), Some(1));
+            assert_eq!(resource.error_value(cx), Some("failed"));
+            assert!(resource.is_stale(cx));
+            assert!(resource.is_error(cx));
+        });
+    }
+
+    #[gpui::test]
+    fn resource_reload_from_stale_error_reenters_reloading(cx: &mut TestAppContext) {
+        let resource = cx.update(|cx| {
+            init(cx);
+            Resource::<i32, &'static str>::ready(cx, 1)
+        });
+
+        cx.update(|cx| {
+            resource.reload(cx, |_| async move { Err("failed") });
+        });
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            resource.reload(cx, |cx| async move {
+                cx.background_executor()
+                    .timer(Duration::from_millis(20))
+                    .await;
+                Ok(2)
+            });
+        });
+
+        cx.read(|cx| {
+            assert_eq!(resource.get(cx), ResourceState::Reloading(1));
         });
     }
 

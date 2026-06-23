@@ -15,6 +15,7 @@ pub use query::{
 };
 pub use selection::{
     MultiSelectionModel, OrderedSelectionModel, SelectionModel, SelectionReconcilePolicy,
-    use_multi_selection_model, use_ordered_selection_model, use_selection_model,
+    use_multi_selection_model, use_ordered_selection_model,
+    use_ordered_selection_model_with_navigation, use_selection_model,
 };
 pub use tree::{ProjectedTreeNode, TreeProjection, use_tree_projection};

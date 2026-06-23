@@ -20,6 +20,7 @@ pub struct Query<T, E> {
     reloading: Memo<bool>,
     ready: Memo<bool>,
     errored: Memo<bool>,
+    stale: Memo<bool>,
     has_latest: Memo<bool>,
 }
 
@@ -84,6 +85,7 @@ impl<T: 'static, E: 'static> Query<T, E> {
         let reloading_resource = resource.clone();
         let ready_resource = resource.clone();
         let errored_resource = resource.clone();
+        let stale_resource = resource.clone();
         let latest_resource = resource.clone();
 
         Self {
@@ -93,6 +95,7 @@ impl<T: 'static, E: 'static> Query<T, E> {
             reloading: Memo::new(cx, move |cx| reloading_resource.is_reloading(cx)),
             ready: Memo::new(cx, move |cx| ready_resource.is_ready(cx)),
             errored: Memo::new(cx, move |cx| errored_resource.is_error(cx)),
+            stale: Memo::new(cx, move |cx| stale_resource.is_stale(cx)),
             has_latest: Memo::new(cx, move |cx| latest_resource.has_latest(cx)),
         }
     }
@@ -125,6 +128,11 @@ impl<T: 'static, E: 'static> Query<T, E> {
     /// Return a memo that is `true` when the query is in an error state.
     pub fn errored(&self) -> &Memo<bool> {
         &self.errored
+    }
+
+    /// Return a memo that is `true` when the query retains stale data alongside an error.
+    pub fn stale(&self) -> &Memo<bool> {
+        &self.stale
     }
 
     /// Return a memo that is `true` when the query has a latest usable value.
@@ -186,6 +194,11 @@ impl<T: 'static, E: 'static> Query<T, E> {
     /// Return whether the query is in an error state.
     pub fn is_error(&self, cx: &App) -> bool {
         self.resource.is_error(cx)
+    }
+
+    /// Return whether the query retains stale data alongside an error.
+    pub fn is_stale(&self, cx: &App) -> bool {
+        self.resource.is_stale(cx)
     }
 
     /// Mark the query as pending.
@@ -361,6 +374,7 @@ impl<T, E> Clone for Query<T, E> {
             reloading: self.reloading.clone(),
             ready: self.ready.clone(),
             errored: self.errored.clone(),
+            stale: self.stale.clone(),
             has_latest: self.has_latest.clone(),
         }
     }
@@ -415,6 +429,7 @@ mod tests {
 
         app.read(|cx| {
             assert!(query.errored().get(cx));
+            assert!(!query.stale().get(cx));
             assert_eq!(query.error_value(cx), Some("failed"));
         });
     }
@@ -576,6 +591,34 @@ mod tests {
 
         cx.read_entity(&entity, |host, cx| {
             assert_eq!(host.query.query().get(cx), ResourceState::Ready(20));
+        });
+    }
+
+    #[gpui::test]
+    fn query_reload_error_retains_latest_value(cx: &mut TestAppContext) {
+        let query = cx.update(|cx| {
+            init(cx);
+            use_ready_query::<i32, &'static str>(cx, 1)
+        });
+
+        cx.update(|cx| {
+            query.reload(cx, |_| async move { Err("failed") });
+        });
+
+        cx.run_until_parked();
+
+        cx.read(|cx| {
+            assert_eq!(
+                query.get(cx),
+                ResourceState::Error {
+                    latest: Some(1),
+                    error: "failed",
+                }
+            );
+            assert!(query.errored().get(cx));
+            assert!(query.stale().get(cx));
+            assert!(query.has_latest().get(cx));
+            assert_eq!(query.latest(cx), Some(1));
         });
     }
 }
