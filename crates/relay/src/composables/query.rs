@@ -1,8 +1,12 @@
-use std::future::Future;
+use std::{
+    cell::{Cell, RefCell},
+    future::Future,
+    rc::Rc,
+};
 
-use gpui::{App, AsyncApp};
+use gpui::{App, AsyncApp, Context};
 
-use crate::{Memo, Resource, ResourceState};
+use crate::{Effect, Memo, ReactiveContextExt, Resource, ResourceState};
 
 /// A higher-level async query model built on top of [`Resource`].
 ///
@@ -17,6 +21,16 @@ pub struct Query<T, E> {
     ready: Memo<bool>,
     errored: Memo<bool>,
     has_latest: Memo<bool>,
+}
+
+/// An entity-scoped query that automatically loads from tracked source state.
+///
+/// This packages a [`Query`] together with the effect that watches source
+/// dependencies and drives `load` / `reload` transitions across the owning
+/// GPUI entity's lifetime.
+pub struct SourceQuery<T, E> {
+    query: Query<T, E>,
+    _effect: Effect,
 }
 
 /// Create a pending query model.
@@ -35,6 +49,30 @@ pub fn use_ready_query<T: 'static, E: 'static>(cx: &mut App, value: T) -> Query<
 pub fn use_error_query<T: 'static, E: 'static>(cx: &mut App, error: E) -> Query<T, E> {
     let resource = Resource::error(cx, error);
     Query::from_resource(cx, resource)
+}
+
+/// Create an entity-scoped query from tracked source state.
+///
+/// The `source` closure declares and snapshots the tracked dependencies. The
+/// first run calls `load`; later source changes call `reload`, preserving the
+/// latest ready value during refresh.
+pub fn use_query_from_source<T, E, Owner, Source, SourceFn, BuildLoad, Load, Fut>(
+    cx: &mut Context<Owner>,
+    source: SourceFn,
+    build_load: BuildLoad,
+) -> SourceQuery<T, E>
+where
+    Owner: 'static,
+    T: 'static,
+    E: 'static,
+    Source: 'static,
+    SourceFn: Fn(&App) -> Source + 'static,
+    BuildLoad: Fn(Source) -> Load + 'static,
+    Load: FnOnce(AsyncApp) -> Fut + 'static,
+    Fut: Future<Output = Result<T, E>> + 'static,
+{
+    let query = use_query(cx);
+    SourceQuery::from_query_and_source(cx, query, source, build_load)
 }
 
 impl<T: 'static, E: 'static> Query<T, E> {
@@ -164,6 +202,57 @@ impl<T: 'static, E: 'static> Query<T, E> {
     }
 }
 
+impl<T: 'static, E: 'static> SourceQuery<T, E> {
+    /// Build a source-driven query model from an existing query.
+    pub fn from_query_and_source<Owner, Source, SourceFn, BuildLoad, Load, Fut>(
+        cx: &mut Context<Owner>,
+        query: Query<T, E>,
+        source: SourceFn,
+        build_load: BuildLoad,
+    ) -> Self
+    where
+        Owner: 'static,
+        Source: 'static,
+        SourceFn: Fn(&App) -> Source + 'static,
+        BuildLoad: Fn(Source) -> Load + 'static,
+        Load: FnOnce(AsyncApp) -> Fut + 'static,
+        Fut: Future<Output = Result<T, E>> + 'static,
+    {
+        let latest_source: Rc<RefCell<Option<Source>>> = Rc::new(RefCell::new(None));
+        let latest_source_for_sources = latest_source.clone();
+        let initialized = Cell::new(false);
+        let query_for_effect = query.clone();
+
+        let effect = cx.watch(
+            move |cx| {
+                *latest_source_for_sources.borrow_mut() = Some(source(cx));
+            },
+            move |cx| {
+                let Some(source) = latest_source.borrow_mut().take() else {
+                    return;
+                };
+
+                let load = build_load(source);
+                if initialized.replace(true) {
+                    query_for_effect.reload(cx, load);
+                } else {
+                    query_for_effect.load(cx, load);
+                }
+            },
+        );
+
+        Self {
+            query,
+            _effect: effect,
+        }
+    }
+
+    /// Return the underlying query model.
+    pub fn query(&self) -> &Query<T, E> {
+        &self.query
+    }
+}
+
 impl<T, E> Query<T, E>
 where
     T: 'static,
@@ -235,9 +324,9 @@ impl<T, E> Clone for Query<T, E> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{cell::RefCell, rc::Rc, time::Duration};
 
-    use gpui::{TestApp, TestAppContext};
+    use gpui::{AppContext, Context, TestApp, TestAppContext};
 
     use crate::{ResourceState, init};
 
@@ -305,6 +394,71 @@ mod tests {
             assert_eq!(query.get(cx), ResourceState::Ready(2));
             assert!(query.ready().get(cx));
             assert!(!query.reloading().get(cx));
+        });
+    }
+
+    #[gpui::test]
+    fn source_query_loads_initially_and_reloads_from_latest_source(cx: &mut TestAppContext) {
+        struct QueryHost {
+            source: crate::Signal<i32>,
+            query: SourceQuery<i32, &'static str>,
+        }
+
+        impl QueryHost {
+            fn new(cx: &mut Context<Self>, load_inputs: Rc<RefCell<Vec<i32>>>) -> Self {
+                init(cx);
+                let source = crate::Signal::new(cx, 1);
+                let source_for_query = source.clone();
+                let query = use_query_from_source(
+                    cx,
+                    move |cx| source_for_query.get(cx),
+                    move |value| {
+                        load_inputs.borrow_mut().push(value);
+                        move |cx| async move {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(20))
+                                .await;
+                            Ok(value * 10)
+                        }
+                    },
+                );
+
+                Self { source, query }
+            }
+        }
+
+        let load_inputs = Rc::new(RefCell::new(Vec::new()));
+        let entity = cx.update({
+            let load_inputs = load_inputs.clone();
+            move |cx| cx.new(|cx| QueryHost::new(cx, load_inputs))
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[1]);
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Pending);
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Ready(10));
+        });
+
+        cx.update_entity(&entity, |host, cx| {
+            host.source.set(cx, 2);
+        });
+
+        assert_eq!(&*load_inputs.borrow(), &[1, 2]);
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Reloading(10));
+        });
+
+        cx.executor().advance_clock(Duration::from_millis(20));
+        cx.run_until_parked();
+
+        cx.read_entity(&entity, |host, cx| {
+            assert_eq!(host.query.query().get(cx), ResourceState::Ready(20));
         });
     }
 }

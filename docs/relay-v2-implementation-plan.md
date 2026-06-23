@@ -24,6 +24,7 @@ This means:
 First v2 composables are now implemented in `crates/relay/src/composables/`:
 
 - `use_query` / `use_ready_query` / `use_error_query`
+- `use_query_from_source`
 - `SelectionModel` via `use_selection_model`
 - `FormModel` via `use_form_model`
 - `FocusState` via `use_focus_state`
@@ -31,6 +32,7 @@ First v2 composables are now implemented in `crates/relay/src/composables/`:
 These are intentionally modest first steps:
 
 - `Query` standardizes loading, reloading, error, and latest-value status around `Resource<T, E>`.
+- `SourceQuery` standardizes entity-scoped source tracking plus initial load / reload behavior.
 - `SelectionModel` packages `Selector<K>` with reusable selection-presence and item-projection helpers.
 - `FormModel` removes the awkward lifetime split between `Form` and its dirty memo, and adds submitted-state semantics.
 - `FocusState` keeps GPUI `FocusHandle` as the source of truth while making focus a composable signal-backed state source.
@@ -51,6 +53,8 @@ Exit criteria:
 - no need for ad hoc `_effect`, `std::mem::forget(form)`, or repeated loading flags in those call sites.
 
 ## Phase 2: source-driven async composition
+
+Status: started
 
 Targets:
 

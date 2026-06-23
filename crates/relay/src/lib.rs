@@ -46,8 +46,9 @@ mod window_ext;
 
 pub use binding::Binding;
 pub use composables::{
-    FocusState, FormModel, FormModelBuilder, Query, SelectionModel, use_error_query,
-    use_focus_state, use_form_model, use_query, use_ready_query, use_selection_model,
+    FocusState, FormModel, FormModelBuilder, Query, SelectionModel, SourceQuery, use_error_query,
+    use_focus_state, use_form_model, use_query, use_query_from_source, use_ready_query,
+    use_selection_model,
 };
 pub use context::{ContextHandle, provide_context, use_context};
 pub use effect::{
@@ -74,9 +75,9 @@ pub mod prelude {
         Binding, CleanupScope, ContextHandle, Effect, Form, FormBuilder, KeyedSubView,
         KeyedSubViews, Memo, Query, Reactive, ReactiveAppExt, ReactiveContextExt, ReactiveView,
         Resource, ResourceState, SelectedItemExt, SelectionModel, Selector, Signal, SignalVecExt,
-        StateScope, SubView, WindowSignalExt, batch, effect, effect_in, effect_in_with_cleanup,
-        effect_with_cleanup, init, install, provide_context, track, untrack, use_context,
-        use_error_query, use_focus_state, use_form_model, use_query, use_ready_query,
-        use_selection_model,
+        SourceQuery, StateScope, SubView, WindowSignalExt, batch, effect, effect_in,
+        effect_in_with_cleanup, effect_with_cleanup, init, install, provide_context, track,
+        untrack, use_context, use_error_query, use_focus_state, use_form_model, use_query,
+        use_query_from_source, use_ready_query, use_selection_model,
     };
 }
