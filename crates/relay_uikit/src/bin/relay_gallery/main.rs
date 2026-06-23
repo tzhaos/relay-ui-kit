@@ -23,7 +23,7 @@ use gpui::{
 use gpui_platform::application;
 use relay::{
     ReactiveAppExt, Signal,
-    view::{ReactiveView, StateScope, reactive_render},
+    view::{ReactiveView, reactive_render},
 };
 use relay_uikit::patterns::{TitleBar, WorkspaceBreadcrumb};
 use relay_uikit::{ActiveTheme, Button, IconName, KitAssets, NavRow, space, theme};
@@ -41,7 +41,6 @@ pub struct GalleryApp {
     dark_mode: Signal<bool>,
     gallery: gpui::Entity<gallery::GalleryScenesApp>,
     workbench: gpui::Entity<workbench_demo::WorkbenchApp>,
-    scope: StateScope,
 }
 
 impl GalleryApp {
@@ -51,7 +50,6 @@ impl GalleryApp {
             dark_mode: cx.signal(false),
             gallery: cx.new(gallery::GalleryScenesApp::new),
             workbench: cx.new(workbench_demo::WorkbenchApp::new),
-            scope: StateScope::new(),
         }
     }
 

@@ -1,6 +1,6 @@
 //! Orca-direction workbench sample assembled from the Relay UI crates.
 
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 mod center;
 mod context;
@@ -31,10 +31,32 @@ use data::{
 };
 use rail::left_rail;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WorkbenchContextTab {
+    Files,
+    Sessions,
+    Review,
+}
+
+impl WorkbenchContextTab {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Files => "Files",
+            Self::Sessions => "Sessions",
+            Self::Review => "Review",
+        }
+    }
+}
+
+impl fmt::Display for WorkbenchContextTab {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 pub struct WorkbenchApp {
     pub state: WorkbenchState,
-    #[allow(dead_code)]
-    pub scope: StateScope,
+    pub _scope: StateScope,
 }
 
 impl WorkbenchApp {
@@ -43,7 +65,10 @@ impl WorkbenchApp {
         let state = WorkbenchState::new(cx);
         state.watch_terminal_output_sources(cx, &mut scope);
         state.watch_review_report_sources(cx, &mut scope);
-        Self { state, scope }
+        Self {
+            state,
+            _scope: scope,
+        }
     }
 }
 
@@ -59,8 +84,7 @@ pub struct WorkbenchState {
     review_report: Resource<WorkbenchReviewReport, String>,
     task_list: Entity<rail::TaskListView>,
     session_list: Entity<context::SessionListView>,
-    pub context_tab: Binding<&'static str>,
-    pub route: Binding<&'static str>,
+    pub context_tab: Binding<WorkbenchContextTab>,
     pub filter: Binding<TextInputState>,
     pub filter_focus: FocusHandle,
     pub left_split: Entity<SplitPaneState>,
@@ -124,8 +148,7 @@ impl WorkbenchState {
             review_report,
             task_list,
             session_list,
-            context_tab: cx.binding("files"),
-            route: cx.binding("terminal"),
+            context_tab: cx.binding(WorkbenchContextTab::Files),
             filter: cx.binding(TextInputState::new()),
             filter_focus: cx.focus_handle(),
             left_split: cx.new(|_| SplitPaneState::new(space::RAIL_WIDTH)),
@@ -264,7 +287,7 @@ fn status_bar(state: &WorkbenchState, cx: &App) -> impl IntoElement {
                 .icon(IconName::Terminal)
                 .tone(Tone::Info),
         )
-        .left(StatusItem::new("Focus", state.route.get(cx)).tone(Tone::Secondary))
+        .left(StatusItem::new("Focus", "Terminal").tone(Tone::Secondary))
         .left(StatusItem::new(
             "Task",
             format!("{task_position}/{task_count}"),

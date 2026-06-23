@@ -6,12 +6,13 @@ use gpui::{
 use relay_uikit::{
     Button, ButtonVariant, Checkbox, Disclosure, Divider, FilterBar, FilterChip, Icon, IconButton,
     IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput, Radio, SearchField,
-    Segment, SegmentedControl, Slider, Stepper, TextInput, TextInputState, Theme, Toggle, TreeRow,
+    Segment, SegmentedControl, Slider, Stepper, TextInput, TextInputState, Theme, ThemePreviewKind,
+    Toggle, TreeRow,
 };
 
 use super::GalleryScenesApp;
-use super::GalleryState;
 use super::shared::{scene_stack, section, strip};
+use super::{GalleryContentTab, GalleryState};
 
 pub(super) fn render(
     state: &GalleryState,
@@ -189,7 +190,7 @@ fn choice_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                     Radio::bound(
                         "demo-radio-sys",
                         state.radio_choice.clone(),
-                        "system",
+                        ThemePreviewKind::System,
                         "System",
                     )
                     .on_click(toast(h.clone(), "Radio: system")),
@@ -198,7 +199,7 @@ fn choice_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                     Radio::bound(
                         "demo-radio-light",
                         state.radio_choice.clone(),
-                        "light",
+                        ThemePreviewKind::Light,
                         "Light",
                     )
                     .on_click(toast(h.clone(), "Radio: light")),
@@ -207,7 +208,7 @@ fn choice_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                     Radio::bound(
                         "demo-radio-dark",
                         state.radio_choice.clone(),
-                        "dark",
+                        ThemePreviewKind::Dark,
                         "Dark",
                     )
                     .on_click(toast(h, "Radio: dark")),
@@ -344,11 +345,11 @@ fn segmented_sample(state: &GalleryState) -> impl IntoElement {
     SegmentedControl::bound(
         "demo-seg",
         vec![
-            Segment::new("files", "Files"),
-            Segment::new("diff", "Diff"),
-            Segment::new("review", "Review"),
+            Segment::new(GalleryContentTab::Files, "Files"),
+            Segment::new(GalleryContentTab::Diff, "Diff"),
+            Segment::new(GalleryContentTab::Review, "Review"),
         ],
-        state.seg_tab.clone(),
+        state.content_tab.clone(),
     )
 }
 

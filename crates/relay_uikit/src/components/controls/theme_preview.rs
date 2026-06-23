@@ -3,6 +3,8 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     linear_color_stop, linear_gradient, prelude::FluentBuilder, px, rgb,
 };
+use std::hash::Hash;
+
 use relay::Binding;
 
 use crate::{
@@ -12,7 +14,7 @@ use crate::{
 };
 
 /// Appearance thumbnail variants used by [`ThemePreviewCard`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ThemePreviewKind {
     System,
     Light,
@@ -20,14 +22,6 @@ pub enum ThemePreviewKind {
 }
 
 impl ThemePreviewKind {
-    pub fn key(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::Light => "light",
-            Self::Dark => "dark",
-        }
-    }
-
     pub fn label(self) -> &'static str {
         match self {
             Self::System => "System",
@@ -44,7 +38,7 @@ pub struct ThemePreviewCard {
     kind: ThemePreviewKind,
     label: String,
     selected: bool,
-    binding: Option<Binding<&'static str>>,
+    binding: Option<Binding<ThemePreviewKind>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -63,7 +57,7 @@ impl ThemePreviewCard {
     pub fn bound(
         id: impl Into<ElementId>,
         kind: ThemePreviewKind,
-        binding: Binding<&'static str>,
+        binding: Binding<ThemePreviewKind>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -85,10 +79,6 @@ impl ThemePreviewCard {
         self
     }
 
-    pub fn key(&self) -> &'static str {
-        self.kind.key()
-    }
-
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -104,7 +94,7 @@ impl RenderOnce for ThemePreviewCard {
         let binding = self.binding;
         let selected = binding
             .as_ref()
-            .map_or(self.selected, |b| b.get(cx) == self.kind.key());
+            .map_or(self.selected, |b| b.get(cx) == self.kind);
         let border = if selected { theme.accent } else { theme.border };
         let id = self.id;
         let handler = self.on_click;
@@ -168,7 +158,7 @@ impl RenderOnce for ThemePreviewCard {
             .when(interactive, |this| {
                 this.on_click(move |event, window, cx| {
                     if let Some(binding) = &binding {
-                        binding.set(cx, kind.key());
+                        binding.set(cx, kind);
                     }
                     if let Some(handler) = &handler {
                         handler(event, window, cx);
@@ -310,19 +300,28 @@ fn line(color: Hsla, width: f32) -> impl IntoElement {
 
 #[cfg(test)]
 mod tests {
+    use relay::ReactiveAppExt;
+
     use super::*;
 
     #[test]
-    fn theme_preview_kind_keys_match_settings_values() {
-        assert_eq!(ThemePreviewKind::System.key(), "system");
-        assert_eq!(ThemePreviewKind::Light.key(), "light");
-        assert_eq!(ThemePreviewKind::Dark.key(), "dark");
+    fn theme_preview_kind_labels_match_settings_copy() {
+        assert_eq!(ThemePreviewKind::System.label(), "System");
+        assert_eq!(ThemePreviewKind::Light.label(), "Light");
+        assert_eq!(ThemePreviewKind::Dark.label(), "Dark");
     }
 
     #[test]
-    fn theme_preview_card_exposes_kind_key() {
-        let card = ThemePreviewCard::new("theme-card", ThemePreviewKind::Dark);
+    fn bound_theme_preview_card_stores_binding() {
+        let mut app = gpui::TestApp::new();
+        let card = app.update(|cx| {
+            ThemePreviewCard::bound(
+                "theme-card",
+                ThemePreviewKind::Dark,
+                cx.binding(ThemePreviewKind::System),
+            )
+        });
 
-        assert_eq!(card.key(), "dark");
+        assert!(card.binding.is_some());
     }
 }

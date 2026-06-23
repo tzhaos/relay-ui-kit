@@ -1,11 +1,6 @@
-use gpui::{App, Entity, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
+use gpui::{App, FocusHandle, FontWeight, IntoElement, ParentElement, Styled, div, px};
 use relay::Binding;
-use relay_uikit::{
-    ActiveTheme, Icon, IconName, IconSize, StatusDot, TextInput, TextInputState, Theme, Tone,
-    radius, space,
-};
-
-use super::GalleryScenesApp;
+use relay_uikit::{ActiveTheme, IconName, TextInput, TextInputState, radius, space};
 
 pub(super) fn section<T: IntoElement>(cx: &App, title: &str, body: T) -> impl IntoElement + use<T> {
     let theme = *cx.theme();
@@ -41,7 +36,6 @@ pub(super) fn strip() -> gpui::Div {
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn text_input_field(
-    _host: &Entity<GalleryScenesApp>,
     id: &'static str,
     input: &Binding<TextInputState>,
     focus: FocusHandle,
@@ -56,35 +50,4 @@ pub(super) fn text_input_field(
         field = field.leading_icon(icon);
     }
     field
-}
-
-pub(super) fn dot_label(theme: Theme, tone: Tone, label: &str) -> impl IntoElement {
-    div()
-        .flex()
-        .items_center()
-        .gap_2()
-        .child(StatusDot::new(tone))
-        .child(
-            div()
-                .text_sm()
-                .text_color(theme.text_secondary)
-                .child(label.to_string()),
-        )
-}
-
-pub(super) fn icon_sample(theme: Theme, name: IconName) -> impl IntoElement {
-    div()
-        .size(px(32.0))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(px(radius::MD))
-        .bg(theme.panel_alt)
-        .border_1()
-        .border_color(theme.border)
-        .child(
-            Icon::new(name)
-                .size(IconSize::Medium)
-                .color(theme.text_secondary),
-        )
 }

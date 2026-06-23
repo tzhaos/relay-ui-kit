@@ -3,7 +3,7 @@
 //! Each scene presents components in the kind of surface where Relay will use
 //! them, instead of packing every primitive into one long showcase page.
 
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use gpui::{
     AnyElement, App, AppContext, Context, Entity, FocusHandle, IntoElement, ParentElement, Render,
@@ -15,7 +15,7 @@ use relay::{
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
-use relay_uikit::{ActiveTheme, TextInputState, TreeNode, space};
+use relay_uikit::{ActiveTheme, TextInputState, ThemePreviewKind, space};
 
 mod core_scene;
 mod patterns_scene;
@@ -25,8 +25,16 @@ mod stress_scene;
 
 pub(super) const FEEDBACK_TOAST_DURATION: Duration = Duration::from_secs(4);
 const FEEDBACK_TOAST_LIMIT: usize = 4;
-const PATTERN_COMMAND_KEYS: [&str; 3] = ["terminal:new", "agent:launch", "review:open"];
-const PATTERN_BRANCH_KEYS: [&str; 3] = ["main", "relay/runtime", "gallery/patterns"];
+const PATTERN_COMMANDS: [PatternCommand; 3] = [
+    PatternCommand::NewTerminal,
+    PatternCommand::LaunchAgent,
+    PatternCommand::OpenReview,
+];
+const PATTERN_BRANCHES: [PatternBranch; 3] = [
+    PatternBranch::Main,
+    PatternBranch::RelayRuntime,
+    PatternBranch::GalleryPatterns,
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GallerySurface {
@@ -35,10 +43,109 @@ pub enum GallerySurface {
     Stress,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GalleryAccent {
+    Green,
+    Blue,
+    Violet,
+    Amber,
+    Red,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GalleryContentTab {
+    Files,
+    Diff,
+    Review,
+}
+
+impl GalleryContentTab {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Files => "Files",
+            Self::Diff => "Diff",
+            Self::Review => "Review",
+        }
+    }
+}
+
+impl fmt::Display for GalleryContentTab {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PatternRowKind {
+    Task,
+    Session,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PatternPreviewTab {
+    Terminal,
+    Preview,
+    Review,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PatternCommand {
+    NewTerminal,
+    LaunchAgent,
+    OpenReview,
+}
+
+impl PatternCommand {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::NewTerminal => "New terminal",
+            Self::LaunchAgent => "Launch agent",
+            Self::OpenReview => "Open review",
+        }
+    }
+}
+
+impl fmt::Display for PatternCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PatternBranch {
+    Main,
+    RelayRuntime,
+    GalleryPatterns,
+}
+
+impl PatternBranch {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Main => "main",
+            Self::RelayRuntime => "relay/runtime",
+            Self::GalleryPatterns => "gallery/patterns",
+        }
+    }
+
+    pub fn detail(self) -> &'static str {
+        match self {
+            Self::Main => "default workspace",
+            Self::RelayRuntime => "crates/relay",
+            Self::GalleryPatterns => "relay gallery",
+        }
+    }
+}
+
+impl fmt::Display for PatternBranch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 pub struct GalleryScenesApp {
     pub surface: GallerySurface,
     pub state: GalleryState,
-    pub scope: StateScope,
+    pub _scope: StateScope,
 }
 
 impl GalleryScenesApp {
@@ -47,7 +154,7 @@ impl GalleryScenesApp {
         Self {
             surface: GallerySurface::Core,
             state: GalleryState::new(cx, &mut scope),
-            scope,
+            _scope: scope,
         }
     }
 
@@ -69,36 +176,28 @@ pub struct GalleryState {
     pub ui_font_size_focus: FocusHandle,
     pub notifications: Binding<bool>,
     pub auto_archive: Binding<bool>,
-    pub theme_choice: Binding<&'static str>,
-    pub filter_choice: Binding<&'static str>,
-    pub project_filter_choice: Binding<&'static str>,
-    pub filter_menu_open: Binding<&'static str>,
-    pub radio_choice: Binding<&'static str>,
-    pub seg_tab: Binding<&'static str>,
+    pub theme_choice: Binding<ThemePreviewKind>,
+    pub radio_choice: Binding<ThemePreviewKind>,
+    pub content_tab: Binding<GalleryContentTab>,
     pub settings_select_open: Binding<bool>,
     pub ui_font_size: Binding<i32>,
     pub contrast: Binding<f32>,
     pub command_popover_open: Binding<bool>,
     pub command_context_open: Binding<bool>,
-    pub confirm_dialog_open: Binding<bool>,
     pub pattern_dialog_open: Binding<bool>,
-    pub pattern_row_selection: Selector<&'static str>,
-    pub pattern_tab_selection: Selector<&'static str>,
-    pub pattern_command_selection: OrderedSelectionModel<&'static str>,
-    pub pattern_branch_selection: OrderedSelectionModel<&'static str>,
+    pub pattern_row_selection: Selector<PatternRowKind>,
+    pub pattern_tab_selection: Selector<PatternPreviewTab>,
+    pub pattern_command_selection: OrderedSelectionModel<PatternCommand>,
+    pub pattern_branch_selection: OrderedSelectionModel<PatternBranch>,
     pub pattern_output: Resource<Vec<OutputLine>, String>,
     pattern_output_refresh_serial: u64,
     pattern_project_picker: Entity<patterns_scene::PatternProjectPicker>,
     stress_session_list: Entity<stress_scene::StressSessionList>,
     pub feedback_toasts: Signal<Vec<FeedbackToast>>,
     pub feedback_toast_serial: u64,
-    pub accent_choice: Signal<&'static str>,
+    pub accent_choice: Signal<GalleryAccent>,
     pub overlay_event: Signal<String>,
     pub core_disclosure_open: Binding<bool>,
-    pub core_tree_src_open: Binding<bool>,
-    pub core_tree_components_open: Binding<bool>,
-    pub core_tree_list_open: Binding<bool>,
-    pub core_tree_nodes: Memo<Vec<TreeNode<&'static str>>>,
     pub settings_dirty: Memo<bool>,
 }
 
@@ -119,22 +218,10 @@ impl FeedbackToast {
 
 impl GalleryState {
     pub fn new(cx: &mut Context<GalleryScenesApp>, scope: &mut StateScope) -> Self {
-        let core_tree_src_open: Binding<bool> = cx.binding(true);
-        let core_tree_components_open: Binding<bool> = cx.binding(true);
-        let core_tree_list_open: Binding<bool> = cx.binding(true);
-        let core_tree_nodes = {
-            let src = core_tree_src_open.clone();
-            let components = core_tree_components_open.clone();
-            let list = core_tree_list_open.clone();
-            cx.derived(move |cx| {
-                build_core_tree_nodes(src.get(cx), components.get(cx), list.get(cx))
-            })
-        };
-
         let notifications: Binding<bool> = cx.binding(true);
         let auto_archive: Binding<bool> = cx.binding(false);
         let ui_font_size: Binding<i32> = cx.binding(14);
-        let theme_choice: Binding<&'static str> = cx.binding("system");
+        let theme_choice: Binding<ThemePreviewKind> = cx.binding(ThemePreviewKind::System);
         let settings_dirty = scope
             .form()
             .field("notifications", notifications.clone(), cx)
@@ -144,14 +231,14 @@ impl GalleryState {
             .build_is_dirty(cx);
         let pattern_command_selection = use_ordered_selection_model(
             cx,
-            Some("terminal:new"),
-            |_cx| PATTERN_COMMAND_KEYS.to_vec(),
+            Some(PatternCommand::NewTerminal),
+            |_cx| PATTERN_COMMANDS.to_vec(),
             SelectionReconcilePolicy::SelectFirst,
         );
         let pattern_branch_selection = use_ordered_selection_model(
             cx,
-            Some("main"),
-            |_cx| PATTERN_BRANCH_KEYS.to_vec(),
+            Some(PatternBranch::Main),
+            |_cx| PATTERN_BRANCHES.to_vec(),
             SelectionReconcilePolicy::SelectFirst,
         );
 
@@ -165,20 +252,16 @@ impl GalleryState {
             notifications,
             auto_archive,
             theme_choice,
-            filter_choice: cx.binding("all"),
-            project_filter_choice: cx.binding("all-projects"),
-            filter_menu_open: cx.binding(""),
-            radio_choice: cx.binding("system"),
-            seg_tab: cx.binding("diff"),
+            radio_choice: cx.binding(ThemePreviewKind::System),
+            content_tab: cx.binding(GalleryContentTab::Diff),
             settings_select_open: cx.binding(false),
             ui_font_size,
             contrast: cx.binding(60.0),
             command_popover_open: cx.binding(false),
             command_context_open: cx.binding(false),
-            confirm_dialog_open: cx.binding(false),
             pattern_dialog_open: cx.binding(false),
-            pattern_row_selection: cx.selector(Some("task")),
-            pattern_tab_selection: cx.selector(Some("terminal")),
+            pattern_row_selection: cx.selector(Some(PatternRowKind::Task)),
+            pattern_tab_selection: cx.selector(Some(PatternPreviewTab::Terminal)),
             pattern_command_selection,
             pattern_branch_selection,
             pattern_output: cx.ready_resource(initial_pattern_output_lines()),
@@ -187,13 +270,9 @@ impl GalleryState {
             stress_session_list: cx.new(stress_scene::StressSessionList::new),
             feedback_toasts: cx.signal(Vec::new()),
             feedback_toast_serial: 0,
-            accent_choice: cx.signal("green"),
+            accent_choice: cx.signal(GalleryAccent::Green),
             overlay_event: cx.signal("No overlay action yet".into()),
             core_disclosure_open: cx.binding(true),
-            core_tree_src_open: core_tree_src_open.clone(),
-            core_tree_components_open: core_tree_components_open.clone(),
-            core_tree_list_open: core_tree_list_open.clone(),
-            core_tree_nodes,
             settings_dirty,
         }
     }
@@ -217,42 +296,6 @@ fn refreshed_pattern_output_lines(revision: u64) -> Vec<OutputLine> {
         OutputLine::new("   Checking relay-uikit v0.1.0").style(OutputLineStyle::Muted),
         OutputLine::new("   Finished dev in 0.8s").style(OutputLineStyle::Success),
     ]
-}
-
-fn build_core_tree_nodes(
-    src_open: bool,
-    components_open: bool,
-    list_open: bool,
-) -> Vec<TreeNode<&'static str>> {
-    use relay_uikit::IconName;
-
-    let mut nodes = vec![TreeNode::new("tree:src", IconName::Folder, "src").expanded(src_open)];
-
-    if src_open {
-        nodes.push(
-            TreeNode::new("tree:components", IconName::Folder, "components")
-                .depth(1)
-                .expanded(components_open),
-        );
-    }
-
-    if src_open && components_open {
-        nodes.push(
-            TreeNode::new("tree:list", IconName::Folder, "list")
-                .depth(2)
-                .expanded(list_open),
-        );
-    }
-
-    if src_open && components_open && list_open {
-        nodes.push(
-            TreeNode::new("tree:item", IconName::FileText, "item.rs")
-                .depth(3)
-                .selected(true),
-        );
-    }
-
-    nodes
 }
 
 impl GalleryScenesApp {

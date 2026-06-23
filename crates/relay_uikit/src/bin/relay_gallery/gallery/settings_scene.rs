@@ -11,7 +11,7 @@ use relay_uikit::{
 };
 
 use super::{
-    FEEDBACK_TOAST_DURATION, GalleryScenesApp, GalleryState,
+    FEEDBACK_TOAST_DURATION, GalleryAccent, GalleryContentTab, GalleryScenesApp, GalleryState,
     shared::{scene_stack, section, strip, text_input_field},
 };
 
@@ -47,7 +47,6 @@ pub(super) fn render(
                     SettingsRow::new("Agent name")
                         .description("Used as the default terminal session label")
                         .control(text_input_field(
-                            host,
                             "settings-name",
                             &state.name_input,
                             state.name_focus.clone(),
@@ -60,7 +59,6 @@ pub(super) fn render(
                     SettingsRow::new("Default file filter")
                         .description("Applied when opening review and file panels")
                         .control(text_input_field(
-                            host,
                             "settings-filter",
                             &state.search_input,
                             state.search_focus.clone(),
@@ -121,10 +119,10 @@ pub(super) fn render(
                         .detail("Install the CLI or update PATH before launching an agent.")
                         .tone(Tone::Warning)
                         .action(
-                            Button::new("feedback-banner-action", "Open settings").on_click({
-                                let seg_tab = state.seg_tab.clone();
+                            Button::new("feedback-banner-action", "Open review").on_click({
+                                let content_tab = state.content_tab.clone();
                                 move |_event, _window, cx| {
-                                    seg_tab.set(cx, "settings");
+                                    content_tab.set(cx, GalleryContentTab::Review);
                                 }
                             }),
                         ),
@@ -239,8 +237,8 @@ pub(super) fn render(
                     )
                 })
                 .child(div().text_xs().text_color(theme.text_muted).child(format!(
-                    "Current tab: {}",
-                    state.seg_tab.get(cx)
+                    "Current workspace tab: {}",
+                    state.content_tab.get(cx).label()
                 ))),
         ))
 }
@@ -253,9 +251,9 @@ fn theme_select(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> imp
         "settings-theme-select",
         state.theme_choice.clone(),
         vec![
-            SelectOption::new("system", "System").detail("Follow OS appearance"),
-            SelectOption::new("light", "Light"),
-            SelectOption::new("dark", "Dark"),
+            SelectOption::new(ThemePreviewKind::System, "System").detail("Follow OS appearance"),
+            SelectOption::new(ThemePreviewKind::Light, "Light"),
+            SelectOption::new(ThemePreviewKind::Dark, "Dark"),
         ],
     )
     .open(is_open)
@@ -317,13 +315,7 @@ fn accent_picker(
     ColorPicker::new(
         "settings-accent-picker",
         accent_choice.get(cx),
-        vec![
-            ColorPreset::new("green", "Green", rgb(0x16a34a).into()),
-            ColorPreset::new("blue", "Blue", rgb(0x2563eb).into()),
-            ColorPreset::new("violet", "Violet", rgb(0x7c3aed).into()),
-            ColorPreset::new("amber", "Amber", rgb(0xb45309).into()),
-            ColorPreset::new("red", "Red", rgb(0xb91c1c).into()),
-        ],
+        accent_presets(),
     )
     .on_select({
         let accent_choice = accent_choice.clone();
@@ -370,4 +362,14 @@ fn notifications_toggle(state: &GalleryState) -> impl IntoElement {
 
 fn auto_archive_toggle(state: &GalleryState) -> impl IntoElement {
     Toggle::bound("settings-auto-archive", state.auto_archive.clone())
+}
+
+fn accent_presets() -> Vec<ColorPreset<GalleryAccent>> {
+    vec![
+        ColorPreset::new(GalleryAccent::Green, "Green", rgb(0x16a34a).into()),
+        ColorPreset::new(GalleryAccent::Blue, "Blue", rgb(0x2563eb).into()),
+        ColorPreset::new(GalleryAccent::Violet, "Violet", rgb(0x7c3aed).into()),
+        ColorPreset::new(GalleryAccent::Amber, "Amber", rgb(0xb45309).into()),
+        ColorPreset::new(GalleryAccent::Red, "Red", rgb(0xb91c1c).into()),
+    ]
 }

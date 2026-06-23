@@ -13,7 +13,7 @@ use relay_uikit::patterns::{
 };
 use relay_uikit::{Button, IconButton, IconName, Theme, Tone};
 
-use super::{WorkbenchApp, WorkbenchState, data::WorkbenchSession};
+use super::{WorkbenchApp, WorkbenchContextTab, WorkbenchState, data::WorkbenchSession};
 
 pub(super) fn right_context(
     state: &WorkbenchState,
@@ -32,16 +32,17 @@ pub(super) fn right_context(
             .child(Tabs::bound(
                 "workbench-context-tabs",
                 vec![
-                    Tab::new("files", "Files").icon(IconName::FileText),
-                    Tab::new("sessions", "Sessions").icon(IconName::Terminal),
-                    Tab::new("review", "Review").icon(IconName::MessageSquareText),
+                    Tab::new(WorkbenchContextTab::Files, "Files").icon(IconName::FileText),
+                    Tab::new(WorkbenchContextTab::Sessions, "Sessions").icon(IconName::Terminal),
+                    Tab::new(WorkbenchContextTab::Review, "Review")
+                        .icon(IconName::MessageSquareText),
                 ],
                 state.context_tab.clone(),
             ))
             .child(div().flex_1().min_h_0().p_3().child(match tab {
-                "sessions" => cached_session_list(state.session_list.clone()),
-                "review" => review_panel(state, theme, cx).into_any_element(),
-                _ => files_panel(state, theme, cx).into_any_element(),
+                WorkbenchContextTab::Sessions => cached_session_list(state.session_list.clone()),
+                WorkbenchContextTab::Review => review_panel(state, theme, cx).into_any_element(),
+                WorkbenchContextTab::Files => files_panel(state, theme, cx).into_any_element(),
             })),
     )
     .header(
@@ -54,7 +55,7 @@ pub(super) fn right_context(
                 TopToolbar::new()
                     .leading(WorkspaceBreadcrumb::new(vec![
                         "Context".into(),
-                        tab.to_string(),
+                        tab.label().into(),
                     ]))
                     .trailing(PaneToolbar::new().action(IconButton::new(
                         "workbench-context-settings",
