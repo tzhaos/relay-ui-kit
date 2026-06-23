@@ -131,6 +131,19 @@ impl TextInputState {
         self.cursor
     }
 
+    pub fn set_cursor(&mut self, byte: usize) {
+        self.cursor = self.clamp_to_boundary(byte);
+        self.selection_anchor = None;
+        self.marked_range = None;
+    }
+
+    pub fn extend_selection_to(&mut self, byte: usize) {
+        if self.selection_anchor.is_none() {
+            self.selection_anchor = Some(self.safe_cursor());
+        }
+        self.cursor = self.clamp_to_boundary(byte);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.value.is_empty()
     }
@@ -196,6 +209,14 @@ impl TextInputState {
         self.marked_range
             .as_ref()
             .map(|range| self.range_to_utf16(range))
+    }
+
+    pub fn utf16_offset_for_byte(&self, byte: usize) -> usize {
+        self.offset_to_utf16(byte)
+    }
+
+    pub fn byte_range_for_utf16(&self, range_utf16: &Range<usize>) -> Range<usize> {
+        self.range_from_utf16(range_utf16)
     }
 
     /// Removes the selected text. Returns `true` if a non-empty selection
@@ -497,6 +518,21 @@ impl TextInputState {
         }
     }
 
+    /// Handle only non-printable editing/navigation keys when the control is
+    /// also wired into GPUI's platform text input pipeline.
+    pub fn handle_platform_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+        let keystroke = event.keystroke.clone().with_simulated_ime();
+        let mods = keystroke.modifiers;
+
+        match keystroke.key.as_str() {
+            "enter" => TextInputAction::Submit,
+            "escape" => TextInputAction::Cancel,
+            "backspace" | "delete" | "left" | "right" | "home" | "end" => self.handle_key(event),
+            "a" if mods.control => self.handle_key(event),
+            _ => TextInputAction::Ignored,
+        }
+    }
+
     pub fn handle_integer_key(
         &mut self,
         event: &KeyDownEvent,
@@ -549,6 +585,17 @@ impl TextInputState {
                 TextInputAction::Changed
             }
             _ => self.handle_key(event),
+        }
+    }
+
+    pub fn handle_platform_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+        let keystroke = event.keystroke.clone().with_simulated_ime();
+        let mods = keystroke.modifiers;
+
+        match keystroke.key.as_str() {
+            "enter" if mods.control || mods.platform => TextInputAction::Submit,
+            "enter" => TextInputAction::Ignored,
+            _ => self.handle_platform_key(event),
         }
     }
 
@@ -929,6 +976,21 @@ mod tests {
         let mut s = TextInputState::with_text("x");
         assert_eq!(s.handle_key(&key("enter", None)), TextInputAction::Submit);
         assert_eq!(s.handle_key(&key("escape", None)), TextInputAction::Cancel);
+    }
+
+    #[test]
+    fn platform_key_mode_ignores_printable_text() {
+        let mut s = TextInputState::with_text("x");
+        assert_eq!(s.handle_platform_key(&key("a", Some("a"))), TextInputAction::Ignored);
+        assert_eq!(s.value(), "x");
+    }
+
+    #[test]
+    fn extend_selection_to_anchors_existing_cursor() {
+        let mut s = TextInputState::with_text("hello");
+        s.set_cursor(2);
+        s.extend_selection_to(4);
+        assert_eq!(s.selection_range(), Some((2, 4)));
     }
 
     #[test]

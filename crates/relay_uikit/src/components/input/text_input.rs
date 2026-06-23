@@ -11,7 +11,12 @@ use crate::{
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
-use super::TextInputState;
+use super::{
+    TextInputState,
+    platform_input::{
+        PlatformInputMode, PointerSelectionState, SingleLineInputStyle, single_line_input,
+    },
+};
 
 /// A single-line text input view. The host owns the editable state.
 #[derive(IntoElement)]
@@ -107,6 +112,14 @@ impl RenderOnce for TextInput {
         let theme = *cx.theme();
         let binding = self.binding;
         let is_focused = self.focus.is_focused(window) || self.focused;
+        let root_id = self.id.clone();
+        let placeholder = self.placeholder.clone();
+        let focus = self.focus.clone();
+        let pointer = binding.as_ref().map(|_| {
+            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+                PointerSelectionState::default()
+            })
+        });
         let (before_str, selection_str, after_str, cursor_visible) = match binding.as_ref() {
             Some(binding) => {
                 let state = binding.get(cx);
@@ -138,7 +151,7 @@ impl RenderOnce for TextInput {
         let disabled = self.disabled;
 
         div()
-            .id(self.id)
+            .id(root_id.clone())
             .h(px(30.0))
             .w_full()
             .flex()
@@ -171,34 +184,75 @@ impl RenderOnce for TextInput {
                 div()
                     .flex_1()
                     .min_w_0()
+                    .relative()
                     .flex()
                     .items_center()
                     .text_sm()
                     .when(show_placeholder, |this| {
-                        this.text_color(theme.text_muted).child(self.placeholder)
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(single_line_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                show_placeholder,
+                                disabled,
+                                PlatformInputMode::Text,
+                                None,
+                            ))
+                        } else {
+                            this.text_color(theme.text_muted).child(placeholder.clone())
+                        }
                     })
                     .when(!show_placeholder, |this| {
-                        this.text_color(theme.text)
-                            .child(div().child(before_str))
-                            .when(!selection_str.is_empty(), |this| {
-                                this.child(
-                                    div()
-                                        .bg(theme.selection)
-                                        .text_color(theme.text)
-                                        .child(selection_str),
-                                )
-                            })
-                            .when(is_focused && cursor_visible, |this| {
-                                this.child(caret(theme.accent))
-                            })
-                            .child(div().child(after_str))
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(single_line_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                show_placeholder,
+                                disabled,
+                                PlatformInputMode::Text,
+                                None,
+                            ))
+                        } else {
+                            this.text_color(theme.text)
+                                .child(div().child(before_str))
+                                .when(!selection_str.is_empty(), |this| {
+                                    this.child(
+                                        div()
+                                            .bg(theme.selection)
+                                            .text_color(theme.text)
+                                            .child(selection_str),
+                                    )
+                                })
+                                .when(is_focused && cursor_visible, |this| {
+                                    this.child(caret(theme.accent))
+                                })
+                                .child(div().child(after_str))
+                        }
                     }),
             )
             .when(handle_key, |this| {
                 let binding_clone = binding.clone();
                 this.on_key_down(move |event, window, cx| {
                     if let Some(binding) = &binding_clone {
-                        binding.update(cx, |state| state.handle_key(event).should_notify());
+                        binding.update(cx, |state| state.handle_platform_key(event).should_notify());
                     }
                     if let Some(on_key) = &on_key {
                         on_key(event, window, cx);

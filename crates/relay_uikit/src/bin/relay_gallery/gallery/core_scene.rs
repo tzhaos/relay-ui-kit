@@ -1,8 +1,11 @@
 //! Core kit gallery — every component wired to relay signals with toast feedback.
 
-use gpui::{App, Context, Entity, IntoElement, ParentElement, Styled, div, prelude::FluentBuilder, px};
+use gpui::{
+    App, Context, Entity, IntoElement, ParentElement, Role, Styled, div,
+    prelude::FluentBuilder, px,
+};
 use relay_uikit::{
-    ActiveTheme, Button, ButtonVariant, Checkbox, Disclosure, Divider, FilterBar, FilterChip,
+    Button, ButtonVariant, Checkbox, Disclosure, Divider, FilterBar, FilterChip,
     Icon, IconButton, IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput,
     Radio, SearchField, SegmentedControl, Segment, Slider, Stepper, TextInput, TextInputState,
     Theme, Toggle, TreeRow,
@@ -16,15 +19,15 @@ pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
     window: &gpui::Window,
-    theme: Theme,
+    _theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     let disclosure_open = state.core_disclosure_open.get(cx);
     let name_focused = state.name_focus.is_focused(window);
 
     scene_stack()
-        .child(section(cx, "Buttons", button_sample(state, host)))
-        .child(section(cx, "Icon Buttons", icon_button_sample(state, host)))
+        .child(section(cx, "Buttons", button_sample(host)))
+        .child(section(cx, "Icon Buttons", icon_button_sample(host)))
         .child(section(cx, "Toggle · Checkbox · Radio", choice_sample(state, host)))
         .child(section(cx, "Text Input", text_input_sample(state, name_focused)))
         .child(section(cx, "Search & Filter", search_sample(state, host)))
@@ -43,7 +46,7 @@ fn toast(host: Entity<GalleryScenesApp>, msg: impl Into<String>) -> impl Fn(&gpu
 
 // ── Button samples ────────────────────────────────────────────────────────
 
-fn button_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn button_sample(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     let h = host.clone();
     div().flex().flex_col().gap_3()
         .child(strip()
@@ -59,14 +62,14 @@ fn button_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
             .child(Button::new("btn-ghost-icon", "Settings").ghost().icon(IconName::Settings).on_click(toast(h, "Settings"))))
 }
 
-fn icon_button_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+fn icon_button_sample(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     let h = host.clone();
     div().flex().flex_col().gap_2()
         .child(strip()
-            .child(IconButton::new("ib-plus", IconName::Plus).size(IconSize::Small).on_click(toast(h.clone(), "Plus")))
-            .child(IconButton::new("ib-search", IconName::Search).size(IconSize::Small).on_click(toast(h.clone(), "Search")))
-            .child(IconButton::new("ib-archive", IconName::Archive).size(IconSize::Small).on_click(toast(h.clone(), "Archive")))
-            .child(IconButton::new("ib-panel", IconName::PanelLeft).size(IconSize::Small).active(true).on_click(toast(h, "Panel toggle"))))
+            .child(IconButton::new("ib-plus", IconName::Plus).size(IconSize::Small).aria_label("Add item").on_click(toast(h.clone(), "Plus")))
+            .child(IconButton::new("ib-search", IconName::Search).size(IconSize::Small).aria_label("Search").on_click(toast(h.clone(), "Search")))
+            .child(IconButton::new("ib-archive", IconName::Archive).size(IconSize::Small).aria_label("Archive").on_click(toast(h.clone(), "Archive")))
+            .child(IconButton::new("ib-panel", IconName::PanelLeft).size(IconSize::Small).aria_label("Toggle left panel").active(true).on_click(toast(h, "Panel toggle"))))
         .child(strip()
             .child(IconButton::new("ib-dis", IconName::Plus).size(IconSize::Small).disabled(true)))
 }
@@ -91,6 +94,7 @@ fn text_input_sample(state: &GalleryState, focused: bool) -> impl IntoElement {
     div().flex().flex_col().gap_3()
         .child(div().max_w(px(320.0)).child(
             TextInput::bound("demo-name", state.name_focus.clone(), state.name_input.clone())
+                .leading_icon(IconName::Search)
                 .placeholder("Enter your name — type to see live text")
                 .focused(focused)))
         .child(div().max_w(px(320.0)).child(
@@ -100,10 +104,21 @@ fn text_input_sample(state: &GalleryState, focused: bool) -> impl IntoElement {
 
 fn search_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     let h = host.clone();
+    let clear_host = h.clone();
+    let search_input = state.search_input.clone();
     div().flex().flex_col().gap_3()
         .child(div().max_w(px(280.0)).child(
             SearchField::bound("demo-search", state.search_focus.clone(), state.search_input.clone())
-                .placeholder("Filter items..."),
+                .placeholder("Filter items...")
+                .on_clear(move |_, _, cx| {
+                    search_input.update(cx, |state| {
+                        state.clear();
+                        true
+                    });
+                    clear_host.update(cx, |this, cx| {
+                        this.add_feedback_toast(cx, "Search cleared");
+                    });
+                }),
         ))
         .child(strip()
             .child(FilterBar::new("demo-fb")
@@ -118,6 +133,7 @@ fn number_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
     div().flex().flex_col().gap_3()
         .child(strip()
             .child(NumberInput::bound("demo-num", state.ui_font_size.clone())
+                .input_bound(state.ui_font_size_focus.clone(), state.ui_font_size_input.clone())
                 .range(10, 24).suffix("px")
                 .on_change({
                     let h = host.clone();
@@ -168,6 +184,24 @@ fn tree_sample(state: &GalleryState, cx: &App) -> impl IntoElement {
         .child(NavRow::new("demo-nav", IconName::Terminal, "Active session").count(3).selected(true))
         .child(NavRow::new("demo-nav2", IconName::PanelLeft, "Files"))
         .child(Divider::horizontal())
+        .child(
+            ListItem::new("demo-list-selected")
+                .role(Role::ListItem)
+                .aria_label("Selected inbox thread")
+                .selected(true)
+                .start_slot(Icon::new(IconName::Archive).size(IconSize::Small))
+                .end_slot(Label::new("Pinned").size(LabelSize::Small))
+                .child("relay_v2 migration thread"),
+        )
+        .child(
+            ListItem::new("demo-list-toggle")
+                .role(Role::ListItem)
+                .aria_label("Readonly source file")
+                .toggled(true)
+                .start_slot(Icon::new(IconName::FileText).size(IconSize::Small))
+                .end_slot(Label::new("Readonly").size(LabelSize::Small))
+                .child("src/components/button.rs"),
+        )
         .child(TreeRow::new("demo-tree", IconName::Folder, "src/components").expandable(true))
         .child(TreeRow::bound("demo-tree-file", IconName::FileText, "button.rs", state.core_disclosure_open.clone())
             .depth(1).expanded_bound(state.core_disclosure_open.clone()))

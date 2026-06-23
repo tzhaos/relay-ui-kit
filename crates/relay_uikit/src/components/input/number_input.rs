@@ -11,7 +11,13 @@ use crate::{
     theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius},
 };
 
-use super::{InputActionKind, InputValueKind, TextInputState};
+use super::{
+    InputActionKind, InputValueKind, TextInputState,
+    platform_input::{
+        AfterEdit, PlatformInputMode, PointerSelectionState, SingleLineInputStyle,
+        single_line_input,
+    },
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberInputLayout {
@@ -226,6 +232,13 @@ impl RenderOnce for NumberInput {
             on_increment,
         } = self;
         let theme = *cx.theme();
+        let pointer = editable.as_ref().and_then(|editable| {
+            editable.binding.as_ref().map(|_| {
+                window.use_keyed_state((id.clone(), "pointer-selection"), cx, |_, _| {
+                    PointerSelectionState::default()
+                })
+            })
+        });
         let current_value = value_binding
             .as_ref()
             .map_or(current_value, |binding| binding.get(cx));
@@ -245,6 +258,7 @@ impl RenderOnce for NumberInput {
                 editable_number_value(
                     value_id,
                     editable,
+                    pointer,
                     current_value,
                     suffix,
                     theme,
@@ -356,6 +370,7 @@ fn number_value(
 fn editable_number_value(
     id: impl Into<ElementId>,
     editable: EditableNumberValue,
+    pointer: Option<gpui::Entity<PointerSelectionState>>,
     fallback: i32,
     suffix: Option<String>,
     theme: crate::Theme,
@@ -364,6 +379,7 @@ fn editable_number_value(
     max: Option<i32>,
     on_change: Option<SharedChangeHandler<i32>>,
 ) -> impl IntoElement {
+    let id = id.into();
     let focus_for_click = editable.focus.clone();
     let focus_for_mouse_down = editable.focus.clone();
     let is_focused = editable.focused;
@@ -372,9 +388,28 @@ fn editable_number_value(
     let show_fallback = editable.before.is_empty() && editable.after.is_empty() && !is_focused;
     let allow_negative = min.is_none_or(|min| min < 0);
     let handle_key = text_binding.is_some() || on_key.is_some();
+    let after_edit = text_binding.as_ref().map(|_| {
+        let value_binding = value_binding.clone();
+        let on_change = on_change.clone();
+        std::rc::Rc::new(
+            move |text_binding: &Binding<TextInputState>, window: &mut Window, cx: &mut App| {
+                apply_parsed_integer_value(
+                    text_binding,
+                    &value_binding,
+                    &on_change,
+                    fallback,
+                    min,
+                    max,
+                    false,
+                    window,
+                    cx,
+                );
+            },
+        ) as AfterEdit
+    });
 
     div()
-        .id(id)
+        .id(id.clone())
         .min_w(px(58.0))
         .h_full()
         .px_2()
@@ -397,12 +432,32 @@ fn editable_number_value(
                 .child(fallback.to_string())
         })
         .when(!show_fallback, |this| {
-            this.text_color(theme.text)
-                .child(editable.before)
-                .when(is_focused, |this| {
-                    this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
-                })
-                .child(editable.after)
+            if let (Some(text_binding), Some(pointer)) = (text_binding.clone(), pointer.clone()) {
+                this.text_color(theme.text).child(single_line_input(
+                    (id.clone(), "editor"),
+                    editable.focus.clone(),
+                    text_binding,
+                    pointer,
+                    SingleLineInputStyle {
+                        text_color: theme.text,
+                        placeholder_color: theme.text_muted,
+                        selection_color: theme.selection,
+                        cursor_color: theme.accent,
+                    },
+                    fallback.to_string(),
+                    show_fallback,
+                    false,
+                    PlatformInputMode::Integer { allow_negative },
+                    after_edit.clone(),
+                ))
+            } else {
+                this.text_color(theme.text)
+                    .child(editable.before)
+                    .when(is_focused, |this| {
+                        this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
+                    })
+                    .child(editable.after)
+            }
         })
         .when_some(suffix, |this, suffix| {
             this.child(div().text_xs().text_color(theme.text_muted).child(suffix))
@@ -410,7 +465,7 @@ fn editable_number_value(
         .when(handle_key, |this| {
             this.on_key_down(move |event, window, cx| {
                 if let Some(binding) = &text_binding {
-                    handle_bound_integer_key(
+                    handle_bound_integer_platform_key(
                         binding,
                         &value_binding,
                         &on_change,
@@ -500,7 +555,7 @@ fn stepper(
     clippy::too_many_arguments,
     reason = "Keyboard handling bridges text, value, and optional host callbacks."
 )]
-fn handle_bound_integer_key(
+fn handle_bound_integer_platform_key(
     text_binding: &Binding<TextInputState>,
     value_binding: &Option<Binding<i32>>,
     on_change: &Option<SharedChangeHandler<i32>>,
@@ -512,17 +567,18 @@ fn handle_bound_integer_key(
     window: &mut Window,
     cx: &mut App,
 ) {
-    let mut parsed_value = None;
+    let _allow_negative = allow_negative;
+    let mut should_parse = false;
     let mut should_sync_text = false;
     text_binding.update(cx, |state| {
-        let action = state.handle_integer_key(event, allow_negative);
+        let action = state.handle_platform_key(event);
         match action.contract_kind_for(InputValueKind::Number) {
             InputActionKind::Changed(InputValueKind::Number) => {
-                parsed_value = parse_integer(state.value(), min, max);
+                should_parse = true;
             }
             InputActionKind::Submit | InputActionKind::Validate => {
-                parsed_value = parse_integer(state.value(), min, max);
-                should_sync_text = parsed_value.is_some();
+                should_parse = true;
+                should_sync_text = true;
             }
             InputActionKind::Cancel => {
                 state.set_text(current_value.to_string());
@@ -534,18 +590,50 @@ fn handle_bound_integer_key(
         action.should_notify()
     });
 
-    if let Some(value) = parsed_value {
-        if let Some(binding) = value_binding {
-            binding.set(cx, value);
-        }
-        if should_sync_text {
-            sync_text_binding(text_binding, cx, value);
-        }
-        if value != current_value
-            && let Some(handler) = on_change
-        {
-            handler(value, window, cx);
-        }
+    if should_parse {
+        apply_parsed_integer_value(
+            text_binding,
+            value_binding,
+            on_change,
+            current_value,
+            min,
+            max,
+            should_sync_text,
+            window,
+            cx,
+        );
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Numeric input sync depends on host value binding, range, and submit semantics."
+)]
+fn apply_parsed_integer_value(
+    text_binding: &Binding<TextInputState>,
+    value_binding: &Option<Binding<i32>>,
+    on_change: &Option<SharedChangeHandler<i32>>,
+    current_value: i32,
+    min: Option<i32>,
+    max: Option<i32>,
+    should_sync_text: bool,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let Some(value) = parse_integer(text_binding.get(cx).value(), min, max) else {
+        return;
+    };
+
+    if let Some(binding) = value_binding {
+        binding.set(cx, value);
+    }
+    if should_sync_text {
+        sync_text_binding(text_binding, cx, value);
+    }
+    if value != current_value
+        && let Some(handler) = on_change
+    {
+        handler(value, window, cx);
     }
 }
 

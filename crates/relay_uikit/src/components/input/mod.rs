@@ -1,6 +1,7 @@
 //! Keyboard-driven text and numeric input components.
 
 mod number_input;
+mod platform_input;
 mod search_field;
 mod state;
 mod text_area;

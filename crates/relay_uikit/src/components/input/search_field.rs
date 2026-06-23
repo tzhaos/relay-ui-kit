@@ -11,7 +11,12 @@ use crate::{
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
-use super::TextInputState;
+use super::{
+    TextInputState,
+    platform_input::{
+        PlatformInputMode, PointerSelectionState, SingleLineInputStyle, single_line_input,
+    },
+};
 
 /// A focusable search/filter well with a leading magnifier icon.
 #[derive(IntoElement)]
@@ -103,6 +108,14 @@ impl RenderOnce for SearchField {
         let theme = *cx.theme();
         let binding = self.binding;
         let is_focused = self.focus.is_focused(window);
+        let root_id = self.id.clone();
+        let placeholder = self.placeholder.clone();
+        let focus = self.focus.clone();
+        let pointer = binding.as_ref().map(|_| {
+            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+                PointerSelectionState::default()
+            })
+        });
         let (before_str, sel_str, after_str, cursor_visible, is_empty) = match binding.as_ref() {
             Some(b) => {
                 let state = b.get(cx);
@@ -145,7 +158,7 @@ impl RenderOnce for SearchField {
         let disabled = self.disabled;
         let on_clear = self.on_clear;
         div()
-            .id(self.id)
+            .id(root_id.clone())
             .h(px(30.0))
             .w_full()
             .flex()
@@ -177,22 +190,63 @@ impl RenderOnce for SearchField {
                 div()
                     .flex_1()
                     .min_w_0()
+                    .relative()
                     .flex()
                     .items_center()
                     .text_sm()
                     .text_color(text_color)
                     .when(is_empty, |this| {
-                        this.child(placeholder_text)
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(single_line_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                is_empty,
+                                disabled,
+                                PlatformInputMode::Text,
+                                None,
+                            ))
+                        } else {
+                            this.child(placeholder_text)
+                        }
                     })
                     .when(!is_empty, |this| {
-                        this.child(div().child(before_str))
-                            .when(!sel_str.is_empty(), |this| {
-                                this.child(div().bg(theme.selection).text_color(theme.text).child(sel_str))
-                            })
-                            .when(cursor_visible, |this| {
-                                this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
-                            })
-                            .child(div().child(after_str))
+                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
+                            this.child(single_line_input(
+                                (root_id.clone(), "editor"),
+                                focus.clone(),
+                                binding,
+                                pointer,
+                                SingleLineInputStyle {
+                                    text_color: theme.text,
+                                    placeholder_color: theme.text_muted,
+                                    selection_color: theme.selection,
+                                    cursor_color: theme.accent,
+                                },
+                                placeholder.clone(),
+                                is_empty,
+                                disabled,
+                                PlatformInputMode::Text,
+                                None,
+                            ))
+                        } else {
+                            this.child(div().child(before_str))
+                                .when(!sel_str.is_empty(), |this| {
+                                    this.child(div().bg(theme.selection).text_color(theme.text).child(sel_str))
+                                })
+                                .when(cursor_visible, |this| {
+                                    this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
+                                })
+                                .child(div().child(after_str))
+                        }
                     }),
             )
             .when(!is_empty && !disabled, |this| {
@@ -228,7 +282,7 @@ impl RenderOnce for SearchField {
                     let mut consumed = false;
                     if let Some(binding) = &binding {
                         binding.update(cx, |state| {
-                            let action = state.handle_key(event);
+                            let action = state.handle_platform_key(event);
                             consumed = action.should_notify();
                             consumed
                         });
