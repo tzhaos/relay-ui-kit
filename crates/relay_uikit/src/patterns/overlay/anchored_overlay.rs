@@ -104,6 +104,7 @@ fn sync_overlay_focus_state(
         if let Some(focus_handle) = focus_handle.cloned() {
             window.on_next_frame(move |window, _cx| {
                 window.on_next_frame(move |window, cx| {
+                    window.activate_window();
                     window.focus(&focus_handle, cx);
                 });
             });
@@ -288,7 +289,34 @@ impl IntoElement for AnchoredOverlay {
 
 #[cfg(test)]
 mod tests {
+    use gpui::{Context, InteractiveElement, IntoElement, Render, TestApp, Window, div};
+
     use super::*;
+
+    struct FocusHost {
+        trigger_focus: FocusHandle,
+        overlay_focus: FocusHandle,
+        outside_focus: FocusHandle,
+    }
+
+    impl FocusHost {
+        fn new(cx: &mut Context<Self>) -> Self {
+            Self {
+                trigger_focus: cx.focus_handle(),
+                overlay_focus: cx.focus_handle(),
+                outside_focus: cx.focus_handle(),
+            }
+        }
+    }
+
+    impl Render for FocusHost {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .child(div().track_focus(&self.trigger_focus))
+                .child(div().track_focus(&self.overlay_focus))
+                .child(div().track_focus(&self.outside_focus))
+        }
+    }
 
     #[test]
     fn anchored_overlay_defaults_to_trigger_bottom_left() {
@@ -296,5 +324,91 @@ mod tests {
 
         assert_eq!(overlay.anchor, Anchor::TopLeft);
         assert_eq!(overlay.attach, Anchor::BottomLeft);
+    }
+
+    #[test]
+    fn overlay_focus_state_restores_previous_focus_when_overlay_closes() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| FocusHost::new(cx));
+        let mut state = AnchoredOverlayState::default();
+
+        window.draw();
+        window.update(|view, window, cx| {
+            window.activate_window();
+            window.focus(&view.trigger_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_overlay_focus_state(&mut state, true, Some(&view.overlay_focus), window, cx);
+        });
+        window.draw();
+        window.update(|view, window, cx| {
+            window.focus(&view.overlay_focus, cx);
+        });
+        window.draw();
+
+        let overlay_focused =
+            window.update(|view, window, cx| view.overlay_focus.contains_focused(window, cx));
+        assert!(overlay_focused);
+
+        window.update(|view, window, cx| {
+            sync_overlay_focus_state(&mut state, false, Some(&view.overlay_focus), window, cx);
+        });
+        window.draw();
+
+        let (trigger_focused, overlay_focused) = window.update(|view, window, cx| {
+            (
+                view.trigger_focus.contains_focused(window, cx),
+                view.overlay_focus.contains_focused(window, cx),
+            )
+        });
+        assert!(trigger_focused);
+        assert!(!overlay_focused);
+    }
+
+    #[test]
+    fn overlay_focus_state_does_not_steal_focus_back_after_focus_leaves_overlay() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| FocusHost::new(cx));
+        let mut state = AnchoredOverlayState::default();
+
+        window.draw();
+        window.update(|view, window, cx| {
+            window.activate_window();
+            window.focus(&view.trigger_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_overlay_focus_state(&mut state, true, Some(&view.overlay_focus), window, cx);
+        });
+        window.draw();
+        window.update(|view, window, cx| {
+            window.focus(&view.overlay_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            window.focus(&view.outside_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_overlay_focus_state(&mut state, false, Some(&view.overlay_focus), window, cx);
+        });
+        window.draw();
+
+        let (outside_focused, trigger_focused, overlay_focused) =
+            window.update(|view, window, cx| {
+                (
+                    view.outside_focus.contains_focused(window, cx),
+                    view.trigger_focus.contains_focused(window, cx),
+                    view.overlay_focus.contains_focused(window, cx),
+                )
+            });
+        assert!(outside_focused);
+        assert!(!trigger_focused);
+        assert!(!overlay_focused);
     }
 }

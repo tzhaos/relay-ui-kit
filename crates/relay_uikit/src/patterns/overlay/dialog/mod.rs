@@ -137,6 +137,7 @@ impl Dialog {
 fn schedule_dialog_focus(target: FocusHandle, window: &mut Window) {
     window.on_next_frame(move |window, _cx| {
         window.on_next_frame(move |window, cx| {
+            window.activate_window();
             window.focus(&target, cx);
         });
     });
@@ -287,9 +288,35 @@ impl RenderOnce for Dialog {
 
 #[cfg(test)]
 mod tests {
+    use gpui::{Context, InteractiveElement, IntoElement, Render, TestApp, Window, div};
     use relay::ReactiveAppExt;
 
     use super::*;
+
+    struct FocusHost {
+        trigger_focus: FocusHandle,
+        dialog_focus: FocusHandle,
+        outside_focus: FocusHandle,
+    }
+
+    impl FocusHost {
+        fn new(cx: &mut Context<Self>) -> Self {
+            Self {
+                trigger_focus: cx.focus_handle(),
+                dialog_focus: cx.focus_handle(),
+                outside_focus: cx.focus_handle(),
+            }
+        }
+    }
+
+    impl Render for FocusHost {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .child(div().track_focus(&self.trigger_focus))
+                .child(div().track_focus(&self.dialog_focus))
+                .child(div().track_focus(&self.outside_focus))
+        }
+    }
 
     #[test]
     fn dialog_width_can_be_overridden() {
@@ -314,10 +341,124 @@ mod tests {
 
     #[test]
     fn dialog_open_bound_stores_open_state() {
-        let mut app = gpui::TestApp::new();
+        let mut app = TestApp::new();
         let dialog =
             app.update(|cx| Dialog::new("dialog", "Settings").open_bound(cx.binding(false)));
 
         assert!(dialog.open_state.is_some());
+    }
+
+    #[test]
+    fn dialog_focus_state_restores_previous_focus_when_dialog_closes() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| FocusHost::new(cx));
+        let mut state = DialogLifecycleState::default();
+
+        window.draw();
+        window.update(|view, window, cx| {
+            window.activate_window();
+            window.focus(&view.trigger_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_dialog_focus_state(
+                &mut state,
+                true,
+                &view.dialog_focus,
+                &view.dialog_focus,
+                window,
+                cx,
+            );
+        });
+        window.draw();
+        window.update(|view, window, cx| {
+            window.focus(&view.dialog_focus, cx);
+        });
+        window.draw();
+
+        let dialog_focused =
+            window.update(|view, window, cx| view.dialog_focus.contains_focused(window, cx));
+        assert!(dialog_focused);
+
+        window.update(|view, window, cx| {
+            sync_dialog_focus_state(
+                &mut state,
+                false,
+                &view.dialog_focus,
+                &view.dialog_focus,
+                window,
+                cx,
+            );
+        });
+        window.draw();
+
+        let (trigger_focused, dialog_focused) = window.update(|view, window, cx| {
+            (
+                view.trigger_focus.contains_focused(window, cx),
+                view.dialog_focus.contains_focused(window, cx),
+            )
+        });
+        assert!(trigger_focused);
+        assert!(!dialog_focused);
+    }
+
+    #[test]
+    fn dialog_focus_state_does_not_steal_focus_back_after_focus_leaves_dialog() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| FocusHost::new(cx));
+        let mut state = DialogLifecycleState::default();
+
+        window.draw();
+        window.update(|view, window, cx| {
+            window.activate_window();
+            window.focus(&view.trigger_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_dialog_focus_state(
+                &mut state,
+                true,
+                &view.dialog_focus,
+                &view.dialog_focus,
+                window,
+                cx,
+            );
+        });
+        window.draw();
+        window.update(|view, window, cx| {
+            window.focus(&view.dialog_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            window.focus(&view.outside_focus, cx);
+        });
+        window.draw();
+
+        window.update(|view, window, cx| {
+            sync_dialog_focus_state(
+                &mut state,
+                false,
+                &view.dialog_focus,
+                &view.dialog_focus,
+                window,
+                cx,
+            );
+        });
+        window.draw();
+
+        let (outside_focused, trigger_focused, dialog_focused) =
+            window.update(|view, window, cx| {
+                (
+                    view.outside_focus.contains_focused(window, cx),
+                    view.trigger_focus.contains_focused(window, cx),
+                    view.dialog_focus.contains_focused(window, cx),
+                )
+            });
+        assert!(outside_focused);
+        assert!(!trigger_focused);
+        assert!(!dialog_focused);
     }
 }

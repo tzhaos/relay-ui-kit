@@ -69,6 +69,7 @@ impl RenderOnce for Overlay {
         if let Some(focus_handle) = focus_handle.clone() {
             window.on_next_frame(move |window, _cx| {
                 window.on_next_frame(move |window, cx| {
+                    window.activate_window();
                     window.focus(&focus_handle, cx);
                 });
             });
