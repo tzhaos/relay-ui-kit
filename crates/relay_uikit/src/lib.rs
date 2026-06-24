@@ -57,10 +57,7 @@ pub use display::{
 pub use feedback::{Banner, Callout, InlineError, LoadingSpinner, ProgressBar, Skeleton, Toast};
 pub use form::{FieldDescription, FieldLabel, SettingsRow, SettingsSection};
 pub use icon::{Icon, IconName, IconSize, KitAssets};
-pub use input::{
-    InputActionKind, InputValueKind, NumberInput, NumberInputLayout, SearchField, TextArea,
-    TextInput, TextInputAction, TextInputState, ValidationState,
-};
+pub use input::{NumberInput, NumberInputLayout, SearchField, TextArea, TextInput, TextInputState};
 pub use list::{
     ForEach, ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView,
 };
@@ -90,14 +87,13 @@ pub mod core {
         ActiveTheme, Badge, BadgeStyle, Banner, Button, ButtonVariant, Callout, Checkbox,
         ColorField, ColorPicker, ColorPreset, ColorSwatch, CountBadge, Disclosure, Divider,
         EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton,
-        IconName, IconSize, InlineError, InputActionKind, InputValueKind, KitAssets, Label,
-        LabelColor, LabelSize, ListItem, ListItemSpacing, LoadingSpinner, MotionDirection,
-        MotionDuration, MotionExt, MotionPolicy, NavRow, NumberInput, NumberInputLayout,
-        PanelHeader, ProgressBar, Radio, SearchField, SectionedList, SectionedListGroup, Segment,
-        SegmentedControl, SettingsRow, SettingsSection, Skeleton, Slider, StatusDot, Stepper,
-        TextArea, TextInput, TextInputAction, TextInputState, Theme, ThemePreviewCard,
-        ThemePreviewKind, Toast, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
-        ValidationState, button, choice, components, controls, display, feedback, form, icon,
-        input, interaction, list, motion, radius, row, space, styles, theme, tone,
+        IconName, IconSize, InlineError, KitAssets, Label, LabelColor, LabelSize, ListItem,
+        ListItemSpacing, LoadingSpinner, MotionDirection, MotionDuration, MotionExt, MotionPolicy,
+        NavRow, NumberInput, NumberInputLayout, PanelHeader, ProgressBar, Radio, SearchField,
+        SectionedList, SectionedListGroup, Segment, SegmentedControl, SettingsRow, SettingsSection,
+        Skeleton, Slider, StatusDot, Stepper, TextArea, TextInput, TextInputState, Theme,
+        ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow,
+        TreeView, button, choice, components, controls, display, feedback, form, icon, input,
+        interaction, list, motion, radius, row, space, styles, theme, tone,
     };
 }

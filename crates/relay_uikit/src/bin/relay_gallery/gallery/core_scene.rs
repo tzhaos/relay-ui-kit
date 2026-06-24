@@ -7,10 +7,10 @@ use gpui::{
 use relay_uikit::{
     ActiveTheme, Badge, Button, ButtonVariant, Checkbox, ColorField, ColorSwatch, CountBadge,
     Disclosure, Divider, FieldDescription, FieldLabel, FilterBar, FilterChip, ForEach, Icon,
-    IconButton, IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput, PanelHeader,
-    Radio, SearchField, SectionedList, SectionedListGroup, Segment, SegmentedControl, Slider,
-    StatusDot, Stepper, TextInput, TextInputState, Theme, ThemePreviewKind, Toggle, Tone,
-    ToolbarGroup, TreeNode, TreeRow, TreeView,
+    IconButton, IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput,
+    NumberInputLayout, PanelHeader, Radio, SearchField, SectionedList, SectionedListGroup, Segment,
+    SegmentedControl, Slider, StatusDot, Stepper, TextInput, TextInputState, Theme,
+    ThemePreviewKind, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::GalleryScenesApp;
@@ -566,6 +566,25 @@ fn number_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                         move |v: i32, _: &mut Window, cx: &mut App| {
                             h.update(cx, |this, cx| {
                                 this.add_feedback_toast(cx, format!("Font size: {v}px"))
+                            });
+                        }
+                    }),
+            ),
+        )
+        .child(
+            strip().child(
+                NumberInput::bound("demo-num-trailing", state.ui_font_size.clone())
+                    .layout(NumberInputLayout::ControlsTrailing)
+                    .range(10, 24)
+                    .suffix("px")
+                    .on_change({
+                        let h = host.clone();
+                        move |v: i32, _: &mut Window, cx: &mut App| {
+                            h.update(cx, |this, cx| {
+                                this.add_feedback_toast(
+                                    cx,
+                                    format!("Trailing number layout: {v}px"),
+                                )
                             });
                         }
                     }),

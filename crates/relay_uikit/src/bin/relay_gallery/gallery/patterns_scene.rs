@@ -8,10 +8,10 @@ use relay::{
 };
 use relay_uikit::patterns::{
     ActionsMenu, CommandMenu, CommandMenuItem, CommandMenuItemKind, CommandPalette, CommandRow,
-    DiffView, FileKind, FileViewer, InputComposer, ItemPicker, KeybindingActionKind,
-    KeybindingActions, KeybindingRow, KeybindingShortcut, KeybindingTable, MarkdownViewer,
-    OutputLog, OutputSurface, PaneToolbar, PickerAction, PickerOption, Popover, QuickAction,
-    SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData, TopToolbar,
+    DiffHunk, DiffLine, DiffLineKind, DiffView, FileKind, FileViewer, InputComposer, ItemPicker,
+    KeybindingActionKind, KeybindingActions, KeybindingRow, KeybindingShortcut, KeybindingTable,
+    MarkdownViewer, OutputLog, OutputSurface, PaneToolbar, PickerAction, PickerOption, Popover,
+    QuickAction, SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData, TopToolbar,
     WorkspaceBreadcrumb,
     display::KeyValue,
     layout::ListSection,
@@ -846,7 +846,7 @@ fn viewer_patterns(
                 GalleryContentTab::Diff => FileViewer::new(
                     "crates/relay_uikit/src/patterns/diff_view.rs",
                     FileKind::Diff,
-                    DiffView::from_text_diff(VIEWER_DIFF_BEFORE, VIEWER_DIFF_AFTER),
+                    DiffView::new(viewer_diff_hunks()),
                 )
                 .detail("Unified diff"),
                 GalleryContentTab::Review => FileViewer::new(
@@ -860,10 +860,55 @@ fn viewer_patterns(
 }
 
 const VIEWER_SAMPLE: &str = "pub struct OutputLine {\n    text: String,\n    style: OutputLineStyle,\n}\n\nimpl OutputLine {\n    pub fn new(text: impl Into<String>) -> Self {\n        Self { text: text.into(), style: OutputLineStyle::Output }\n    }\n}";
-const VIEWER_DIFF_BEFORE: &str =
-    "pub fn launch_agent() {\n    enqueue(\"relay\");\n    log(\"pending\");\n}\n";
-const VIEWER_DIFF_AFTER: &str = "pub fn launch_agent() {\n    enqueue(\"relay_v2\");\n    log(\"ready\");\n    notify(\"agent started\");\n}\n";
 const VIEWER_REVIEW_MARKDOWN: &str = "# Relay UIKit Review\n\n- Productize every exported component.\n- Keep focus, keyboard, and pointer behavior aligned.\n- Remove compatibility aliases instead of preserving them.\n\n> Gallery scenes should behave like real desktop surfaces.";
+
+fn viewer_diff_hunks() -> Vec<DiffHunk> {
+    vec![
+        DiffHunk::new(
+            "@@ relay_gallery @@",
+            vec![
+                DiffLine::with_numbers(
+                    DiffLineKind::Context,
+                    Some(12),
+                    Some(12),
+                    "fn launch_agent() {",
+                ),
+                DiffLine::with_numbers(
+                    DiffLineKind::Removed,
+                    Some(13),
+                    None,
+                    "    enqueue(\"relay\");",
+                ),
+                DiffLine::with_numbers(
+                    DiffLineKind::Added,
+                    None,
+                    Some(13),
+                    "    enqueue(\"relay_v2\");",
+                ),
+                DiffLine::with_numbers(
+                    DiffLineKind::Added,
+                    None,
+                    Some(14),
+                    "    notify(\"agent started\");",
+                ),
+                DiffLine::with_numbers(DiffLineKind::Context, Some(14), Some(15), "}"),
+            ],
+        ),
+        DiffHunk::new(
+            "@@ relay_uikit @@",
+            vec![
+                DiffLine::new(
+                    DiffLineKind::Context,
+                    "Badge and Label now expose explicit style builders.",
+                ),
+                DiffLine::new(
+                    DiffLineKind::Added,
+                    "Anchored overlays and shell primitives land in realistic gallery scenes.",
+                ),
+            ],
+        ),
+    ]
+}
 
 fn layout_patterns(
     state: &GalleryState,
