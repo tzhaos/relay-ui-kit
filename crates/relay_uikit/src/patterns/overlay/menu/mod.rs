@@ -406,16 +406,15 @@ impl RenderOnce for Menu {
                                 cx.stop_propagation();
                             }
                         }
-                        "escape" => {
-                            if snapshot.open_submenu.is_some() {
-                                state.update(cx, |state, cx| {
-                                    if state.close_submenu() {
-                                        cx.notify();
-                                    }
-                                });
-                                cx.stop_propagation();
-                            }
+                        "escape" if snapshot.open_submenu.is_some() => {
+                            state.update(cx, |state, cx| {
+                                if state.close_submenu() {
+                                    cx.notify();
+                                }
+                            });
+                            cx.stop_propagation();
                         }
+                        "escape" => {}
                         _ => {}
                     }
                 }

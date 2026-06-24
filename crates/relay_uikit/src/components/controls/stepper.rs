@@ -25,6 +25,65 @@ pub struct Stepper {
     on_reset: Option<ClickHandler>,
 }
 
+#[derive(Clone, Copy)]
+struct StepperRange {
+    min: Option<i32>,
+    max: Option<i32>,
+}
+
+impl StepperRange {
+    fn clamp(self, value: i32, delta: i32) -> i32 {
+        let new_value = if delta >= 0 {
+            value.saturating_add(delta)
+        } else {
+            value.saturating_sub(-delta)
+        };
+        let mut clamped = new_value;
+        if let Some(min) = self.min {
+            clamped = clamped.max(min);
+        }
+        if let Some(max) = self.max {
+            clamped = clamped.min(max);
+        }
+        clamped
+    }
+
+    fn at_limit(self, value: i32, delta: i32) -> bool {
+        if delta < 0 {
+            self.min.is_some_and(|min| value <= min)
+        } else {
+            self.max.is_some_and(|max| value >= max)
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct StepperButtonStyle {
+    hover_bg: gpui::Hsla,
+    color: gpui::Hsla,
+}
+
+struct StepperButtonProps {
+    id: ElementId,
+    icon: IconName,
+    binding: Option<Binding<i32>>,
+    delta: i32,
+    handler: Option<ClickHandler>,
+    range: StepperRange,
+    disabled: bool,
+    style: StepperButtonStyle,
+}
+
+struct StepperValueProps {
+    value: String,
+    binding: Option<Binding<i32>>,
+    range: StepperRange,
+    disabled: bool,
+    text_color: gpui::Hsla,
+    border_color: gpui::Hsla,
+    hover_bg: gpui::Hsla,
+}
+
 impl Stepper {
     pub fn new(id: impl Into<ElementId>, value: impl Into<String>) -> Self {
         Self {
@@ -97,16 +156,26 @@ impl Stepper {
 
 impl RenderOnce for Stepper {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let Self {
+            id,
+            value,
+            disabled,
+            min,
+            max,
+            binding,
+            on_decrement,
+            on_increment,
+            on_reset,
+        } = self;
         let theme = *cx.theme();
-        let id = self.id;
-        let binding = self.binding;
-        let disabled = self.disabled;
-        let min = self.min;
-        let max = self.max;
+        let range = StepperRange { min, max };
         let display = binding
             .as_ref()
-            .map_or(self.value.clone(), |b| format!("{}", b.get(cx)));
-        let reset = self.on_reset;
+            .map_or(value, |stepper_binding| stepper_binding.get(cx).to_string());
+        let button_style = StepperButtonStyle {
+            hover_bg: theme.hover,
+            color: theme.text_muted,
+        };
 
         div()
             .id(id.clone())
@@ -128,42 +197,37 @@ impl RenderOnce for Stepper {
                     .border_1()
                     .border_color(theme.border)
                     .bg(theme.panel_alt)
-                    .child(stepper_button(
-                        (id.clone(), "decrement"),
-                        IconName::Minus,
-                        binding.clone(),
-                        -1,
-                        self.on_decrement,
-                        min,
-                        max,
+                    .child(stepper_button(StepperButtonProps {
+                        id: (id.clone(), "decrement").into(),
+                        icon: IconName::Minus,
+                        binding: binding.clone(),
+                        delta: -1,
+                        handler: on_decrement,
+                        range,
                         disabled,
-                        theme.hover,
-                        theme.text_muted,
-                    ))
-                    .child(stepper_value(
-                        display,
-                        binding.clone(),
-                        min,
-                        max,
+                        style: button_style,
+                    }))
+                    .child(stepper_value(StepperValueProps {
+                        value: display,
+                        binding: binding.clone(),
+                        range,
                         disabled,
-                        theme.text,
-                        theme.border,
-                        theme.hover,
-                    ))
-                    .child(stepper_button(
-                        (id.clone(), "increment"),
-                        IconName::Plus,
+                        text_color: theme.text,
+                        border_color: theme.border,
+                        hover_bg: theme.hover,
+                    }))
+                    .child(stepper_button(StepperButtonProps {
+                        id: (id.clone(), "increment").into(),
+                        icon: IconName::Plus,
                         binding,
-                        1,
-                        self.on_increment,
-                        min,
-                        max,
+                        delta: 1,
+                        handler: on_increment,
+                        range,
                         disabled,
-                        theme.hover,
-                        theme.text_muted,
-                    )),
+                        style: button_style,
+                    })),
             )
-            .when_some(reset, |this, handler| {
+            .when_some(on_reset, |this, handler| {
                 this.child(
                     div()
                         .id((id, "reset"))
@@ -188,41 +252,24 @@ impl RenderOnce for Stepper {
     }
 }
 
-fn clamp_value(value: i32, delta: i32, min: Option<i32>, max: Option<i32>) -> i32 {
-    let new_value = if delta >= 0 {
-        value.saturating_add(delta as i32)
-    } else {
-        value.saturating_sub((-delta) as i32)
-    };
-    let mut clamped = new_value;
-    if let Some(min) = min {
-        clamped = clamped.max(min);
-    }
-    if let Some(max) = max {
-        clamped = clamped.min(max);
-    }
-    clamped
+fn clamp_value(value: i32, delta: i32, range: StepperRange) -> i32 {
+    range.clamp(value, delta)
 }
 
-fn stepper_button(
-    id: impl Into<ElementId>,
-    icon: IconName,
-    binding: Option<Binding<i32>>,
-    delta: i32,
-    handler: Option<ClickHandler>,
-    min: Option<i32>,
-    max: Option<i32>,
-    disabled: bool,
-    hover_bg: gpui::Hsla,
-    color: gpui::Hsla,
-) -> impl IntoElement {
-    let at_limit = binding.as_ref().map_or(false, |b| {
-        let value = b.signal().peek(|v| *v);
-        if delta < 0 {
-            min.is_some_and(|m| value <= m)
-        } else {
-            max.is_some_and(|m| value >= m)
-        }
+fn stepper_button(props: StepperButtonProps) -> impl IntoElement {
+    let StepperButtonProps {
+        id,
+        icon,
+        binding,
+        delta,
+        handler,
+        range,
+        disabled,
+        style,
+    } = props;
+    let at_limit = binding.as_ref().is_some_and(|stepper_binding| {
+        let value = stepper_binding.signal().peek(|current| *current);
+        range.at_limit(value, delta)
     });
     let interactive = !disabled && !at_limit && (binding.is_some() || handler.is_some());
     let is_dimmed = disabled || at_limit;
@@ -239,14 +286,14 @@ fn stepper_button(
         })
         .when(interactive, |this| {
             this.cursor_pointer()
-                .hover(move |style| style.bg(hover_bg))
+                .hover(move |hover| hover.bg(style.hover_bg))
                 .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
                     window.prevent_default();
                 })
                 .on_click(move |event, window, cx| {
-                    if let Some(binding) = &binding {
-                        binding.update(cx, |value| {
-                            *value = clamp_value(*value, delta, min, max);
+                    if let Some(stepper_binding) = &binding {
+                        stepper_binding.update(cx, |value| {
+                            *value = clamp_value(*value, delta, range);
                             true
                         });
                     }
@@ -256,19 +303,19 @@ fn stepper_button(
                     cx.stop_propagation();
                 })
         })
-        .child(Icon::new(icon).size(IconSize::Small).color(color))
+        .child(Icon::new(icon).size(IconSize::Small).color(style.color))
 }
 
-fn stepper_value(
-    value: String,
-    binding: Option<Binding<i32>>,
-    min: Option<i32>,
-    max: Option<i32>,
-    disabled: bool,
-    text_color: gpui::Hsla,
-    border_color: gpui::Hsla,
-    hover_bg: gpui::Hsla,
-) -> impl IntoElement {
+fn stepper_value(props: StepperValueProps) -> impl IntoElement {
+    let StepperValueProps {
+        value,
+        binding,
+        range,
+        disabled,
+        text_color,
+        border_color,
+        hover_bg,
+    } = props;
     let interactive = !disabled && binding.is_some();
     div()
         .min_w(px(58.0))
@@ -295,7 +342,7 @@ fn stepper_value(
                     };
                     if let Some(binding) = &binding {
                         binding.update(cx, |value| {
-                            *value = clamp_value(*value, delta, min, max);
+                            *value = clamp_value(*value, delta, range);
                             true
                         });
                         cx.stop_propagation();
@@ -333,10 +380,19 @@ mod tests {
 
     #[test]
     fn clamp_value_respects_min_max() {
-        assert_eq!(clamp_value(5, -10, Some(0), Some(10)), 0);
-        assert_eq!(clamp_value(8, 5, Some(0), Some(10)), 10);
-        assert_eq!(clamp_value(5, 2, None, None), 7);
-        assert_eq!(clamp_value(5, -3, None, None), 2);
+        let range = StepperRange {
+            min: Some(0),
+            max: Some(10),
+        };
+        let unbounded = StepperRange {
+            min: None,
+            max: None,
+        };
+
+        assert_eq!(clamp_value(5, -10, range), 0);
+        assert_eq!(clamp_value(8, 5, range), 10);
+        assert_eq!(clamp_value(5, 2, unbounded), 7);
+        assert_eq!(clamp_value(5, -3, unbounded), 2);
     }
 
     #[test]

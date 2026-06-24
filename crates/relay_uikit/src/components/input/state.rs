@@ -313,15 +313,12 @@ impl TextInputState {
             "escape" => TextInputAction::Cancel,
 
             "backspace" => {
-                if mods.control {
-                    if self.delete_word_before() {
-                        TextInputAction::Changed
-                    } else {
-                        TextInputAction::Ignored
-                    }
-                } else if self.delete_selection() {
-                    TextInputAction::Changed
-                } else if self.delete_grapheme_before() {
+                let changed = if mods.control {
+                    self.delete_word_before()
+                } else {
+                    self.delete_selection() || self.delete_grapheme_before()
+                };
+                if changed {
                     TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored
@@ -329,15 +326,12 @@ impl TextInputState {
             }
 
             "delete" => {
-                if mods.control {
-                    if self.delete_word_after() {
-                        TextInputAction::Changed
-                    } else {
-                        TextInputAction::Ignored
-                    }
-                } else if self.delete_selection() {
-                    TextInputAction::Changed
-                } else if self.delete_grapheme_after() {
+                let changed = if mods.control {
+                    self.delete_word_after()
+                } else {
+                    self.delete_selection() || self.delete_grapheme_after()
+                };
+                if changed {
                     TextInputAction::Changed
                 } else {
                     TextInputAction::Ignored

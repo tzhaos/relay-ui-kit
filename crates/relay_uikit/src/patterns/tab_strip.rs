@@ -86,40 +86,6 @@ impl TabStrip {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use gpui::TestApp;
-    use relay::{SelectionModel, init};
-
-    use super::*;
-
-    #[test]
-    fn tab_strip_active_with_selection_model_selects_row_key() {
-        let mut app = TestApp::new();
-        let (selection, tab) = app.update(|cx| {
-            init(cx);
-            let selection = SelectionModel::new(cx, Some("terminal"));
-            let tab = TabStrip::new("preview-tab", "Preview").active_with(
-                SelectionBinding::selection_model(selection.clone(), "preview"),
-            );
-            (selection, tab)
-        });
-
-        app.update(|cx| {
-            let selection_binding = tab.selection.as_ref().expect("tab should store selection");
-            assert!(!selection_binding.is_selected(cx));
-
-            selection_binding.select(cx);
-
-            assert!(selection_binding.is_selected(cx));
-        });
-
-        app.read(|cx| {
-            assert_eq!(selection.get(cx), Some("preview"));
-        });
-    }
-}
-
 impl RenderOnce for TabStrip {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
@@ -188,5 +154,46 @@ impl RenderOnce for TabStrip {
                     cx.stop_propagation();
                 })
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    fn tab_selection(tab: &TabStrip) -> &SelectionBinding {
+        let Some(selection) = tab.selection.as_ref() else {
+            panic!("tab should store selection");
+        };
+        selection
+    }
+
+    #[test]
+    fn tab_strip_active_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, tab) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("terminal"));
+            let tab = TabStrip::new("preview-tab", "Preview").active_with(
+                SelectionBinding::selection_model(selection.clone(), "preview"),
+            );
+            (selection, tab)
+        });
+
+        app.update(|cx| {
+            let selection_binding = tab_selection(&tab);
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("preview"));
+        });
     }
 }

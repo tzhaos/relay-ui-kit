@@ -189,6 +189,13 @@ mod tests {
 
     use super::*;
 
+    fn row_selection(row: &TaskRow) -> &SelectionBinding {
+        let Some(selection) = row.selection.as_ref() else {
+            panic!("row should store selection");
+        };
+        selection
+    }
+
     fn row_data() -> TaskRowData {
         TaskRowData {
             title: "Ship v2".to_string(),
@@ -213,7 +220,7 @@ mod tests {
         });
 
         app.update(|cx| {
-            let selection_binding = row.selection.as_ref().expect("row should store selection");
+            let selection_binding = row_selection(&row);
             assert!(!selection_binding.is_selected(cx));
 
             selection_binding.select(cx);

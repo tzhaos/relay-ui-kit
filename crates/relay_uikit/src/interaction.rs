@@ -36,6 +36,11 @@ pub type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 /// Shared variant of [`DismissHandler`] for dismissal logic reused by multiple elements.
 pub type SharedDismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
+type OpenStateReader = dyn Fn(&App) -> bool + 'static;
+type OpenStateWriter = dyn Fn(&mut App, bool) + 'static;
+type SelectionSourceReader<K> = dyn Fn(&App) -> Option<K> + 'static;
+type SelectionSourceWriter<K> = dyn Fn(&mut App, K) + 'static;
+
 // ---------------------------------------------------------------------------
 // Open / expanded state
 // ---------------------------------------------------------------------------
@@ -43,8 +48,8 @@ pub type SharedDismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 /// Type-erased adapter for host-owned open/closed state.
 #[derive(Clone)]
 pub struct OpenState {
-    get: Rc<dyn Fn(&App) -> bool + 'static>,
-    set: Rc<dyn Fn(&mut App, bool) + 'static>,
+    get: Rc<OpenStateReader>,
+    set: Rc<OpenStateWriter>,
 }
 
 impl OpenState {
@@ -166,8 +171,8 @@ impl SelectionBinding {
 /// Type-erased adapter for components that read and write a single selected key.
 #[derive(Clone)]
 pub struct SelectionSource<K> {
-    get: Rc<dyn Fn(&App) -> Option<K> + 'static>,
-    select: Rc<dyn Fn(&mut App, K) + 'static>,
+    get: Rc<SelectionSourceReader<K>>,
+    select: Rc<SelectionSourceWriter<K>>,
 }
 
 impl<K> SelectionSource<K>

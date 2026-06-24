@@ -6,6 +6,9 @@ use gpui::{
 };
 use relay::Signal;
 
+type ItemKeyFn<T> = dyn Fn(&T) -> usize + 'static;
+type ItemRenderFn<T> = dyn Fn(&T, &mut Window, &mut App) -> AnyElement + 'static;
+
 /// A lightweight reactive element-list renderer backed by a `Signal<Vec<T>>`.
 ///
 /// `ForEach` reads the signal during render (subscribing the surrounding view)
@@ -33,8 +36,8 @@ use relay::Signal;
 pub struct ForEach<T: Clone + 'static> {
     id: ElementId,
     signal: Signal<Vec<T>>,
-    key: Option<Rc<dyn Fn(&T) -> usize>>,
-    render: Option<Rc<dyn Fn(&T, &mut Window, &mut App) -> AnyElement>>,
+    key: Option<Rc<ItemKeyFn<T>>>,
+    render: Option<Rc<ItemRenderFn<T>>>,
 }
 
 impl<T: Clone + 'static> ForEach<T> {

@@ -494,76 +494,6 @@ impl Render for StressSessionRow {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use gpui::{EntityId, TestApp};
-
-    use super::*;
-
-    fn row_ids(rows: &KeyedSubViews<u64, StressSessionRow>) -> Vec<(u64, EntityId)> {
-        rows.keyed_iter()
-            .map(|(key, view)| (*key, view.entity().entity_id()))
-            .collect()
-    }
-
-    fn session_ids(list: &StressSessionList) -> Vec<u64> {
-        list.sessions
-            .get_untracked()
-            .into_iter()
-            .map(|session| session.id)
-            .collect()
-    }
-
-    #[test]
-    fn session_list_reuses_rows_when_selection_changes() {
-        let mut app = TestApp::new();
-        let mut window = app.open_window(|_, cx| {
-            relay_uikit::theme::init(cx);
-            StressSessionList::new(cx)
-        });
-        let root = window.root();
-
-        window.draw();
-        let initial_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
-
-        app.update_entity(&root, |list, cx| {
-            list.activate_next(cx);
-        });
-        window.draw();
-
-        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
-        let updated_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
-        assert_eq!(selected, Some(2));
-        assert_eq!(updated_rows, initial_rows);
-    }
-
-    #[test]
-    fn session_list_reconcile_clears_selection_when_active_removed() {
-        let mut app = TestApp::new();
-        let mut window = app.open_window(|_, cx| {
-            relay_uikit::theme::init(cx);
-            StressSessionList::new(cx)
-        });
-        let root = window.root();
-
-        window.draw();
-        app.update_entity(&root, |list, cx| {
-            list.remove_active(cx);
-        });
-        window.draw();
-
-        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
-        let sessions = app.update_entity(&root, |list, _cx| session_ids(list));
-        let rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
-        assert_eq!(selected, None);
-        assert_eq!(sessions, vec![2, 3, 4]);
-        assert_eq!(
-            rows.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
-            sessions
-        );
-    }
-}
-
 fn long_file_tree() -> impl IntoElement {
     div()
         .w(px(420.0))
@@ -632,4 +562,74 @@ fn scroll_surface_sample(theme: Theme) -> impl IntoElement {
                     )
             })),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{EntityId, TestApp};
+
+    use super::*;
+
+    fn row_ids(rows: &KeyedSubViews<u64, StressSessionRow>) -> Vec<(u64, EntityId)> {
+        rows.keyed_iter()
+            .map(|(key, view)| (*key, view.entity().entity_id()))
+            .collect()
+    }
+
+    fn session_ids(list: &StressSessionList) -> Vec<u64> {
+        list.sessions
+            .get_untracked()
+            .into_iter()
+            .map(|session| session.id)
+            .collect()
+    }
+
+    #[test]
+    fn session_list_reuses_rows_when_selection_changes() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            StressSessionList::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        let initial_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+
+        app.update_entity(&root, |list, cx| {
+            list.activate_next(cx);
+        });
+        window.draw();
+
+        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
+        let updated_rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+        assert_eq!(selected, Some(2));
+        assert_eq!(updated_rows, initial_rows);
+    }
+
+    #[test]
+    fn session_list_reconcile_clears_selection_when_active_removed() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, cx| {
+            relay_uikit::theme::init(cx);
+            StressSessionList::new(cx)
+        });
+        let root = window.root();
+
+        window.draw();
+        app.update_entity(&root, |list, cx| {
+            list.remove_active(cx);
+        });
+        window.draw();
+
+        let selected = app.update_entity(&root, |list, _cx| list.selection.get_untracked());
+        let sessions = app.update_entity(&root, |list, _cx| session_ids(list));
+        let rows = app.update_entity(&root, |list, _cx| row_ids(&list.rows));
+        assert_eq!(selected, None);
+        assert_eq!(sessions, vec![2, 3, 4]);
+        assert_eq!(
+            rows.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            sessions
+        );
+    }
 }

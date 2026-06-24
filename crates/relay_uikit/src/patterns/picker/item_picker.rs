@@ -11,12 +11,13 @@ use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
     icon::{Icon, IconName, IconSize},
     interaction::{
-        ClickHandler, OpenState, SelectionSource, SharedActionHandler, SharedDismissHandler,
+        ClickHandler, OpenState, SelectionSource, SharedActionHandler, SharedClickHandler,
+        SharedDismissHandler,
     },
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
-use super::picker_panel::{branch_picker_panel, default_picker_actions};
+use super::picker_panel::{BranchPickerPanelProps, branch_picker_panel, default_picker_actions};
 use super::picker_types::{PickerAction, PickerOption};
 
 /// Compact branch selector for title bars and pane toolbars.
@@ -225,9 +226,7 @@ where
         let select_handler = on_select;
         let action_handler = on_action;
         let dismiss_handler = on_dismiss;
-        let toggle_handler: Option<
-            std::rc::Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>,
-        > = on_toggle.map(std::rc::Rc::from);
+        let toggle_handler: Option<SharedClickHandler> = on_toggle.map(std::rc::Rc::from);
         let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
         let aria_label = aria_label.unwrap_or_else(|| format!("Select item: {selected_label}"));
         let trigger = div()
@@ -330,16 +329,16 @@ where
         let mut overlay = AnchoredOverlay::new(
             id.clone(),
             trigger,
-            branch_picker_panel(
-                id.clone(),
-                panel_focus.clone(),
+            branch_picker_panel(BranchPickerPanelProps {
+                id: id.clone(),
+                focus_handle: panel_focus.clone(),
                 selected_key,
                 items,
                 actions,
-                selection.clone(),
+                selection: selection.clone(),
                 select_handler,
                 action_handler,
-            ),
+            }),
         )
         .open(open)
         .focus_handle(panel_focus);

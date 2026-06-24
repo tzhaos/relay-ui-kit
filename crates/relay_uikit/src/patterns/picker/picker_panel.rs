@@ -39,19 +39,35 @@ enum PickerMove {
     Previous,
 }
 
-pub(super) fn branch_picker_panel<K>(
-    id: ElementId,
-    focus_handle: FocusHandle,
-    selected_key: Option<K>,
-    items: Vec<PickerOption<K>>,
-    actions: Vec<PickerAction>,
-    selection: Option<SelectionSource<K>>,
-    select_handler: Option<SharedActionHandler<K>>,
-    action_handler: Option<SharedActionHandler<String>>,
-) -> impl IntoElement
+pub(super) struct BranchPickerPanelProps<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
+    pub(super) id: ElementId,
+    pub(super) focus_handle: FocusHandle,
+    pub(super) selected_key: Option<K>,
+    pub(super) items: Vec<PickerOption<K>>,
+    pub(super) actions: Vec<PickerAction>,
+    pub(super) selection: Option<SelectionSource<K>>,
+    pub(super) select_handler: Option<SharedActionHandler<K>>,
+    pub(super) action_handler: Option<SharedActionHandler<String>>,
+}
+
+pub(super) fn branch_picker_panel<K>(props: BranchPickerPanelProps<K>) -> impl IntoElement
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    let BranchPickerPanelProps {
+        id,
+        focus_handle,
+        selected_key,
+        items,
+        actions,
+        selection,
+        select_handler,
+        action_handler,
+    } = props;
+
     PickerPanel {
         id,
         focus_handle,

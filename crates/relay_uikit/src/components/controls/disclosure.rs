@@ -239,18 +239,21 @@ mod tests {
     #[test]
     fn stateful_disclosure_uses_window_signal() {
         use gpui::{IntoElement, ParentElement, Render};
-        use std::sync::{Arc, Mutex};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
 
         // We render a Disclosure::stateful inside a view's render method.
         // The use_signal call happens during layout (inside render), which is
         // the only place use_keyed_state is valid.
-        let binding_created = Arc::new(Mutex::new(false));
+        let binding_created = Arc::new(AtomicBool::new(false));
 
         struct HostView {
-            binding_created: Arc<Mutex<bool>>,
+            binding_created: Arc<AtomicBool>,
         }
         impl HostView {
-            fn new(cx: &mut gpui::Context<Self>, binding_created: Arc<Mutex<bool>>) -> Self {
+            fn new(cx: &mut gpui::Context<Self>, binding_created: Arc<AtomicBool>) -> Self {
                 relay::init(cx);
                 crate::styles::theme::init(cx);
                 Self { binding_created }
@@ -266,7 +269,8 @@ mod tests {
                 // is called here, inside the layout phase. Context<Self>
                 // derefs to &mut App.
                 let disclosure = Disclosure::stateful("test-group", "Test", window, cx);
-                *self.binding_created.lock().unwrap() = disclosure.binding.is_some();
+                self.binding_created
+                    .store(disclosure.binding.is_some(), Ordering::Relaxed);
                 div().child(disclosure)
             }
         }
@@ -277,7 +281,7 @@ mod tests {
         window.draw();
 
         assert!(
-            *binding_created.lock().unwrap(),
+            binding_created.load(Ordering::Relaxed),
             "stateful disclosure should have an internal binding after render"
         );
     }

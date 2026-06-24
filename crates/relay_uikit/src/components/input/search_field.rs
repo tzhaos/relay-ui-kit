@@ -16,7 +16,8 @@ use crate::{
 use super::{
     TextInputState,
     platform_input::{
-        PlatformInputMode, PointerSelectionState, SingleLineInputStyle, single_line_input,
+        PlatformInputBase, PlatformInputMode, PointerSelectionState, SingleLineInputProps,
+        SingleLineInputStyle, single_line_input,
     },
 };
 
@@ -174,6 +175,12 @@ impl RenderOnce for SearchField {
         let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
         let disabled = self.disabled;
         let on_clear = self.on_clear;
+        let editor_style = SingleLineInputStyle {
+            text_color: theme.text,
+            placeholder_color: theme.text_muted,
+            selection_color: theme.selection,
+            cursor_color: theme.accent,
+        };
         div()
             .id(root_id.clone())
             .h(px(30.0))
@@ -217,46 +224,40 @@ impl RenderOnce for SearchField {
                     .text_color(text_color)
                     .when(is_empty, |this| {
                         if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(
-                                (root_id.clone(), "editor"),
-                                focus.clone(),
-                                binding,
-                                pointer,
-                                SingleLineInputStyle {
-                                    text_color: theme.text,
-                                    placeholder_color: theme.text_muted,
-                                    selection_color: theme.selection,
-                                    cursor_color: theme.accent,
+                            this.child(single_line_input(SingleLineInputProps {
+                                base: PlatformInputBase {
+                                    id: (root_id.clone(), "editor").into(),
+                                    focus: focus.clone(),
+                                    binding,
+                                    pointer,
+                                    style: editor_style,
+                                    placeholder: placeholder.clone(),
+                                    show_placeholder: is_empty,
+                                    disabled,
                                 },
-                                placeholder.clone(),
-                                is_empty,
-                                disabled,
-                                PlatformInputMode::Text,
-                                None,
-                            ))
+                                mode: PlatformInputMode::Text,
+                                after_edit: None,
+                            }))
                         } else {
                             this.child(placeholder_text)
                         }
                     })
                     .when(!is_empty, |this| {
                         if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(
-                                (root_id.clone(), "editor"),
-                                focus.clone(),
-                                binding,
-                                pointer,
-                                SingleLineInputStyle {
-                                    text_color: theme.text,
-                                    placeholder_color: theme.text_muted,
-                                    selection_color: theme.selection,
-                                    cursor_color: theme.accent,
+                            this.child(single_line_input(SingleLineInputProps {
+                                base: PlatformInputBase {
+                                    id: (root_id.clone(), "editor").into(),
+                                    focus: focus.clone(),
+                                    binding,
+                                    pointer,
+                                    style: editor_style,
+                                    placeholder: placeholder.clone(),
+                                    show_placeholder: is_empty,
+                                    disabled,
                                 },
-                                placeholder.clone(),
-                                is_empty,
-                                disabled,
-                                PlatformInputMode::Text,
-                                None,
-                            ))
+                                mode: PlatformInputMode::Text,
+                                after_edit: None,
+                            }))
                         } else {
                             this.child(div().child(before_str))
                                 .when(!sel_str.is_empty(), |this| {

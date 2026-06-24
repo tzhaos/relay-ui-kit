@@ -205,6 +205,16 @@ mod tests {
 
     use super::*;
 
+    fn row_selection<K>(row: &CommandRow<K>) -> &SelectionBinding
+    where
+        K: Clone + Eq + Hash + PartialEq + 'static,
+    {
+        let Some(selection) = row.selection.as_ref() else {
+            panic!("row should store selection");
+        };
+        selection
+    }
+
     #[test]
     fn command_row_selected_by_reads_selector_key() {
         let mut app = TestApp::new();
@@ -215,7 +225,7 @@ mod tests {
         });
 
         app.update(|cx| {
-            let selection = row.selection.as_ref().expect("row should store selection");
+            let selection = row_selection(&row);
             assert!(selection.is_selected(cx));
         });
     }
@@ -232,7 +242,7 @@ mod tests {
         });
 
         app.update(|cx| {
-            let selection = row.selection.as_ref().expect("row should store selection");
+            let selection = row_selection(&row);
             selection.select(cx);
         });
 
@@ -254,7 +264,7 @@ mod tests {
         });
 
         app.update(|cx| {
-            let selection_binding = row.selection.as_ref().expect("row should store selection");
+            let selection_binding = row_selection(&row);
             assert!(!selection_binding.is_selected(cx));
 
             selection_binding.select(cx);

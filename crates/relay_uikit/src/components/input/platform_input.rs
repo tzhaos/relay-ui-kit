@@ -35,25 +35,47 @@ pub(super) type AfterEdit = Rc<dyn Fn(&Binding<TextInputState>, &mut Window, &mu
 const MULTILINE_LINE_GAP: f32 = space::XXS;
 const SINGLE_LINE_SCROLL_INSET: f32 = 6.0;
 
-pub(super) fn single_line_input(
-    id: impl Into<ElementId>,
-    focus: FocusHandle,
-    binding: Binding<TextInputState>,
-    pointer: gpui::Entity<PointerSelectionState>,
-    style: SingleLineInputStyle,
-    placeholder: impl Into<String>,
-    show_placeholder: bool,
-    disabled: bool,
-    mode: PlatformInputMode,
-    after_edit: Option<AfterEdit>,
-) -> SingleLineInputElement {
-    SingleLineInputElement {
-        id: id.into(),
+pub(super) struct PlatformInputBase {
+    pub id: ElementId,
+    pub focus: FocusHandle,
+    pub binding: Binding<TextInputState>,
+    pub pointer: gpui::Entity<PointerSelectionState>,
+    pub style: SingleLineInputStyle,
+    pub placeholder: String,
+    pub show_placeholder: bool,
+    pub disabled: bool,
+}
+
+pub(super) struct SingleLineInputProps {
+    pub base: PlatformInputBase,
+    pub mode: PlatformInputMode,
+    pub after_edit: Option<AfterEdit>,
+}
+
+pub(super) fn single_line_input(props: SingleLineInputProps) -> SingleLineInputElement {
+    let SingleLineInputProps {
+        base,
+        mode,
+        after_edit,
+    } = props;
+    let PlatformInputBase {
+        id,
         focus,
         binding,
         pointer,
         style,
-        placeholder: placeholder.into(),
+        placeholder,
+        show_placeholder,
+        disabled,
+    } = base;
+
+    SingleLineInputElement {
+        id,
+        focus,
+        binding,
+        pointer,
+        style,
+        placeholder,
         show_placeholder,
         disabled,
         mode,
@@ -74,24 +96,31 @@ pub(super) struct SingleLineInputElement {
     after_edit: Option<AfterEdit>,
 }
 
-pub(super) fn multiline_input(
-    id: impl Into<ElementId>,
-    focus: FocusHandle,
-    binding: Binding<TextInputState>,
-    pointer: gpui::Entity<PointerSelectionState>,
-    style: SingleLineInputStyle,
-    placeholder: impl Into<String>,
-    show_placeholder: bool,
-    disabled: bool,
-    min_rows: usize,
-) -> MultilineInputElement {
-    MultilineInputElement {
-        id: id.into(),
+pub(super) struct MultilineInputProps {
+    pub base: PlatformInputBase,
+    pub min_rows: usize,
+}
+
+pub(super) fn multiline_input(props: MultilineInputProps) -> MultilineInputElement {
+    let MultilineInputProps { base, min_rows } = props;
+    let PlatformInputBase {
+        id,
         focus,
         binding,
         pointer,
         style,
-        placeholder: placeholder.into(),
+        placeholder,
+        show_placeholder,
+        disabled,
+    } = base;
+
+    MultilineInputElement {
+        id,
+        focus,
+        binding,
+        pointer,
+        style,
+        placeholder,
         show_placeholder,
         disabled,
         min_rows: min_rows.max(1),
@@ -460,8 +489,7 @@ impl Element for MultilineInputElement {
         let selection_bounds =
             selection_bounds_for_lines(&state, &input_lines, bounds, line_height);
         let cursor_bounds = if selection_bounds.is_empty() {
-            let cursor = cursor_bounds_for_lines(&state, &input_lines, bounds, line_height);
-            cursor
+            cursor_bounds_for_lines(&state, &input_lines, bounds, line_height)
         } else {
             None
         };

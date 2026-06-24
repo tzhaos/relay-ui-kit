@@ -16,28 +16,6 @@ pub(super) struct WorkbenchTask {
 }
 
 impl WorkbenchTask {
-    fn new(
-        id: u64,
-        title: impl Into<String>,
-        status_label: &'static str,
-        branch: &'static str,
-        worktree: &'static str,
-        changed: usize,
-        review: usize,
-        tone: Tone,
-    ) -> Self {
-        Self {
-            id,
-            title: title.into(),
-            status_label,
-            branch,
-            worktree,
-            changed,
-            review,
-            tone,
-        }
-    }
-
     pub fn row_data(&self) -> TaskRowData {
         TaskRowData {
             title: self.title.clone(),
@@ -103,36 +81,36 @@ impl WorkbenchReviewReport {
 
 pub(super) fn initial_tasks() -> Vec<WorkbenchTask> {
     vec![
-        WorkbenchTask::new(
-            1,
-            "Implement Relay workbench state",
-            "ACTIVE",
-            "relay/workbench",
-            "relay-ui-kit",
-            8,
-            2,
-            Tone::Accent,
-        ),
-        WorkbenchTask::new(
-            2,
-            "Audit GPUI entity boundaries",
-            "REVIEW",
-            "relay/gpui-runtime",
-            "crates/relay",
-            4,
-            5,
-            Tone::Warning,
-        ),
-        WorkbenchTask::new(
-            3,
-            "Prepare UIKit adapter notes",
-            "READY",
-            "relay/uikit-adapters",
-            "crates/relay_uikit",
-            2,
-            0,
-            Tone::Info,
-        ),
+        WorkbenchTask {
+            id: 1,
+            title: "Implement Relay workbench state".to_string(),
+            status_label: "ACTIVE",
+            branch: "relay/workbench",
+            worktree: "relay-ui-kit",
+            changed: 8,
+            review: 2,
+            tone: Tone::Accent,
+        },
+        WorkbenchTask {
+            id: 2,
+            title: "Audit GPUI entity boundaries".to_string(),
+            status_label: "REVIEW",
+            branch: "relay/gpui-runtime",
+            worktree: "crates/relay",
+            changed: 4,
+            review: 5,
+            tone: Tone::Warning,
+        },
+        WorkbenchTask {
+            id: 3,
+            title: "Prepare UIKit adapter notes".to_string(),
+            status_label: "READY",
+            branch: "relay/uikit-adapters",
+            worktree: "crates/relay_uikit",
+            changed: 2,
+            review: 0,
+            tone: Tone::Info,
+        },
     ]
 }
 

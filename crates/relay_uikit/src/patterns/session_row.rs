@@ -95,40 +95,6 @@ impl SessionRow {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use gpui::TestApp;
-    use relay::{SelectionModel, init};
-
-    use super::*;
-
-    #[test]
-    fn session_row_active_with_selection_model_selects_row_key() {
-        let mut app = TestApp::new();
-        let (selection, row) = app.update(|cx| {
-            init(cx);
-            let selection = SelectionModel::new(cx, Some("open"));
-            let row = SessionRow::new("session", "codex", "relay/patterns").active_with(
-                SelectionBinding::selection_model(selection.clone(), "close"),
-            );
-            (selection, row)
-        });
-
-        app.update(|cx| {
-            let selection_binding = row.selection.as_ref().expect("row should store selection");
-            assert!(!selection_binding.is_selected(cx));
-
-            selection_binding.select(cx);
-
-            assert!(selection_binding.is_selected(cx));
-        });
-
-        app.read(|cx| {
-            assert_eq!(selection.get(cx), Some("close"));
-        });
-    }
-}
-
 impl RenderOnce for SessionRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
@@ -216,5 +182,46 @@ impl RenderOnce for SessionRow {
                     cx.stop_propagation();
                 })
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::{SelectionModel, init};
+
+    use super::*;
+
+    fn row_selection(row: &SessionRow) -> &SelectionBinding {
+        let Some(selection) = row.selection.as_ref() else {
+            panic!("row should store selection");
+        };
+        selection
+    }
+
+    #[test]
+    fn session_row_active_with_selection_model_selects_row_key() {
+        let mut app = TestApp::new();
+        let (selection, row) = app.update(|cx| {
+            init(cx);
+            let selection = SelectionModel::new(cx, Some("open"));
+            let row = SessionRow::new("session", "codex", "relay/patterns").active_with(
+                SelectionBinding::selection_model(selection.clone(), "close"),
+            );
+            (selection, row)
+        });
+
+        app.update(|cx| {
+            let selection_binding = row_selection(&row);
+            assert!(!selection_binding.is_selected(cx));
+
+            selection_binding.select(cx);
+
+            assert!(selection_binding.is_selected(cx));
+        });
+
+        app.read(|cx| {
+            assert_eq!(selection.get(cx), Some("close"));
+        });
     }
 }

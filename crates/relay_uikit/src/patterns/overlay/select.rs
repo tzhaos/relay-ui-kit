@@ -9,7 +9,9 @@ use relay::{Binding, WindowSignalExt};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::{ActionHandler, ClickHandler, DismissHandler, OpenState, SelectionSource},
+    interaction::{
+        ActionHandler, ClickHandler, DismissHandler, OpenState, SelectionSource, SharedClickHandler,
+    },
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
@@ -226,8 +228,7 @@ where
         let label = selected_label(&options, selected_value.as_ref(), &placeholder).to_string();
         let select_handler = on_select.map(Rc::new);
         let dismiss_handler = on_dismiss;
-        let toggle_handler: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>> =
-            on_toggle.map(Rc::from);
+        let toggle_handler: Option<SharedClickHandler> = on_toggle.map(Rc::from);
         let can_select = source.is_some() || select_handler.is_some();
         let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
         let aria_label = aria_label.unwrap_or_else(|| format!("{}: {}", placeholder, label));

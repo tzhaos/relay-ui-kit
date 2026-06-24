@@ -14,7 +14,10 @@ use crate::{
 
 use super::{
     TextInputState,
-    platform_input::{PointerSelectionState, SingleLineInputStyle, multiline_input},
+    platform_input::{
+        MultilineInputProps, PlatformInputBase, PointerSelectionState, SingleLineInputStyle,
+        multiline_input,
+    },
 };
 
 /// A multi-line text area that can be host-owned or Relay-bound.
@@ -167,6 +170,12 @@ impl RenderOnce for TextArea {
             before.is_empty() && after.is_empty() && !has_selection && !is_focused;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
         let disabled = self.disabled;
+        let editor_style = SingleLineInputStyle {
+            text_color: theme.text,
+            placeholder_color: theme.text_muted,
+            selection_color: theme.selection,
+            cursor_color: theme.accent,
+        };
 
         div()
             .id(root_id.clone())
@@ -200,44 +209,38 @@ impl RenderOnce for TextArea {
                     .line_height(px(20.0))
                     .when(show_placeholder, |this| {
                         if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(multiline_input(
-                                (root_id.clone(), "editor"),
-                                focus.clone(),
-                                binding,
-                                pointer,
-                                SingleLineInputStyle {
-                                    text_color: theme.text,
-                                    placeholder_color: theme.text_muted,
-                                    selection_color: theme.selection,
-                                    cursor_color: theme.accent,
+                            this.child(multiline_input(MultilineInputProps {
+                                base: PlatformInputBase {
+                                    id: (root_id.clone(), "editor").into(),
+                                    focus: focus.clone(),
+                                    binding,
+                                    pointer,
+                                    style: editor_style,
+                                    placeholder: placeholder.clone(),
+                                    show_placeholder,
+                                    disabled,
                                 },
-                                placeholder.clone(),
-                                show_placeholder,
-                                disabled,
-                                self.min_rows,
-                            ))
+                                min_rows: self.min_rows,
+                            }))
                         } else {
                             this.text_color(theme.text_muted).child(placeholder.clone())
                         }
                     })
                     .when(!show_placeholder, |this| {
                         if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(multiline_input(
-                                (root_id.clone(), "editor"),
-                                focus.clone(),
-                                binding,
-                                pointer,
-                                SingleLineInputStyle {
-                                    text_color: theme.text,
-                                    placeholder_color: theme.text_muted,
-                                    selection_color: theme.selection,
-                                    cursor_color: theme.accent,
+                            this.child(multiline_input(MultilineInputProps {
+                                base: PlatformInputBase {
+                                    id: (root_id.clone(), "editor").into(),
+                                    focus: focus.clone(),
+                                    binding,
+                                    pointer,
+                                    style: editor_style,
+                                    placeholder: placeholder.clone(),
+                                    show_placeholder,
+                                    disabled,
                                 },
-                                placeholder.clone(),
-                                show_placeholder,
-                                disabled,
-                                self.min_rows,
-                            ))
+                                min_rows: self.min_rows,
+                            }))
                         } else {
                             this.text_color(theme.text).children(text_area_lines(
                                 before,

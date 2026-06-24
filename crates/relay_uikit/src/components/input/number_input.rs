@@ -16,8 +16,8 @@ use crate::{
 use super::{
     TextInputState,
     platform_input::{
-        AfterEdit, PlatformInputMode, PointerSelectionState, SingleLineInputStyle,
-        single_line_input,
+        AfterEdit, PlatformInputBase, PlatformInputMode, PointerSelectionState,
+        SingleLineInputProps, SingleLineInputStyle, single_line_input,
     },
     state::{InputActionKind, InputValueKind},
 };
@@ -404,6 +404,12 @@ fn editable_number_value(
     let show_fallback = editable.before.is_empty() && editable.after.is_empty() && !is_focused;
     let allow_negative = min.is_none_or(|min| min < 0);
     let handle_key = text_binding.is_some() || on_key.is_some();
+    let editor_style = SingleLineInputStyle {
+        text_color: theme.text,
+        placeholder_color: theme.text_muted,
+        selection_color: theme.selection,
+        cursor_color: theme.accent,
+    };
     let after_edit = text_binding.as_ref().map(|_| {
         let value_binding = value_binding.clone();
         let on_change = on_change.clone();
@@ -449,23 +455,21 @@ fn editable_number_value(
         })
         .when(!show_fallback, |this| {
             if let (Some(text_binding), Some(pointer)) = (text_binding.clone(), pointer.clone()) {
-                this.text_color(theme.text).child(single_line_input(
-                    (id.clone(), "editor"),
-                    editable.focus.clone(),
-                    text_binding,
-                    pointer,
-                    SingleLineInputStyle {
-                        text_color: theme.text,
-                        placeholder_color: theme.text_muted,
-                        selection_color: theme.selection,
-                        cursor_color: theme.accent,
-                    },
-                    fallback.to_string(),
-                    show_fallback,
-                    false,
-                    PlatformInputMode::Integer { allow_negative },
-                    after_edit.clone(),
-                ))
+                this.text_color(theme.text)
+                    .child(single_line_input(SingleLineInputProps {
+                        base: PlatformInputBase {
+                            id: (id.clone(), "editor").into(),
+                            focus: editable.focus.clone(),
+                            binding: text_binding,
+                            pointer,
+                            style: editor_style,
+                            placeholder: fallback.to_string(),
+                            show_placeholder: show_fallback,
+                            disabled: false,
+                        },
+                        mode: PlatformInputMode::Integer { allow_negative },
+                        after_edit: after_edit.clone(),
+                    }))
             } else {
                 this.text_color(theme.text)
                     .child(editable.before)
