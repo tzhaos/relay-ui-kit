@@ -1,7 +1,6 @@
 //! Relay UI gallery.
 //!
 //! A standalone, fully-interactive showcase app that proves the Relay UI crates
-#![allow(clippy::expect_used)]
 //! render and behave at Orca quality in GPUI. The gallery is a studio that
 //! launches several small app-shaped scenes so components appear in the kind of
 //! surface where Relay will use them:
@@ -234,7 +233,7 @@ fn main() {
     application().with_assets(KitAssets).run(|cx: &mut App| {
         theme::init(cx);
         let bounds = Bounds::centered(None, size(px(1440.0), px(900.0)), cx);
-        cx.open_window(
+        let Ok(_window) = cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 titlebar: None,
@@ -244,8 +243,10 @@ fn main() {
                 ..Default::default()
             },
             |_, cx| cx.new(GalleryApp::new),
-        )
-        .expect("open gallery window");
+        ) else {
+            eprintln!("relay_gallery: failed to open gallery window");
+            return;
+        };
         cx.activate(true);
     });
 }

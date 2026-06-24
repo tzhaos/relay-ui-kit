@@ -34,15 +34,24 @@ pub(super) fn strip() -> gpui::Div {
     div().flex().items_center().gap_3().flex_wrap()
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn text_input_field(
-    id: &'static str,
-    input: &Binding<TextInputState>,
-    focus: FocusHandle,
-    focused: bool,
-    icon: Option<IconName>,
-    placeholder: &'static str,
-) -> impl IntoElement {
+pub(super) struct TextInputFieldProps<'a> {
+    pub id: &'static str,
+    pub input: &'a Binding<TextInputState>,
+    pub focus: FocusHandle,
+    pub focused: bool,
+    pub icon: Option<IconName>,
+    pub placeholder: &'static str,
+}
+
+pub(super) fn text_input_field(props: TextInputFieldProps<'_>) -> impl IntoElement {
+    let TextInputFieldProps {
+        id,
+        input,
+        focus,
+        focused,
+        icon,
+        placeholder,
+    } = props;
     let mut field = TextInput::bound(id, focus, input.clone())
         .placeholder(placeholder)
         .focused(focused);

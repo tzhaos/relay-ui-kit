@@ -13,7 +13,7 @@ use relay_uikit::{
 
 use super::{
     FEEDBACK_TOAST_DURATION, GalleryAccent, GalleryContentTab, GalleryScenesApp, GalleryState,
-    shared::{scene_stack, section, strip, text_input_field},
+    shared::{TextInputFieldProps, scene_stack, section, strip, text_input_field},
 };
 
 pub(super) fn render(
@@ -47,26 +47,26 @@ pub(super) fn render(
                 .row(
                     SettingsRow::new("Agent name")
                         .description("Used as the default terminal session label")
-                        .control(text_input_field(
-                            "settings-name",
-                            &state.name_input,
-                            state.name_focus.clone(),
-                            name_focused,
-                            None,
-                            "Agent name",
-                        )),
+                        .control(text_input_field(TextInputFieldProps {
+                            id: "settings-name",
+                            input: &state.name_input,
+                            focus: state.name_focus.clone(),
+                            focused: name_focused,
+                            icon: None,
+                            placeholder: "Agent name",
+                        })),
                 )
                 .row(
                     SettingsRow::new("Default file filter")
                         .description("Applied when opening review and file panels")
-                        .control(text_input_field(
-                            "settings-filter",
-                            &state.search_input,
-                            state.search_focus.clone(),
-                            search_focused,
-                            Some(IconName::Search),
-                            "Default file filter",
-                        )),
+                        .control(text_input_field(TextInputFieldProps {
+                            id: "settings-filter",
+                            input: &state.search_input,
+                            focus: state.search_focus.clone(),
+                            focused: search_focused,
+                            icon: Some(IconName::Search),
+                            placeholder: "Default file filter",
+                        })),
                 ),
         )
         .child(
