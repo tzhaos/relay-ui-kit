@@ -8,47 +8,23 @@ use unicode_segmentation::UnicodeSegmentation;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InputValueKind {
+pub(crate) enum InputValueKind {
     Text,
     Number,
-    Selection,
-    Toggle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InputActionKind {
+pub(crate) enum InputActionKind {
     Changed(InputValueKind),
     CursorMoved,
     Submit,
     Cancel,
-    Validate,
     Ignored,
 }
 
 impl InputActionKind {
-    pub fn changes_value(self) -> bool {
-        matches!(self, Self::Changed(_))
-    }
-
     pub fn should_notify(self) -> bool {
         !matches!(self, Self::Ignored)
-    }
-
-    pub fn should_validate(self) -> bool {
-        matches!(self, Self::Changed(_) | Self::Submit | Self::Validate)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ValidationState {
-    NotValidated,
-    Valid,
-    Invalid,
-}
-
-impl ValidationState {
-    pub fn should_show_error(self) -> bool {
-        matches!(self, Self::Invalid)
     }
 }
 
@@ -67,7 +43,7 @@ pub struct TextInputState {
 
 /// What a keystroke did to the model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextInputAction {
+pub(crate) enum TextInputAction {
     Changed,
     CursorMoved,
     Submit,
@@ -90,20 +66,8 @@ impl TextInputAction {
         }
     }
 
-    pub fn changes_text(self) -> bool {
-        self.contract_kind().changes_value()
-    }
-
     pub fn should_notify(self) -> bool {
         self.contract_kind().should_notify()
-    }
-
-    pub fn is_submit(self) -> bool {
-        matches!(self, Self::Submit)
-    }
-
-    pub fn is_cancel(self) -> bool {
-        matches!(self, Self::Cancel)
     }
 }
 
@@ -340,7 +304,7 @@ impl TextInputState {
     // Key dispatch
     // ------------------------------------------------------------------
 
-    pub fn handle_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+    pub(crate) fn handle_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
         let mods = keystroke.modifiers;
 
@@ -521,7 +485,7 @@ impl TextInputState {
 
     /// Handle only non-printable editing/navigation keys when the control is
     /// also wired into GPUI's platform text input pipeline.
-    pub fn handle_platform_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+    pub(crate) fn handle_platform_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
         let mods = keystroke.modifiers;
 
@@ -534,7 +498,8 @@ impl TextInputState {
         }
     }
 
-    pub fn handle_integer_key(
+    #[cfg(test)]
+    pub(crate) fn handle_integer_key(
         &mut self,
         event: &KeyDownEvent,
         allow_negative: bool,
@@ -574,7 +539,8 @@ impl TextInputState {
         }
     }
 
-    pub fn handle_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+    #[cfg(test)]
+    pub(crate) fn handle_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
         let mods = keystroke.modifiers;
 
@@ -589,7 +555,10 @@ impl TextInputState {
         }
     }
 
-    pub fn handle_platform_multiline_key(&mut self, event: &KeyDownEvent) -> TextInputAction {
+    pub(crate) fn handle_platform_multiline_key(
+        &mut self,
+        event: &KeyDownEvent,
+    ) -> TextInputAction {
         let keystroke = event.keystroke.clone().with_simulated_ime();
         let mods = keystroke.modifiers;
 
@@ -950,8 +919,14 @@ mod tests {
 
     #[test]
     fn action_helpers_distinguish_text_changes_from_cursor_motion() {
-        assert!(TextInputAction::Changed.changes_text());
-        assert!(!TextInputAction::CursorMoved.changes_text());
+        assert_eq!(
+            TextInputAction::Changed.contract_kind(),
+            InputActionKind::Changed(InputValueKind::Text)
+        );
+        assert_eq!(
+            TextInputAction::CursorMoved.contract_kind(),
+            InputActionKind::CursorMoved
+        );
         assert!(TextInputAction::CursorMoved.should_notify());
         assert!(!TextInputAction::Ignored.should_notify());
     }

@@ -12,11 +12,12 @@ use crate::{
 };
 
 use super::{
-    InputActionKind, InputValueKind, TextInputState,
+    TextInputState,
     platform_input::{
         AfterEdit, PlatformInputMode, PointerSelectionState, SingleLineInputStyle,
         single_line_input,
     },
+    state::{InputActionKind, InputValueKind},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -584,7 +585,7 @@ fn handle_bound_integer_platform_key(
             InputActionKind::Changed(InputValueKind::Number) => {
                 should_parse = true;
             }
-            InputActionKind::Submit | InputActionKind::Validate => {
+            InputActionKind::Submit => {
                 should_parse = true;
                 should_sync_text = true;
             }
