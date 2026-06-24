@@ -56,19 +56,21 @@ impl Label {
         self
     }
 
-    pub fn muted(mut self) -> Self {
-        self.color = LabelColor::Muted;
+    pub fn color(mut self, color: LabelColor) -> Self {
+        self.color = color;
         self
     }
 
-    pub fn secondary(mut self) -> Self {
-        self.color = LabelColor::Secondary;
-        self
+    pub fn muted(self) -> Self {
+        self.color(LabelColor::Muted)
     }
 
-    pub fn tone(mut self, tone: Tone) -> Self {
-        self.color = LabelColor::Tone(tone);
-        self
+    pub fn secondary(self) -> Self {
+        self.color(LabelColor::Secondary)
+    }
+
+    pub fn tone(self, tone: Tone) -> Self {
+        self.color(LabelColor::Tone(tone))
     }
 
     pub fn strong(mut self) -> Self {
@@ -116,5 +118,12 @@ mod tests {
 
         assert_eq!(label.size, LabelSize::Small);
         assert_eq!(label.color, LabelColor::Primary);
+    }
+
+    #[test]
+    fn label_color_builder_stores_explicit_color() {
+        let label = Label::new("Relay").color(LabelColor::Secondary);
+
+        assert_eq!(label.color, LabelColor::Secondary);
     }
 }

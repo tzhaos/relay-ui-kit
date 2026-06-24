@@ -5,9 +5,10 @@ use gpui::{
 use relay::SignalVecExt;
 use relay_uikit::patterns::overlay::{Select, SelectOption, overlay};
 use relay_uikit::{
-    Badge, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState, IconName,
-    InlineError, LoadingSpinner, NumberInput, ProgressBar, SettingsRow, SettingsSection, Skeleton,
-    Slider, Theme, ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone, radius,
+    Badge, BadgeStyle, Banner, Button, Callout, Checkbox, ColorPicker, ColorPreset, EmptyState,
+    IconName, InlineError, Label, LabelColor, LoadingSpinner, NumberInput, ProgressBar,
+    SettingsRow, SettingsSection, Skeleton, Slider, Theme, ThemePreviewCard, ThemePreviewKind,
+    Toast, Toggle, Tone, radius,
 };
 
 use super::{
@@ -138,6 +139,23 @@ pub(super) fn render(
                         .child(Badge::new("WAITING").tone(Tone::Warning).soft())
                         .child(Badge::new("FAILED").tone(Tone::Danger).soft())
                         .child(Badge::new("main").tone(Tone::Secondary)),
+                )
+                .child(
+                    strip()
+                        .child(
+                            Badge::new("Outline badge")
+                                .tone(Tone::Secondary)
+                                .style(BadgeStyle::Outline),
+                        )
+                        .child(
+                            Badge::new("Soft badge")
+                                .tone(Tone::Info)
+                                .style(BadgeStyle::Soft),
+                        )
+                        .child(Label::new("Primary").color(LabelColor::Primary))
+                        .child(Label::new("Secondary").color(LabelColor::Secondary))
+                        .child(Label::new("Muted").color(LabelColor::Muted))
+                        .child(Label::new("Review").color(LabelColor::Tone(Tone::Warning))),
                 )
                 .child(
                     div()

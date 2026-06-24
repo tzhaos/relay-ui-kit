@@ -42,9 +42,13 @@ impl Badge {
         self
     }
 
-    pub fn soft(mut self) -> Self {
-        self.style = BadgeStyle::Soft;
+    pub fn style(mut self, style: BadgeStyle) -> Self {
+        self.style = style;
         self
+    }
+
+    pub fn soft(self) -> Self {
+        self.style(BadgeStyle::Soft)
     }
 
     pub fn icon(mut self, icon: IconName) -> Self {
@@ -81,5 +85,17 @@ impl RenderOnce for Badge {
                 this.child(Icon::new(icon).size(IconSize::XSmall).color(fg))
             })
             .child(div().truncate().child(self.label))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn badge_style_builder_stores_explicit_style() {
+        let badge = Badge::new("Relay").style(BadgeStyle::Soft);
+
+        assert_eq!(badge.style, BadgeStyle::Soft);
     }
 }
