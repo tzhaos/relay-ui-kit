@@ -40,8 +40,8 @@ pub use command::{
 };
 pub use layout::shell;
 pub use overlay::{
-    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,
-    Popover, Select, SelectOption, TooltipBody, overlay,
+    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Popover,
+    Select, SelectOption, TooltipBody, overlay,
 };
 pub use scroll_surface::ScrollSurface;
 pub use shell::{

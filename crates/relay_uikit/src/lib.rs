@@ -61,10 +61,9 @@ pub use input::{NumberInput, NumberInputLayout, SearchField, TextArea, TextInput
 pub use list::{
     ForEach, ListItem, ListItemSpacing, SectionedList, SectionedListGroup, TreeNode, TreeView,
 };
-pub use motion::{MotionDirection, MotionDuration, MotionExt, MotionPolicy};
 pub use patterns::overlay::{
-    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Overlay,
-    Popover, Select, SelectOption, TooltipBody, overlay,
+    AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Popover,
+    Select, SelectOption, TooltipBody, overlay,
 };
 pub use patterns::{
     ActionsMenu, CommandMenu, CommandMenuItem, CommandMenuItemKind, DiffHunk, DiffLine,
@@ -88,12 +87,12 @@ pub mod core {
         ColorField, ColorPicker, ColorPreset, ColorSwatch, CountBadge, Disclosure, Divider,
         EmptyState, FieldDescription, FieldLabel, FilterBar, FilterChip, Icon, IconButton,
         IconName, IconSize, InlineError, KitAssets, Label, LabelColor, LabelSize, ListItem,
-        ListItemSpacing, LoadingSpinner, MotionDirection, MotionDuration, MotionExt, MotionPolicy,
-        NavRow, NumberInput, NumberInputLayout, PanelHeader, ProgressBar, Radio, SearchField,
-        SectionedList, SectionedListGroup, Segment, SegmentedControl, SettingsRow, SettingsSection,
-        Skeleton, Slider, StatusDot, Stepper, TextArea, TextInput, TextInputState, Theme,
-        ThemePreviewCard, ThemePreviewKind, Toast, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow,
-        TreeView, button, choice, components, controls, display, feedback, form, icon, input,
-        interaction, list, motion, radius, row, space, styles, theme, tone,
+        ListItemSpacing, LoadingSpinner, NavRow, NumberInput, NumberInputLayout, PanelHeader,
+        ProgressBar, Radio, SearchField, SectionedList, SectionedListGroup, Segment,
+        SegmentedControl, SettingsRow, SettingsSection, Skeleton, Slider, StatusDot, Stepper,
+        TextArea, TextInput, TextInputState, Theme, ThemePreviewCard, ThemePreviewKind, Toast,
+        Toggle, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView, button, choice, components,
+        controls, display, feedback, form, icon, input, interaction, list, motion, radius, row,
+        space, styles, theme, tone,
     };
 }

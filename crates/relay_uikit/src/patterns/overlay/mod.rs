@@ -14,7 +14,7 @@ pub use anchored_overlay::AnchoredOverlay;
 pub use context_menu::ContextMenu;
 pub use dialog::{ConfirmDialog, Dialog};
 pub use dropdown_menu::DropdownMenu;
-pub use floating_overlay::{Overlay, overlay};
+pub use floating_overlay::overlay;
 pub use menu::{Menu, MenuItem};
 pub use popover::Popover;
 pub use select::{Select, SelectOption};

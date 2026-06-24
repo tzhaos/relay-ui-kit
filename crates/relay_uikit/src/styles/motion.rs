@@ -53,19 +53,6 @@ pub enum MotionDirection {
 }
 
 // ---------------------------------------------------------------------------
-// Motion policy
-// ---------------------------------------------------------------------------
-
-/// What kind of motion a component uses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MotionPolicy {
-    /// Animate the component when it first appears (slide-in + optional fade).
-    Entry,
-    /// A repeating animation that runs as long as the component is visible.
-    ContinuousFeedback,
-}
-
-// ---------------------------------------------------------------------------
 // MotionExt trait
 // ---------------------------------------------------------------------------
 
