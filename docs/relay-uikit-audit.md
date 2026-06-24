@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 242 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 248 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -143,6 +143,7 @@ What is already good:
 
 - checkboxes, radios, toggles, segmented controls, filter chips, and selects all have binding-oriented APIs;
 - select/open semantics are wired through shared `OpenState` and `SelectionSource` adapters;
+- `ItemPicker` now defaults to no secondary actions, so generic picker triggers no longer inherit branch-specific behavior unless the host opts in;
 - patterns scenes exercise select, item picker, command picker, and actions menu compositions.
 
 Remaining concerns:
@@ -217,12 +218,15 @@ Landed changes:
 
 - `TextInput`, `SearchField`, `TextArea`, and editable `NumberInput` now accept owned `String` key contexts instead of forcing `&'static str`.
 - `SplitPane` and `OutputSurface` now accept general `ElementId` inputs instead of forcing static string ids.
+- `ItemPicker` no longer ships branch-specific default action rows; hosts now opt into secondary actions explicitly.
 - gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
 - rustdoc was strengthened for high-frequency public surfaces:
-  `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, and `ConfirmDialog`.
+  `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, `ConfirmDialog`,
+  `SectionedList`, `TreeView`, `TreeRow`, `NavRow`, `ItemPicker`, `PickerOption`, `PickerAction`,
+  `ActionsMenu`, `Menu`, `MenuItem`, and `Select`.
 - dead interaction aliases were removed:
   `SubmitHandler`, `SharedSubmitHandler`, `CancelHandler`, `SharedCancelHandler`, and `ChangeHandler`.
-- regression tests were added for the relaxed contracts.
+- regression tests were added for the relaxed contracts and generic picker defaults.
 
 This is a product-grade improvement because app-shaped desktop surfaces often need dynamically derived ids and key contexts.
 Forcing static strings at the UIKit boundary would otherwise leak artificial constraints into higher-level Relay product code.

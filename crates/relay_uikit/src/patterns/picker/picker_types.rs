@@ -1,6 +1,6 @@
 use crate::icon::IconName;
 
-/// A selectable Git branch row in [`super::BranchSelector`].
+/// One selectable item row inside an [`super::ItemPicker`].
 pub struct PickerOption<K> {
     pub(super) key: K,
     pub(super) label: String,
@@ -8,6 +8,7 @@ pub struct PickerOption<K> {
 }
 
 impl<K> PickerOption<K> {
+    /// Create an item option with a stable key and visible label.
     pub fn new(key: K, label: impl Into<String>) -> Self {
         Self {
             key,
@@ -16,13 +17,14 @@ impl<K> PickerOption<K> {
         }
     }
 
+    /// Add supporting detail text below the main option label.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
         self
     }
 }
 
-/// A non-destructive helper action shown at the bottom of a branch picker.
+/// One secondary action row shown under an [`super::ItemPicker`] item list.
 pub struct PickerAction {
     pub(super) key: String,
     pub(super) label: String,
@@ -30,6 +32,7 @@ pub struct PickerAction {
 }
 
 impl PickerAction {
+    /// Create an action with a stable key, visible label, and leading icon.
     pub fn new(key: impl Into<String>, label: impl Into<String>, icon: IconName) -> Self {
         Self {
             key: key.into(),
@@ -39,7 +42,7 @@ impl PickerAction {
     }
 }
 
-/// Branch operations shown from a separate "more" menu.
+/// Standard contextual actions used by picker-adjacent action menus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PickerActionKind {
     Checkout,
@@ -49,6 +52,7 @@ pub enum PickerActionKind {
 }
 
 impl PickerActionKind {
+    /// User-facing action label for menus and gallery examples.
     pub fn label(self) -> &'static str {
         match self {
             PickerActionKind::Checkout => "Checkout item",
@@ -58,6 +62,7 @@ impl PickerActionKind {
         }
     }
 
+    /// Leading icon that matches the action intent.
     pub fn icon(self) -> IconName {
         match self {
             PickerActionKind::Checkout => IconName::GitBranch,
@@ -67,6 +72,7 @@ impl PickerActionKind {
         }
     }
 
+    /// Whether the action should be rendered in a danger tone.
     pub fn is_dangerous(self) -> bool {
         matches!(self, PickerActionKind::Delete)
     }
@@ -77,7 +83,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn delete_branch_action_is_dangerous() {
+    fn delete_picker_action_is_dangerous() {
         assert!(PickerActionKind::Delete.is_dangerous());
     }
 }

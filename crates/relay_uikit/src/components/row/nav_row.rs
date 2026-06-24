@@ -22,6 +22,7 @@ pub struct NavRow {
 }
 
 impl NavRow {
+    /// Create a top-level navigation row with a stable id and leading icon.
     pub fn new(id: impl Into<ElementId>, icon: IconName, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -33,16 +34,19 @@ impl NavRow {
         }
     }
 
+    /// Show a count badge at the end of the row.
     pub fn count(mut self, count: usize) -> Self {
         self.count = Some(count);
         self
     }
 
+    /// Render the row in the selected state.
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
     }
 
+    /// Observe row activation from both pointer and keyboard interaction.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

@@ -39,7 +39,7 @@ enum PickerMove {
     Previous,
 }
 
-pub(super) struct BranchPickerPanelProps<K>
+pub(super) struct PickerPanelProps<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
@@ -53,11 +53,11 @@ where
     pub(super) action_handler: Option<SharedActionHandler<String>>,
 }
 
-pub(super) fn branch_picker_panel<K>(props: BranchPickerPanelProps<K>) -> impl IntoElement
+pub(super) fn picker_panel<K>(props: PickerPanelProps<K>) -> impl IntoElement
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
-    let BranchPickerPanelProps {
+    let PickerPanelProps {
         id,
         focus_handle,
         selected_key,
@@ -215,7 +215,7 @@ where
             });
         }
         let mut panel = div()
-            .id((id, "branch-picker-panel"))
+            .id((id, "item-picker-panel"))
             .w(px(320.0))
             .p(px(space::XS))
             .flex()
@@ -361,7 +361,7 @@ where
 
             panel = panel.child(
                 div()
-                    .id(("branch-option", index))
+                    .id(("picker-option", index))
                     .min_h(px(34.0))
                     .px_2()
                     .py_1()
@@ -467,7 +467,7 @@ where
             let active = active_entry == Some(PickerPanelEntry::Action(index));
             panel = panel.child(
                 div()
-                    .id(("branch-picker-action", index))
+                    .id(("picker-action", index))
                     .h(px(30.0))
                     .px_2()
                     .flex()
@@ -519,13 +519,6 @@ where
 
         panel.motion_slide_in(MotionDirection::FromTop, true)
     }
-}
-
-pub(super) fn default_picker_actions() -> Vec<PickerAction> {
-    vec![
-        PickerAction::new("branch:create", "Create branch", IconName::Plus),
-        PickerAction::new("worktree:create", "New worktree", IconName::FolderPlus),
-    ]
 }
 
 #[cfg(test)]

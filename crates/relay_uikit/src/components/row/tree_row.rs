@@ -26,6 +26,7 @@ pub struct TreeRow {
 }
 
 impl TreeRow {
+    /// Create a single tree row with a stable id, icon, and visible label.
     pub fn new(id: impl Into<ElementId>, icon: IconName, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -53,22 +54,26 @@ impl TreeRow {
         self
     }
 
+    /// Indent the row to represent hierarchical depth.
     pub fn depth(mut self, depth: usize) -> Self {
         self.depth = depth;
         self
     }
 
+    /// Mark the row as expandable and set its current open state.
     pub fn expandable(mut self, expanded: bool) -> Self {
         self.expandable = true;
         self.expanded = expanded;
         self
     }
 
+    /// Render the row in the selected state.
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
     }
 
+    /// Observe row activation after shared selection and open-state updates run.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -190,5 +195,13 @@ mod tests {
         });
 
         assert!(row.open_state.is_some());
+    }
+
+    #[test]
+    fn tree_row_expandable_marks_row_as_expandable() {
+        let row = TreeRow::new("tree", IconName::Folder, "src").expandable(true);
+
+        assert!(row.expandable);
+        assert!(row.expanded);
     }
 }

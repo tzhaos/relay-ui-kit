@@ -5,7 +5,7 @@ use crate::patterns::{Menu, MenuItem};
 
 use super::picker_types::PickerActionKind;
 
-/// Context menu for branch management actions.
+/// Compact menu for item-level management actions such as checkout or rename.
 #[derive(IntoElement)]
 pub struct ActionsMenu {
     id: ElementId,
@@ -14,6 +14,7 @@ pub struct ActionsMenu {
 }
 
 impl ActionsMenu {
+    /// Create a menu with the standard picker action set.
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
@@ -27,11 +28,13 @@ impl ActionsMenu {
         }
     }
 
+    /// Override the action order and membership shown in the menu.
     pub fn actions(mut self, actions: Vec<PickerActionKind>) -> Self {
         self.actions = actions;
         self
     }
 
+    /// Observe item action selection with the resolved [`PickerActionKind`].
     pub fn on_select(
         mut self,
         handler: impl Fn(PickerActionKind, &mut Window, &mut App) + 'static,

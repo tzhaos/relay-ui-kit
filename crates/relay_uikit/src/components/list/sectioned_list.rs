@@ -1,5 +1,6 @@
 use crate::component_prelude::*;
 
+/// One titled group inside a [`SectionedList`].
 pub struct SectionedListGroup {
     title: String,
     count: Option<usize>,
@@ -8,6 +9,7 @@ pub struct SectionedListGroup {
 }
 
 impl SectionedListGroup {
+    /// Create a group with an uppercase section heading.
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             title: title.into(),
@@ -17,11 +19,13 @@ impl SectionedListGroup {
         }
     }
 
+    /// Show a numeric badge next to the section title.
     pub fn count(mut self, count: usize) -> Self {
         self.count = Some(count);
         self
     }
 
+    /// Render trailing metadata or controls in the section header row.
     pub fn trailing(mut self, trailing: impl IntoElement) -> Self {
         self.trailing = Some(trailing.into_any_element());
         self
@@ -34,6 +38,7 @@ impl ParentElement for SectionedListGroup {
     }
 }
 
+/// Stacked list groups with lightweight headers and host-owned row content.
 #[derive(IntoElement)]
 pub struct SectionedList {
     id: ElementId,
@@ -41,6 +46,7 @@ pub struct SectionedList {
 }
 
 impl SectionedList {
+    /// Create a grouped list from prebuilt section definitions.
     pub fn new(id: impl Into<ElementId>, groups: Vec<SectionedListGroup>) -> Self {
         Self {
             id: id.into(),

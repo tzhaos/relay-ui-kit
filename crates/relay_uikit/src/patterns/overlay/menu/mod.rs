@@ -113,7 +113,7 @@ impl MenuState {
     }
 }
 
-/// A floating menu panel.
+/// Floating menu panel with keyboard navigation and optional nested submenus.
 #[derive(IntoElement)]
 pub struct Menu {
     id: ElementId,
@@ -123,6 +123,7 @@ pub struct Menu {
 }
 
 impl Menu {
+    /// Create a menu with a stable id and ordered rows.
     pub fn new(id: impl Into<ElementId>, items: Vec<MenuItem>) -> Self {
         Self {
             id: id.into(),
@@ -132,11 +133,13 @@ impl Menu {
         }
     }
 
+    /// Override the menu's minimum panel width in pixels.
     pub fn min_width(mut self, width: f32) -> Self {
         self.min_width = width;
         self
     }
 
+    /// Track panel focus with a host-owned or overlay-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self

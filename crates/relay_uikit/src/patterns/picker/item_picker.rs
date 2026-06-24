@@ -17,10 +17,10 @@ use crate::{
     theme::{ActiveTheme, DISABLED_OPACITY, radius},
 };
 
-use super::picker_panel::{BranchPickerPanelProps, branch_picker_panel, default_picker_actions};
+use super::picker_panel::{PickerPanelProps, picker_panel};
 use super::picker_types::{PickerAction, PickerOption};
 
-/// Compact branch selector for title bars and pane toolbars.
+/// Compact item picker for toolbars, panes, and other dense product surfaces.
 ///
 /// `ItemPicker` is the product-facing picker trigger for "select one item, then
 /// maybe run a secondary action on that item". Like [`crate::Select`], it keeps
@@ -55,7 +55,7 @@ where
             id: id.into(),
             selected_key: Some(selected_key),
             items,
-            actions: default_picker_actions(),
+            actions: Vec::new(),
             open: false,
             disabled: false,
             selection: None,
@@ -78,7 +78,7 @@ where
             id: id.into(),
             selected_key: None,
             items,
-            actions: default_picker_actions(),
+            actions: Vec::new(),
             open: false,
             disabled: false,
             selection: Some(SelectionSource::binding(selected)),
@@ -120,7 +120,10 @@ where
         self.selected_with(SelectionSource::selector(selector))
     }
 
-    /// Override the action rows shown under the item list.
+    /// Override the optional action rows shown under the item list.
+    ///
+    /// Actions default to empty so generic item pickers do not inherit any
+    /// domain-specific behavior unless the host opts in.
     pub fn actions(mut self, actions: Vec<PickerAction>) -> Self {
         self.actions = actions;
         self
@@ -159,7 +162,7 @@ where
         self
     }
 
-    /// Returns the display label for the currently selected branch.
+    /// Returns the display label for the currently selected item.
     /// Reads from a selector or binding first, falls back to selected_key.
     pub fn selected_label(&self, cx: &App) -> String {
         let Some(key) = self.current_selected_key(cx) else {
@@ -346,7 +349,7 @@ where
         let mut overlay = AnchoredOverlay::new(
             id.clone(),
             trigger,
-            branch_picker_panel(BranchPickerPanelProps {
+            picker_panel(PickerPanelProps {
                 id: id.clone(),
                 focus_handle: panel_focus.clone(),
                 selected_key,
@@ -388,36 +391,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn branch_selector_uses_branch_label_for_selected_key() {
-        let selector = ItemPicker::new(
-            "branch-selector",
+    fn item_picker_uses_option_label_for_selected_key() {
+        let picker = ItemPicker::new(
+            "item-picker",
             "feat-ui",
             vec![PickerOption::new("feat-ui", "feature/ui-kit")],
         );
         let app = TestApp::new();
-        let label = app.read(|cx| selector.selected_label(cx));
+        let label = app.read(|cx| picker.selected_label(cx));
 
         assert_eq!(label, "feature/ui-kit");
     }
 
     #[test]
-    fn branch_selector_falls_back_to_selected_key() {
-        let selector = ItemPicker::new("branch-selector", "main", vec![]);
+    fn item_picker_falls_back_to_selected_key_when_option_is_missing() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
         let app = TestApp::new();
-        let label = app.read(|cx| selector.selected_label(cx));
+        let label = app.read(|cx| picker.selected_label(cx));
 
         assert_eq!(label, "main");
     }
 
     #[test]
-    fn branch_selector_reads_selected_label_from_selector() {
+    fn item_picker_reads_selected_label_from_selector() {
         let mut app = TestApp::new();
         let selector = app.update(|cx| {
             init(cx);
             cx.selector(Some("feat-ui"))
         });
         let picker = ItemPicker::new(
-            "branch-selector",
+            "item-picker",
             "main",
             vec![
                 PickerOption::new("main", "main"),
@@ -438,14 +441,14 @@ mod tests {
     }
 
     #[test]
-    fn branch_selector_reads_selected_label_from_selection_source() {
+    fn item_picker_reads_selected_label_from_selection_source() {
         let mut app = TestApp::new();
         let selection = app.update(|cx| {
             init(cx);
             SelectionModel::new(cx, Some("feat-ui"))
         });
         let picker = ItemPicker::new(
-            "branch-selector",
+            "item-picker",
             "main",
             vec![
                 PickerOption::new("main", "main"),
@@ -467,16 +470,23 @@ mod tests {
 
     #[test]
     fn item_picker_starts_enabled() {
-        let picker = ItemPicker::new("branch-selector", "main", vec![]);
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
 
         assert!(!picker.disabled);
+    }
+
+    #[test]
+    fn item_picker_defaults_to_no_secondary_actions() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
+
+        assert!(picker.actions.is_empty());
     }
 
     #[test]
     fn open_bound_item_picker_stores_open_state() {
         let mut app = TestApp::new();
         let picker = app.update(|cx| {
-            ItemPicker::new("branch-selector", "main", vec![]).open_bound(cx.binding(false))
+            ItemPicker::new("item-picker", "main", vec![]).open_bound(cx.binding(false))
         });
 
         assert!(picker.open_state.is_some());

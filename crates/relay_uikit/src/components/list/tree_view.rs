@@ -8,6 +8,7 @@ use crate::{
 
 use super::ListItem;
 
+/// One flattened tree node rendered by [`TreeView`].
 #[derive(Clone, PartialEq)]
 pub struct TreeNode<K>
 where
@@ -25,6 +26,7 @@ impl<K> TreeNode<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
+    /// Create a node with a stable key, leading icon, and visible label.
     pub fn new(key: K, icon: IconName, label: impl Into<String>) -> Self {
         Self {
             key,
@@ -36,22 +38,31 @@ where
         }
     }
 
+    /// Indent the node to represent hierarchical depth.
     pub fn depth(mut self, depth: usize) -> Self {
         self.depth = depth;
         self
     }
 
+    /// Mark the node as expandable and set its current open state.
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = Some(expanded);
         self
     }
 
+    /// Render the node in the selected state.
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
     }
 }
 
+/// Flat tree surface with host-owned selection and disclosure behavior.
+///
+/// `TreeView` expects the host to provide already-flattened nodes in display
+/// order. Nodes with [`TreeNode::expanded`] set become disclosure rows and will
+/// use [`TreeView::on_toggle`] when activated. Leaf rows use
+/// [`TreeView::on_select`] instead.
 #[derive(IntoElement)]
 pub struct TreeView<K>
 where
@@ -67,6 +78,7 @@ impl<K> TreeView<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
+    /// Create a tree from the current visible node snapshot.
     pub fn new(id: impl Into<ElementId>, nodes: Vec<TreeNode<K>>) -> Self {
         Self {
             id: id.into(),
@@ -76,11 +88,13 @@ where
         }
     }
 
+    /// Observe activation of non-expandable rows.
     pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 
+    /// Observe activation of expandable rows.
     pub fn on_toggle(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(std::rc::Rc::new(handler));
         self

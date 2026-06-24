@@ -19,6 +19,7 @@ pub struct MenuItem {
 }
 
 impl MenuItem {
+    /// Create an interactive menu row with a visible label.
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
@@ -54,6 +55,7 @@ impl MenuItem {
         }
     }
 
+    /// Create a non-interactive group heading row.
     pub fn header(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
@@ -71,21 +73,25 @@ impl MenuItem {
         }
     }
 
+    /// Add supporting detail text below the main label.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
         self
     }
 
+    /// Add a leading icon to the menu row.
     pub fn icon(mut self, icon: IconName) -> Self {
         self.icon = Some(icon);
         self
     }
 
+    /// Render trailing affordances such as shortcuts or badges.
     pub fn trailing(mut self, trailing: impl IntoElement) -> Self {
         self.trailing = Some(trailing.into_any_element());
         self
     }
 
+    /// Mark the row as currently selected or checked.
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
         self
@@ -97,22 +103,26 @@ impl MenuItem {
         self
     }
 
+    /// Disable activation while keeping the row visible.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    /// Reserve submenu affordance even before submenu items are attached.
     pub fn submenu(mut self) -> Self {
         self.submenu = true;
         self
     }
 
+    /// Attach a nested submenu that opens from this row.
     pub fn submenu_items(mut self, items: Vec<MenuItem>) -> Self {
         self.submenu = true;
         self.submenu_items = items;
         self
     }
 
+    /// Observe row activation from both pointer and keyboard menu interaction.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

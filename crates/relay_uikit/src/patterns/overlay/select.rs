@@ -178,6 +178,7 @@ where
         self
     }
 
+    /// Resolve the visible trigger label for the current selected value.
     pub fn selected_label(&self) -> &str {
         self.options
             .iter()
