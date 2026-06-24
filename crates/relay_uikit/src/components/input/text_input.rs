@@ -1,11 +1,8 @@
 //! Single-line text entry for Relay desktop surfaces.
 //!
-//! [`TextInput`] supports two ownership models:
-//!
-//! - host-owned snapshots via [`TextInput::new`], useful when a parent view is
-//!   already reconciling its own editing state; and
-//! - relay-bound editing via [`TextInput::bound`], which delegates the full
-//!   editing session to a [`relay::Binding`] of [`TextInputState`].
+//! [`TextInput`] always renders against a live [`relay::Binding`] of
+//! [`TextInputState`] so desktop selection, composition, and IME behavior stay
+//! on the real Relay editing path.
 
 use gpui::{
     App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
@@ -28,45 +25,21 @@ use super::{
     },
 };
 
-/// A single-line text input that can be host-owned or Relay-bound.
-///
-/// Use [`TextInput::bound`] when the field should own an active editing session
-/// through Relay state. Use [`TextInput::new`] when the host already derives and
-/// reconciles its own snapshot of [`TextInputState`].
+/// A single-line text input with Relay-bound desktop editing semantics.
 #[derive(IntoElement)]
 pub struct TextInput {
     id: ElementId,
     focus: FocusHandle,
-    before: String,
-    after: String,
     placeholder: String,
     leading_icon: Option<IconName>,
     focused: bool,
     disabled: bool,
     key_context: String,
-    binding: Option<Binding<TextInputState>>,
+    binding: Binding<TextInputState>,
     on_key: Option<KeyHandler>,
 }
 
 impl TextInput {
-    /// Create a host-owned text input from a snapshot of [`TextInputState`].
-    pub fn new(id: impl Into<ElementId>, focus: FocusHandle, state: &TextInputState) -> Self {
-        let (before, after) = state.split();
-        Self {
-            id: id.into(),
-            focus,
-            before: before.to_string(),
-            after: after.to_string(),
-            placeholder: String::new(),
-            leading_icon: None,
-            focused: false,
-            disabled: false,
-            key_context: "TextInput".into(),
-            binding: None,
-            on_key: None,
-        }
-    }
-
     /// Create a Relay-bound text input backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
@@ -76,14 +49,12 @@ impl TextInput {
         Self {
             id: id.into(),
             focus,
-            before: String::new(),
-            after: String::new(),
             placeholder: String::new(),
             leading_icon: None,
             focused: false,
             disabled: false,
             key_context: "TextInput".into(),
-            binding: Some(binding),
+            binding,
             on_key: None,
         }
     }
@@ -139,28 +110,10 @@ impl RenderOnce for TextInput {
         let root_id = self.id.clone();
         let placeholder = self.placeholder.clone();
         let focus = self.focus.clone();
-        let pointer = binding.as_ref().map(|_| {
-            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
-                PointerSelectionState::default()
-            })
+        let pointer = window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+            PointerSelectionState::default()
         });
-        let (before_str, selection_str, after_str, cursor_visible) = match binding.as_ref() {
-            Some(binding) => {
-                let state = binding.get(cx);
-                let sel_range = state.selection_range();
-                let value = state.value().to_string();
-                if let Some((start, end)) = sel_range {
-                    let before = value[..start].to_string();
-                    let selected = value[start..end].to_string();
-                    let after = value[end..].to_string();
-                    (before, selected, after, false)
-                } else {
-                    let (before, after) = state.split();
-                    (before.to_string(), String::new(), after.to_string(), true)
-                }
-            }
-            None => (self.before, String::new(), self.after, false),
-        };
+        let show_placeholder = binding.get(cx).is_empty() && !is_focused;
         let border = if is_focused {
             theme.accent
         } else {
@@ -169,11 +122,7 @@ impl RenderOnce for TextInput {
         let focus_for_click = self.focus.clone();
         let focus_for_mousedown = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder = before_str.is_empty()
-            && after_str.is_empty()
-            && selection_str.is_empty()
-            && !is_focused;
+        let handle_key = !self.disabled;
         let disabled = self.disabled;
         let editor_style = SingleLineInputStyle {
             text_color: theme.text,
@@ -223,71 +172,29 @@ impl RenderOnce for TextInput {
                     .flex()
                     .items_center()
                     .text_sm()
-                    .when(show_placeholder, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(SingleLineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder,
-                                    disabled,
-                                },
-                                mode: PlatformInputMode::Text,
-                                after_edit: None,
-                            }))
-                        } else {
-                            this.text_color(theme.text_muted).child(placeholder.clone())
-                        }
-                    })
-                    .when(!show_placeholder, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(SingleLineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder,
-                                    disabled,
-                                },
-                                mode: PlatformInputMode::Text,
-                                after_edit: None,
-                            }))
-                        } else {
-                            this.text_color(theme.text)
-                                .child(div().child(before_str))
-                                .when(!selection_str.is_empty(), |this| {
-                                    this.child(
-                                        div()
-                                            .bg(theme.selection)
-                                            .text_color(theme.text)
-                                            .child(selection_str),
-                                    )
-                                })
-                                .when(is_focused && cursor_visible, |this| {
-                                    this.child(caret(theme.accent))
-                                })
-                                .child(div().child(after_str))
-                        }
-                    }),
+                    .child(single_line_input(SingleLineInputProps {
+                        base: PlatformInputBase {
+                            id: (root_id.clone(), "editor").into(),
+                            focus: focus.clone(),
+                            binding: binding.clone(),
+                            pointer,
+                            style: editor_style,
+                            placeholder: placeholder.clone(),
+                            show_placeholder,
+                            disabled,
+                        },
+                        mode: PlatformInputMode::Text,
+                        after_edit: None,
+                    })),
             )
             .when(handle_key, |this| {
-                let binding_clone = binding.clone();
                 this.on_key_down(move |event, window, cx| {
                     let mut consumed = false;
-                    if let Some(binding) = &binding_clone {
-                        binding.update(cx, |state| {
-                            let action = state.handle_platform_key(event);
-                            consumed = action.should_notify();
-                            consumed
-                        });
-                    }
+                    binding.update(cx, |state| {
+                        let action = state.handle_platform_key(event);
+                        consumed = action.should_notify();
+                        consumed
+                    });
                     if let Some(on_key) = &on_key {
                         on_key(event, window, cx);
                     }
@@ -305,10 +212,6 @@ impl RenderOnce for TextInput {
                 })
             })
     }
-}
-
-fn caret(color: gpui::Hsla) -> impl IntoElement {
-    div().w(px(1.5)).h(px(16.0)).bg(color)
 }
 
 #[cfg(test)]
@@ -329,14 +232,15 @@ mod tests {
             )
         });
 
-        assert!(input.binding.is_some());
+        let value = app.read(|cx| input.binding.get(cx).value().to_string());
+        assert_eq!(value, "relay");
     }
 
     #[test]
     fn key_context_accepts_owned_strings() {
         let mut app = TestApp::new();
         let input = app.update(|cx| {
-            TextInput::new("text", cx.focus_handle(), &TextInputState::new())
+            TextInput::bound("text", cx.focus_handle(), cx.binding(TextInputState::new()))
                 .key_context(format!("TextInput mode={}", "search"))
         });
 

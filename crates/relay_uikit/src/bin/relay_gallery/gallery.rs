@@ -205,6 +205,8 @@ impl GalleryScenesApp {
 pub struct GalleryState {
     pub name_input: Binding<TextInputState>,
     pub name_focus: FocusHandle,
+    pub disabled_text_input: Binding<TextInputState>,
+    pub disabled_text_focus: FocusHandle,
     pub search_input: Binding<TextInputState>,
     pub search_focus: FocusHandle,
     pub stress_long_text_input: Binding<TextInputState>,
@@ -305,6 +307,8 @@ impl GalleryState {
         Self {
             name_input: cx.binding(TextInputState::with_text("relay-agent")),
             name_focus: cx.focus_handle(),
+            disabled_text_input: cx.binding(TextInputState::with_text("Disabled input")),
+            disabled_text_focus: cx.focus_handle(),
             search_input: cx.binding(TextInputState::new()),
             search_focus: cx.focus_handle(),
             stress_long_text_input: cx.binding(TextInputState::with_text(

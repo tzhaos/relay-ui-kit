@@ -567,6 +567,7 @@ impl TextInputState {
     // Internal helpers
     // ------------------------------------------------------------------
 
+    #[cfg(test)]
     pub(crate) fn split(&self) -> (&str, &str) {
         let cursor = self.safe_cursor();
         self.value.split_at(cursor)

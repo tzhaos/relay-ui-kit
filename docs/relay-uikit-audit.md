@@ -128,7 +128,7 @@ What is already good:
 - IME-aware methods are wired through GPUI `InputHandler`;
 - `TextInputState` has deep unit coverage for cursor movement, selection, word motion, deletion, composition, and UTF-16 range conversion;
 - `NumberInput` now supports less restrictive `key_context` configuration;
-- `SearchField`, `TextArea`, and editable `NumberInput` now stay on the Relay-bound editing path instead of carrying preview-only snapshot constructors and fallback rendering branches;
+- `TextInput`, `SearchField`, `TextArea`, and editable `NumberInput` now stay on the Relay-bound editing path instead of carrying preview-only snapshot constructors and fallback rendering branches;
 - `SearchField` now clears its bound value by default and treats `Escape` as a real "clear search" action when content is present, so hosts do not need to wire the basic product behavior by hand;
 - `NumberInput` now keeps disabled semantics honest across both stepper buttons and inline editing, and its editable configuration no longer depends on builder call order;
 - the latest batch removed unnecessary `&'static str` constraints from text and numeric input public APIs.
@@ -228,8 +228,8 @@ The latest UIKit cleanup batch focused on input-family productization: removing 
 Landed changes:
 
 - `TextInput`, `SearchField`, `TextArea`, and editable `NumberInput` now accept owned `String` key contexts instead of forcing `&'static str`.
+- `TextInput`, `SearchField`, and `TextArea` no longer expose host-owned snapshot constructors or carry fallback preview rendering branches.
 - `SearchField` now clears its bound `TextInputState` by default, and non-empty bound search queries clear on `Escape` instead of requiring host-owned cleanup code.
-- `SearchField` and `TextArea` no longer expose host-owned snapshot constructors or carry fallback preview rendering branches.
 - `NumberInput` no longer exposes host-owned numeric or inline-editing constructors; the product path is now Relay-bound value ownership plus optional `input_bound(...)` text editing.
 - `NumberInput` editable configuration now survives builder call-order changes, so `focused`, `key_context`, and `on_key` are not silently dropped when they are set before `input_bound(...)`.
 - disabled `NumberInput` now blocks both stepper activation and inline text editing instead of only dimming the chrome.

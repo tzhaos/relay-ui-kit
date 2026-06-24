@@ -10,8 +10,8 @@ use relay_uikit::{
     Disclosure, Divider, FieldDescription, FieldLabel, FilterBar, FilterChip, ForEach, Icon,
     IconButton, IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput,
     NumberInputLayout, PanelHeader, Radio, SearchField, SectionedList, SectionedListGroup, Segment,
-    SegmentedControl, Slider, StatusDot, Stepper, TextInput, TextInputState, Theme,
-    ThemePreviewKind, Toggle, Tone, ToolbarGroup, TreeNode, TreeRow, TreeView,
+    SegmentedControl, Slider, StatusDot, Stepper, TextInput, Theme, ThemePreviewKind, Toggle, Tone,
+    ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::GalleryScenesApp;
@@ -331,10 +331,10 @@ fn text_input_sample(state: &GalleryState, focused: bool) -> impl IntoElement {
         )
         .child(
             div().max_w(px(320.0)).child(
-                TextInput::new(
+                TextInput::bound(
                     "demo-dis",
-                    state.name_focus.clone(),
-                    &TextInputState::with_text("Disabled input"),
+                    state.disabled_text_focus.clone(),
+                    state.disabled_text_input.clone(),
                 )
                 .disabled(true),
             ),
