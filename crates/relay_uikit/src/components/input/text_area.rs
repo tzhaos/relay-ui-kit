@@ -27,7 +27,7 @@ pub struct TextArea {
     disabled: bool,
     min_rows: usize,
     bordered: bool,
-    key_context: &'static str,
+    key_context: String,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
@@ -45,7 +45,7 @@ impl TextArea {
             disabled: false,
             min_rows: 3,
             bordered: true,
-            key_context: "TextArea",
+            key_context: "TextArea".into(),
             binding: None,
             on_key: None,
         }
@@ -66,7 +66,7 @@ impl TextArea {
             disabled: false,
             min_rows: 3,
             bordered: true,
-            key_context: "TextArea",
+            key_context: "TextArea".into(),
             binding: Some(binding),
             on_key: None,
         }
@@ -98,8 +98,9 @@ impl TextArea {
         self
     }
 
-    pub fn key_context(mut self, key_context: &'static str) -> Self {
-        self.key_context = key_context;
+    /// Override the GPUI key-dispatch context used while this text area is focused.
+    pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
+        self.key_context = key_context.into();
         self
     }
 
@@ -171,7 +172,7 @@ impl RenderOnce for TextArea {
             .when(!self.bordered, |this| this.bg(gpui::transparent_black()))
             .track_focus(&self.focus)
             .tab_index(0)
-            .key_context(self.key_context)
+            .key_context(self.key_context.as_str())
             .when(disabled, |this| {
                 this.opacity(DISABLED_OPACITY)
                     .cursor(gpui::CursorStyle::OperationNotAllowed)
@@ -325,5 +326,16 @@ mod tests {
         });
 
         assert!(area.binding.is_some());
+    }
+
+    #[test]
+    fn key_context_accepts_owned_strings() {
+        let mut app = TestApp::new();
+        let area = app.update(|cx| {
+            TextArea::new("area", cx.focus_handle(), &TextInputState::new())
+                .key_context(format!("TextArea section={}", "notes"))
+        });
+
+        assert_eq!(area.key_context, "TextArea section=notes");
     }
 }

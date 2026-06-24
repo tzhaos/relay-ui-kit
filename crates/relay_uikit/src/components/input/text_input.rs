@@ -29,7 +29,7 @@ pub struct TextInput {
     leading_icon: Option<IconName>,
     focused: bool,
     disabled: bool,
-    key_context: &'static str,
+    key_context: String,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
@@ -46,7 +46,7 @@ impl TextInput {
             leading_icon: None,
             focused: false,
             disabled: false,
-            key_context: "TextInput",
+            key_context: "TextInput".into(),
             binding: None,
             on_key: None,
         }
@@ -66,7 +66,7 @@ impl TextInput {
             leading_icon: None,
             focused: false,
             disabled: false,
-            key_context: "TextInput",
+            key_context: "TextInput".into(),
             binding: Some(binding),
             on_key: None,
         }
@@ -93,8 +93,9 @@ impl TextInput {
         self
     }
 
-    pub fn key_context(mut self, key_context: &'static str) -> Self {
-        self.key_context = key_context;
+    /// Override the GPUI key-dispatch context used while this input is focused.
+    pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
+        self.key_context = key_context.into();
         self
     }
 
@@ -167,7 +168,7 @@ impl RenderOnce for TextInput {
             .track_focus(&self.focus)
             .tab_index(0)
             .role(Role::TextInput)
-            .key_context(self.key_context)
+            .key_context(self.key_context.as_str())
             .when(disabled, |this| {
                 this.opacity(DISABLED_OPACITY)
                     .cursor(gpui::CursorStyle::OperationNotAllowed)
@@ -306,5 +307,16 @@ mod tests {
         });
 
         assert!(input.binding.is_some());
+    }
+
+    #[test]
+    fn key_context_accepts_owned_strings() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            TextInput::new("text", cx.focus_handle(), &TextInputState::new())
+                .key_context(format!("TextInput mode={}", "search"))
+        });
+
+        assert_eq!(input.key_context, "TextInput mode=search");
     }
 }

@@ -37,7 +37,7 @@ struct EditableNumberValue {
     before: String,
     after: String,
     focused: bool,
-    key_context: &'static str,
+    key_context: String,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyHandler>,
 }
@@ -141,7 +141,7 @@ impl NumberInput {
             before: before.to_string(),
             after: after.to_string(),
             focused: false,
-            key_context: "NumberInput",
+            key_context: "NumberInput".into(),
             binding: None,
             on_key: None,
         });
@@ -158,7 +158,7 @@ impl NumberInput {
             before: String::new(),
             after: String::new(),
             focused: false,
-            key_context: "NumberInput",
+            key_context: "NumberInput".into(),
             binding: Some(binding),
             on_key: None,
         });
@@ -176,9 +176,10 @@ impl NumberInput {
         self
     }
 
-    pub fn key_context(mut self, key_context: &'static str) -> Self {
+    /// Override the GPUI key-dispatch context used while the editable field is focused.
+    pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
         if let Some(editable) = &mut self.editable {
-            editable.key_context = key_context;
+            editable.key_context = key_context.into();
         }
         self
     }
@@ -428,7 +429,7 @@ fn editable_number_value(
         .font_weight(FontWeight::MEDIUM)
         .track_focus(&editable.focus)
         .tab_index(0)
-        .key_context(editable.key_context)
+        .key_context(editable.key_context.as_str())
         .cursor(gpui::CursorStyle::IBeam)
         .when(is_focused, |this| this.bg(theme.accent_bg))
         .when(show_fallback, |this| {
@@ -736,6 +737,24 @@ mod tests {
                 .editable
                 .and_then(|editable| editable.binding)
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn editable_number_input_key_context_accepts_owned_strings() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            NumberInput::new("number", 14)
+                .editable(cx.focus_handle(), &TextInputState::with_text("14"))
+                .key_context(format!("NumberInput mode={}", "density"))
+        });
+
+        assert_eq!(
+            input
+                .editable
+                .as_ref()
+                .map(|editable| editable.key_context.as_str()),
+            Some("NumberInput mode=density")
         );
     }
 

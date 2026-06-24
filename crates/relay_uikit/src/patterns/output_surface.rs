@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, App, FontWeight, InteractiveElement, IntoElement, ParentElement, RenderOnce,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
+    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::theme::{ActiveTheme, Theme, mono_family, space};
@@ -8,23 +8,23 @@ use crate::theme::{ActiveTheme, Theme, mono_family, space};
 /// A terminal frame that hosts a real terminal/PTY projection.
 #[derive(IntoElement)]
 pub struct OutputSurface {
-    id: &'static str,
+    id: ElementId,
     content: Option<AnyElement>,
     connected: bool,
 }
 
 impl OutputSurface {
-    pub fn new(id: &'static str, content: impl IntoElement) -> Self {
+    pub fn new(id: impl Into<ElementId>, content: impl IntoElement) -> Self {
         Self {
-            id,
+            id: id.into(),
             content: Some(content.into_any_element()),
             connected: true,
         }
     }
 
-    pub fn empty(id: &'static str) -> Self {
+    pub fn empty(id: impl Into<ElementId>) -> Self {
         Self {
-            id,
+            id: id.into(),
             content: None,
             connected: false,
         }
@@ -40,6 +40,7 @@ impl RenderOnce for OutputSurface {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let id = self.id;
+        let scroll_id = (id.clone(), "scroll");
         let connected = self.connected;
         let empty = self.content.is_none();
         let content = self.content;
@@ -58,7 +59,7 @@ impl RenderOnce for OutputSurface {
             .when_some(content, |this, content| {
                 this.child(
                     div()
-                        .id((id, 0usize))
+                        .id(scroll_id)
                         .size_full()
                         .min_h_0()
                         .overflow_y_scroll()
@@ -136,5 +137,12 @@ mod tests {
         let surface = OutputSurface::empty("terminal-empty");
 
         assert!(!surface.connected);
+    }
+
+    #[test]
+    fn output_surface_accepts_owned_element_ids() {
+        let surface = OutputSurface::empty(format!("terminal-{}", "review"));
+
+        assert_eq!(surface.id, ElementId::Name("terminal-review".into()));
     }
 }

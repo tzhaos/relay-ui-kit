@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce, Styled,
-    Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, ElementId, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce,
+    Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 mod drag;
@@ -30,7 +30,7 @@ pub enum SplitAxis {
 /// A two-pane layout with a draggable divider.
 #[derive(IntoElement)]
 pub struct SplitPane {
-    id: &'static str,
+    id: ElementId,
     axis: SplitAxis,
     first: AnyElement,
     second: AnyElement,
@@ -43,9 +43,13 @@ pub struct SplitPane {
 }
 
 impl SplitPane {
-    pub fn new(id: &'static str, first: impl IntoElement, second: impl IntoElement) -> Self {
+    pub fn new(
+        id: impl Into<ElementId>,
+        first: impl IntoElement,
+        second: impl IntoElement,
+    ) -> Self {
         Self {
-            id,
+            id: id.into(),
             axis: SplitAxis::Horizontal,
             first: first.into_any_element(),
             second: second.into_any_element(),
@@ -106,6 +110,7 @@ impl RenderOnce for SplitPane {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let id = self.id;
+        let root_id = id.clone();
         let axis = self.axis;
         let min_first = self.min_first;
         let min_second = self.min_second;
@@ -124,7 +129,14 @@ impl RenderOnce for SplitPane {
             min_first,
             min_second,
         });
-        let handle = render_split_handle(id, axis, handler.is_some(), keyboard_ctx, window, cx);
+        let handle = render_split_handle(
+            id.clone(),
+            axis,
+            handler.is_some(),
+            keyboard_ctx,
+            window,
+            cx,
+        );
 
         let first = match axis {
             SplitAxis::Horizontal => div()
@@ -143,7 +155,7 @@ impl RenderOnce for SplitPane {
         let second = div().flex_1().min_w_0().min_h_0().child(self.second);
 
         div()
-            .id(id)
+            .id(root_id)
             .size_full()
             .min_w_0()
             .min_h_0()
@@ -154,8 +166,9 @@ impl RenderOnce for SplitPane {
             .child(handle)
             .child(second)
             .when_some(handler, |this, handler| {
+                let drag_id = id.clone();
                 this.on_drag_move::<DraggedSplitPane>(move |event, window, cx| {
-                    if event.drag(cx).id != id {
+                    if event.drag(cx).id != drag_id {
                         return;
                     }
                     let next = split_size_from_drag(event, axis, min_first, min_second);
@@ -166,12 +179,27 @@ impl RenderOnce for SplitPane {
                 })
             })
             .when_some(resize_end, |this, handler| {
+                let drag_id = id.clone();
                 this.on_drop::<DraggedSplitPane>(move |drag, window, cx| {
-                    if drag.id == id {
+                    if drag.id == drag_id {
                         handler(window, cx);
                         cx.stop_propagation();
                     }
                 })
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::{ElementId, div};
+
+    use super::*;
+
+    #[test]
+    fn split_pane_accepts_owned_element_ids() {
+        let pane = SplitPane::new(format!("split-{}", "review"), div(), div());
+
+        assert_eq!(pane.id, ElementId::Name("split-review".into()));
     }
 }

@@ -1,4 +1,4 @@
-use gpui::DragMoveEvent;
+use gpui::{DragMoveEvent, ElementId};
 
 use super::{
     SplitAxis,
@@ -7,7 +7,7 @@ use super::{
 
 #[derive(Clone)]
 pub(super) struct DraggedSplitPane {
-    pub id: &'static str,
+    pub id: ElementId,
 }
 
 pub(super) fn split_size_from_drag(

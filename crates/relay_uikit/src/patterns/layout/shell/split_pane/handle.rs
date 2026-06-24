@@ -1,6 +1,6 @@
 use gpui::{
-    App, AppContext as _, Empty, InteractiveElement, KeyDownEvent, MouseButton, ParentElement,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, AppContext as _, ElementId, Empty, InteractiveElement, KeyDownEvent, MouseButton,
+    ParentElement, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -25,14 +25,15 @@ pub(super) struct SplitHandleContext {
 }
 
 pub(super) fn render_split_handle(
-    id: &'static str,
+    id: ElementId,
     axis: SplitAxis,
     enabled: bool,
     keyboard: Option<SplitHandleContext>,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::Div {
-    window.with_id((id, 0usize), |window| {
+    let handle_scope_id = (id.clone(), "scope");
+    window.with_id(handle_scope_id, |window| {
         let is_highlighted = window.use_state(cx, |_window, _cx| false);
         let highlighted = *is_highlighted.read(cx);
         let theme = *cx.theme();
@@ -43,7 +44,7 @@ pub(super) fn render_split_handle(
         };
         let interactive = match axis {
             SplitAxis::Horizontal => div()
-                .id((id, 1usize))
+                .id((id.clone(), "handle"))
                 .absolute()
                 .left(px(-3.0))
                 .top_0()
@@ -51,7 +52,7 @@ pub(super) fn render_split_handle(
                 .h_full()
                 .cursor_col_resize(),
             SplitAxis::Vertical => div()
-                .id((id, 1usize))
+                .id((id.clone(), "handle"))
                 .absolute()
                 .top(px(-3.0))
                 .left_0()
@@ -75,16 +76,20 @@ pub(super) fn render_split_handle(
                         let drag_state = is_highlighted.clone();
                         let drop_state = is_highlighted.clone();
                         let key_ctx = keyboard;
+                        let drag_id = id.clone();
                         this.on_hover(move |&hovered, _window, cx| {
                             hover_state.write(cx, hovered);
                         })
                         .on_mouse_down(MouseButton::Left, |_, _, cx| {
                             cx.stop_propagation();
                         })
-                        .on_drag(DraggedSplitPane { id }, move |_, _, _window, cx| {
-                            drag_state.write(cx, true);
-                            cx.new(|_| Empty)
-                        })
+                        .on_drag(
+                            DraggedSplitPane { id: drag_id },
+                            move |_, _, _window, cx| {
+                                drag_state.write(cx, true);
+                                cx.new(|_| Empty)
+                            },
+                        )
                         .on_drop::<DraggedSplitPane>(move |_, _, cx| {
                             drop_state.write(cx, false);
                             cx.stop_propagation();

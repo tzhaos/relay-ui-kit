@@ -26,7 +26,7 @@ pub struct SearchField {
     value: String,
     placeholder: String,
     disabled: bool,
-    key_context: &'static str,
+    key_context: String,
     binding: Option<Binding<TextInputState>>,
     on_key: Option<KeyCaptureHandler>,
     on_clear: Option<ClickHandler>,
@@ -40,7 +40,7 @@ impl SearchField {
             value: String::new(),
             placeholder: "Search".into(),
             disabled: false,
-            key_context: "SearchField",
+            key_context: "SearchField".into(),
             binding: None,
             on_key: None,
             on_clear: None,
@@ -58,7 +58,7 @@ impl SearchField {
             value: String::new(),
             placeholder: "Search".into(),
             disabled: false,
-            key_context: "SearchField",
+            key_context: "SearchField".into(),
             binding: Some(binding),
             on_key: None,
             on_clear: None,
@@ -81,8 +81,9 @@ impl SearchField {
         self
     }
 
-    pub fn key_context(mut self, key_context: &'static str) -> Self {
-        self.key_context = key_context;
+    /// Override the GPUI key-dispatch context used while this field is focused.
+    pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
+        self.key_context = key_context.into();
         self
     }
 
@@ -183,7 +184,7 @@ impl RenderOnce for SearchField {
             })
             .track_focus(&self.focus)
             .tab_index(0)
-            .key_context(self.key_context)
+            .key_context(self.key_context.as_str())
             .when(disabled, |this| {
                 this.opacity(DISABLED_OPACITY)
                     .cursor(gpui::CursorStyle::OperationNotAllowed)
@@ -344,5 +345,16 @@ mod tests {
         });
 
         assert!(field.binding.is_some());
+    }
+
+    #[test]
+    fn key_context_accepts_owned_strings() {
+        let mut app = TestApp::new();
+        let field = app.update(|cx| {
+            SearchField::new("search", cx.focus_handle())
+                .key_context(format!("SearchField pane={}", "left"))
+        });
+
+        assert_eq!(field.key_context, "SearchField pane=left");
     }
 }

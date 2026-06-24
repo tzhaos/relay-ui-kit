@@ -35,14 +35,6 @@ pub type SharedClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 's
 pub type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 pub type SharedDismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
-/// Fires on form submit (Enter in a focused input, submit button).
-pub type SubmitHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
-pub type SharedSubmitHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
-
-/// Fires when an interaction is explicitly cancelled (Escape, cancel button).
-pub type CancelHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
-pub type SharedCancelHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
-
 // ---------------------------------------------------------------------------
 // Open / expanded state
 // ---------------------------------------------------------------------------
@@ -243,9 +235,7 @@ where
 pub type ActionHandler<T> = Box<dyn Fn(T, &mut Window, &mut App) + 'static>;
 pub type SharedActionHandler<T> = Rc<dyn Fn(T, &mut Window, &mut App) + 'static>;
 
-/// Value-change notification.  Fires whenever the host-owned state is mutated
-/// (text changed, slider moved, toggle flipped).
-pub type ChangeHandler<T> = Box<dyn Fn(T, &mut Window, &mut App) + 'static>;
+/// Shared value-change notification cloned into multiple sub-elements.
 pub type SharedChangeHandler<T> = Rc<dyn Fn(T, &mut Window, &mut App) + 'static>;
 
 // ---------------------------------------------------------------------------
@@ -258,10 +248,6 @@ pub type KeyHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) + 'static
 /// Like [`KeyHandler`], but returns `true` when the event was consumed
 /// (stops propagation).  Returning `false` lets the event bubble.
 pub type KeyCaptureHandler = Box<dyn Fn(&KeyDownEvent, &mut Window, &mut App) -> bool + 'static>;
-
-// ---------------------------------------------------------------------------
-// Color picker handler
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
