@@ -264,9 +264,8 @@ pub(super) fn render(
         ))
 }
 
-fn theme_select(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement {
+fn theme_select(state: &GalleryState, _cx: &mut Context<GalleryScenesApp>) -> impl IntoElement {
     let open_binding = state.settings_select_open.clone();
-    let is_open = open_binding.get(cx);
 
     Select::bound(
         "settings-theme-select",
@@ -277,27 +276,7 @@ fn theme_select(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> imp
             SelectOption::new(ThemePreviewKind::Dark, "Dark"),
         ],
     )
-    .open(is_open)
-    .on_toggle({
-        let open = open_binding.clone();
-        move |_event, _window, cx| {
-            open.update(cx, |v| {
-                *v = !*v;
-                true
-            });
-        }
-    })
-    .on_select({
-        let open = open_binding.clone();
-        move |_key, _window, cx| {
-            open.set(cx, false);
-        }
-    })
-    .on_dismiss({
-        move |_window, cx| {
-            open_binding.set(cx, false);
-        }
-    })
+    .open_bound(open_binding)
 }
 
 fn theme_controls(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> impl IntoElement {

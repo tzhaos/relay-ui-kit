@@ -117,6 +117,7 @@ impl RenderOnce for DropdownMenu {
 #[cfg(test)]
 mod tests {
     use gpui::div;
+    use relay::ReactiveAppExt;
 
     use super::*;
 
@@ -139,5 +140,14 @@ mod tests {
         let menu = DropdownMenu::new("dropdown", div(), vec![]);
 
         assert_eq!(menu.offset, point(px(0.0), px(0.0)));
+    }
+
+    #[test]
+    fn dropdown_menu_bound_stores_open_binding() {
+        let mut app = gpui::TestApp::new();
+        let menu =
+            app.update(|cx| DropdownMenu::bound("dropdown", div(), vec![], cx.binding(false)));
+
+        assert!(menu.open_binding.is_some());
     }
 }
