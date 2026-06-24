@@ -5,7 +5,7 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::{Binding, Selector, WindowSignalExt};
+use relay::{Binding, Selector};
 
 use crate::patterns::overlay::AnchoredOverlay;
 use crate::{
@@ -110,6 +110,10 @@ where
     }
 
     /// Render the picker open or closed from a host-owned snapshot.
+    ///
+    /// This does not create internal ownership. Pair it with
+    /// [`ItemPicker::open_bound`] when the trigger should control panel
+    /// visibility directly.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
@@ -237,22 +241,8 @@ where
             on_action,
             on_dismiss,
         } = self;
-        let selection = selection.or_else(|| {
-            selected_key.clone().map(|selected_key| {
-                SelectionSource::binding(window.use_binding(
-                    (id.clone(), "selected-key"),
-                    cx,
-                    || selected_key,
-                ))
-            })
-        });
-        let open_state = open_state.or_else(|| {
-            Some(OpenState::binding(window.use_binding(
-                (id.clone(), "open-state"),
-                cx,
-                || open,
-            )))
-        });
+        let selection = selection;
+        let open_state = open_state;
         let trigger_focus = window
             .use_keyed_state((id.clone(), "trigger-focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
@@ -267,7 +257,7 @@ where
             .or(selected_key);
         let open = open_state
             .as_ref()
-            .is_some_and(|open_state| open_state.get(cx));
+            .map_or(open, |open_state| open_state.get(cx));
         let selected_option = selected_key
             .as_ref()
             .and_then(|selected_key| items.iter().find(|option| option.key == *selected_key));
@@ -304,7 +294,7 @@ where
         });
         let dismiss_handler = on_dismiss;
         let toggle_handler: Option<SharedClickHandler> = on_toggle.map(std::rc::Rc::from);
-        let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
+        let trigger_clickable = !disabled && open_state.is_some();
         let aria_label = aria_label.unwrap_or_else(|| format!("Select item: {selected_label}"));
         let trigger = div()
             .id((id.clone(), "trigger"))
@@ -534,6 +524,13 @@ mod tests {
         let picker = ItemPicker::new("item-picker", "main", vec![]);
 
         assert!(!picker.disabled);
+    }
+
+    #[test]
+    fn item_picker_defaults_to_no_open_controller() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
+
+        assert!(picker.open_state.is_none());
     }
 
     #[test]

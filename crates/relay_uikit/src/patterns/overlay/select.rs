@@ -5,7 +5,7 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::{Binding, WindowSignalExt};
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -122,6 +122,10 @@ where
     }
 
     /// Render the dropdown open or closed from a host-owned snapshot.
+    ///
+    /// This does not create internal ownership. Pair it with
+    /// [`Select::open_bound`] when the trigger itself should be able to open
+    /// and close the menu.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
@@ -217,22 +221,8 @@ where
             on_select,
             on_dismiss,
         } = self;
-        let source = source.or_else(|| {
-            selected_value.map(|selected_value| {
-                SelectionSource::binding(window.use_binding(
-                    (id.clone(), "selected-value"),
-                    cx,
-                    || selected_value,
-                ))
-            })
-        });
-        let open_state = open_state.or_else(|| {
-            Some(OpenState::binding(window.use_binding(
-                (id.clone(), "open-state"),
-                cx,
-                || open,
-            )))
-        });
+        let source = source;
+        let open_state = open_state;
         let trigger_focus = window
             .use_keyed_state((id.clone(), "trigger-focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
@@ -241,16 +231,19 @@ where
             .use_keyed_state((id.clone(), "menu-focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
             .clone();
-        let selected_value = source.as_ref().and_then(|source| source.get(cx));
+        let selected_value = source
+            .as_ref()
+            .and_then(|source| source.get(cx))
+            .or(selected_value);
         let open = open_state
             .as_ref()
-            .is_some_and(|open_state| open_state.get(cx));
+            .map_or(open, |open_state| open_state.get(cx));
         let label = selected_label(&options, selected_value.as_ref(), &placeholder).to_string();
         let select_handler = on_select.map(Rc::new);
         let dismiss_handler = on_dismiss;
         let toggle_handler: Option<SharedClickHandler> = on_toggle.map(Rc::from);
         let can_select = source.is_some() || select_handler.is_some();
-        let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
+        let trigger_clickable = !disabled && open_state.is_some();
         let aria_label = aria_label.unwrap_or_else(|| format!("{}: {}", placeholder, label));
         let trigger = div()
             .id((id.clone(), "trigger"))
@@ -467,6 +460,13 @@ mod tests {
         let select = Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")]);
 
         assert!(!select.disabled);
+    }
+
+    #[test]
+    fn select_defaults_to_no_open_controller() {
+        let select = Select::new("select", "dark", vec![SelectOption::new("dark", "Dark")]);
+
+        assert!(select.open_state.is_none());
     }
 
     #[test]

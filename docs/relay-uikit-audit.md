@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 261 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 263 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -143,6 +143,7 @@ What is already good:
 
 - checkboxes, radios, toggles, segmented controls, filter chips, and selects all have binding-oriented APIs;
 - select/open semantics are wired through shared `OpenState` and `SelectionSource` adapters;
+- `Select` and `ItemPicker` now require explicit open controllers instead of silently creating internal fallback bindings, so open-state ownership is visible at the API boundary;
 - `ItemPicker` now defaults to no secondary actions, so generic picker triggers no longer inherit branch-specific behavior unless the host opts in;
 - `ItemPicker` now auto-dismisses after selection or action handling by default, so hosts no longer need to manually close common picker flows;
 - `ItemPicker` presentation is now host-configurable, so panel title and trigger/row iconography do not hardcode branch semantics into the base picker primitive;
@@ -229,6 +230,7 @@ Landed changes:
 - gallery settings and pattern scenes now use `open_bound` / `DropdownMenu::bound` directly instead of hand-written open/close bookkeeping.
 - `Menu` now owns action-dismiss propagation for nested submenu leaves, and `Select`, `DropdownMenu`, `ContextMenu`, plus the direct anchored-menu gallery sample all consume that shared contract.
 - `ContextMenu` now supports `open` / `open_bound` control and the gallery demonstrates a real open-dismiss-action loop instead of a permanently visible mock overlay.
+- `Select` and `ItemPicker` no longer synthesize hidden open-state fallback bindings during render, which tightens the controller contract around host-owned overlay state.
 - gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
 - rustdoc was strengthened for high-frequency public surfaces:
   `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, `ConfirmDialog`,
