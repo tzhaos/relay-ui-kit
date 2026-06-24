@@ -168,7 +168,7 @@ impl<T: 'static> SignalVecExt<T> for Signal<Vec<T>> {
             }
 
             self.peek(|list| {
-                selector.reconcile_keys_by(cx, list, |item| key(item));
+                selector.reconcile_keys_by(cx, list, &mut key);
             });
         });
 

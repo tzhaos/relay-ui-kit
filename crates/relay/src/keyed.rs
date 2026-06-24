@@ -177,7 +177,7 @@ where
         build: impl FnMut(&T, &mut Context<V>) -> V,
         update: impl FnMut(&T, &mut V, &mut Context<V>) -> bool,
     ) -> bool {
-        let cleared_selection = selector.reconcile_keys_by(cx, &items, |item| key(item));
+        let cleared_selection = selector.reconcile_keys_by(cx, &items, &mut key);
         self.sync(cx, items, key, build, update);
         cleared_selection
     }

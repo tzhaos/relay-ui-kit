@@ -149,7 +149,6 @@ mod tests {
         use gpui::{Context, IntoElement, Render, Window, div};
 
         struct EffectHost {
-            seen: Rc<Cell<i32>>,
             _effect: crate::Effect,
         }
 
@@ -159,7 +158,7 @@ mod tests {
                 let _effect = effect_in(cx, move |cx| {
                     seen_for_effect.set(signal.get(cx));
                 });
-                Self { seen, _effect }
+                Self { _effect }
             }
         }
 
@@ -197,7 +196,7 @@ mod tests {
     #[test]
     fn effect_id_is_unique() {
         let mut app = TestApp::new();
-        app.update(|cx| init(cx));
+        app.update(init);
 
         let e1 = app.update(|cx| effect(cx, |_| {}));
         let e2 = app.update(|cx| effect(cx, |_| {}));

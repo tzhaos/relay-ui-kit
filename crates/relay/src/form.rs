@@ -109,9 +109,10 @@ impl Form {
     ///
     /// Requires [`Form::build_is_dirty`] to have been called first.
     pub fn is_dirty(&self) -> &Memo<bool> {
-        self.dirty_memo
-            .as_ref()
-            .expect("build_is_dirty must be called before is_dirty")
+        match self.dirty_memo.as_ref() {
+            Some(dirty_memo) => dirty_memo,
+            None => panic!("build_is_dirty must be called before is_dirty"),
+        }
     }
 
     /// Reset all fields to their initial values.
@@ -312,8 +313,7 @@ mod tests {
         let dirty = app.update(|cx| {
             init(cx);
             let mut form = Form::new();
-            let dirty = form.build_is_dirty(cx);
-            dirty
+            form.build_is_dirty(cx)
         });
 
         app.read(|cx| assert!(!dirty.get(cx), "empty form should not be dirty"));

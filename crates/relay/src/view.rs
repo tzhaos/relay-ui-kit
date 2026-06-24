@@ -487,7 +487,7 @@ mod tests {
 
     struct CounterView {
         count: Signal<i32>,
-        scope: StateScope,
+        _scope: StateScope,
     }
 
     impl CounterView {
@@ -510,7 +510,10 @@ mod tests {
                 },
             );
 
-            Self { count, scope }
+            Self {
+                count,
+                _scope: scope,
+            }
         }
     }
 
@@ -718,8 +721,7 @@ mod tests {
 
         struct WatchView {
             count: Signal<i32>,
-            scope: StateScope,
-            fired: Rc<Cell<i32>>,
+            _scope: StateScope,
         }
 
         impl WatchView {
@@ -740,8 +742,7 @@ mod tests {
                 );
                 Self {
                     count,
-                    scope,
-                    fired,
+                    _scope: scope,
                 }
             }
         }

@@ -74,7 +74,7 @@ impl Global for ContextRegistry {}
 impl ContextRegistry {
     fn get_or_create_slot<T: 'static>(&self, cx: &App) -> Rc<ContextSlot<T>> {
         let mut slots = self.slots.borrow_mut();
-        slots
+        let slot = slots
             .entry(TypeId::of::<T>())
             .or_insert_with(|| {
                 let signal_id = cx.global::<ReactiveRuntime>().allocate_signal();
@@ -83,9 +83,11 @@ impl ContextRegistry {
                     signal_id,
                 })
             })
-            .clone()
-            .downcast::<ContextSlot<T>>()
-            .expect("type mismatch in context slot")
+            .clone();
+        match slot.downcast::<ContextSlot<T>>() {
+            Ok(slot) => slot,
+            Err(_) => unreachable!("type mismatch in context slot"),
+        }
     }
 }
 
@@ -226,7 +228,7 @@ mod tests {
     #[test]
     fn use_context_returns_none_when_not_provided() {
         let mut app = TestApp::new();
-        app.update(|cx| init(cx));
+        app.update(init);
 
         app.read(|cx| {
             let value = use_context::<i32>(cx);

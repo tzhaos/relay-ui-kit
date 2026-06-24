@@ -912,14 +912,18 @@ where
             .or_else(|| active.clone());
 
         apply_multi_selection_state(
-            &self.active,
-            &self.selected_keys,
-            &self.anchor,
-            &self.keyed,
+            MultiSelectionStateRefs {
+                active: &self.active,
+                selected_keys: &self.selected_keys,
+                anchor: &self.anchor,
+                keyed: &self.keyed,
+            },
             cx,
-            selected,
-            active,
-            anchor,
+            MultiSelectionSnapshot {
+                selected,
+                active_key: active,
+                anchor_key: anchor,
+            },
         )
     }
 
@@ -1024,6 +1028,19 @@ enum SelectionBoundary {
     Last,
 }
 
+struct MultiSelectionStateRefs<'a, K> {
+    active: &'a SelectionModel<K>,
+    selected_keys: &'a Signal<Vec<K>>,
+    anchor: &'a Signal<Option<K>>,
+    keyed: &'a Rc<RefCell<HashMap<K, Signal<bool>>>>,
+}
+
+struct MultiSelectionSnapshot<K> {
+    selected: Vec<K>,
+    active_key: Option<K>,
+    anchor_key: Option<K>,
+}
+
 fn reconcile_selection<K>(
     selection: &SelectionModel<K>,
     cx: &mut App,
@@ -1081,32 +1098,42 @@ where
         .filter(|anchor_key| next_selected.iter().any(|selected| selected == anchor_key))
         .or_else(|| next_active.clone());
     let changed = apply_multi_selection_state(
-        active,
-        selected_keys,
-        anchor,
-        keyed,
+        MultiSelectionStateRefs {
+            active,
+            selected_keys,
+            anchor,
+            keyed,
+        },
         cx,
-        next_selected,
-        next_active,
-        next_anchor,
+        MultiSelectionSnapshot {
+            selected: next_selected,
+            active_key: next_active,
+            anchor_key: next_anchor,
+        },
     );
     retain_multi_selection_keyed_signals(keyed, ordered_keys.iter().cloned());
     changed
 }
 
 fn apply_multi_selection_state<K>(
-    active: &SelectionModel<K>,
-    selected_keys: &Signal<Vec<K>>,
-    anchor: &Signal<Option<K>>,
-    keyed: &Rc<RefCell<HashMap<K, Signal<bool>>>>,
+    state: MultiSelectionStateRefs<'_, K>,
     cx: &mut App,
-    selected: Vec<K>,
-    active_key: Option<K>,
-    anchor_key: Option<K>,
+    next: MultiSelectionSnapshot<K>,
 ) -> bool
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
+    let MultiSelectionStateRefs {
+        active,
+        selected_keys,
+        anchor,
+        keyed,
+    } = state;
+    let MultiSelectionSnapshot {
+        selected,
+        active_key,
+        anchor_key,
+    } = next;
     let previous_selected = selected_keys.get_untracked();
     let previous_active = active.get_untracked();
     let previous_anchor = anchor.get_untracked();

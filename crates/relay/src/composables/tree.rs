@@ -445,6 +445,62 @@ struct ProjectionSnapshot<T, K> {
     parent_by_key: HashMap<K, Option<K>>,
 }
 
+struct ProjectionWalker<'a, T, K, KeyFn, ChildrenFn, Children>
+where
+    KeyFn: Fn(&T) -> K,
+    ChildrenFn: Fn(&T) -> Children,
+    Children: IntoIterator<Item = T>,
+{
+    expanded: &'a HashSet<K>,
+    key: &'a KeyFn,
+    children: &'a ChildrenFn,
+    snapshot: &'a mut ProjectionSnapshot<T, K>,
+}
+
+impl<T, K, KeyFn, ChildrenFn, Children> ProjectionWalker<'_, T, K, KeyFn, ChildrenFn, Children>
+where
+    T: Clone,
+    K: Clone + Eq + Hash,
+    KeyFn: Fn(&T) -> K,
+    ChildrenFn: Fn(&T) -> Children,
+    Children: IntoIterator<Item = T>,
+{
+    fn visit(&mut self, node: &T, parent: Option<K>, depth: usize, is_visible: bool) {
+        let node_key = (self.key)(node);
+        let child_nodes = (self.children)(node).into_iter().collect::<Vec<_>>();
+        let has_children = !child_nodes.is_empty();
+        let is_expanded = has_children && self.expanded.contains(&node_key);
+
+        self.snapshot.all_keys.push(node_key.clone());
+        self.snapshot
+            .parent_by_key
+            .insert(node_key.clone(), parent.clone());
+        if has_children {
+            self.snapshot.expandable_keys.push(node_key.clone());
+        }
+        if is_visible {
+            self.snapshot.visible_keys.push(node_key.clone());
+            self.snapshot.visible_nodes.push(ProjectedTreeNode {
+                key: node_key.clone(),
+                item: node.clone(),
+                depth,
+                parent: parent.clone(),
+                has_children,
+                is_expanded,
+            });
+        }
+
+        for child in &child_nodes {
+            self.visit(
+                child,
+                Some(node_key.clone()),
+                depth + 1,
+                is_visible && is_expanded,
+            );
+        }
+    }
+}
+
 fn build_projection<T, K, KeyFn, ChildrenFn, Children>(
     roots: &[T],
     expanded: &HashSet<K>,
@@ -465,66 +521,18 @@ where
         expandable_keys: Vec::new(),
         parent_by_key: HashMap::new(),
     };
+    let mut walker = ProjectionWalker {
+        expanded,
+        key,
+        children,
+        snapshot: &mut snapshot,
+    };
 
     for root in roots {
-        visit_tree_node(root, None, 0, true, expanded, key, children, &mut snapshot);
+        walker.visit(root, None, 0, true);
     }
 
     snapshot
-}
-
-fn visit_tree_node<T, K, KeyFn, ChildrenFn, Children>(
-    node: &T,
-    parent: Option<K>,
-    depth: usize,
-    is_visible: bool,
-    expanded: &HashSet<K>,
-    key: &KeyFn,
-    children: &ChildrenFn,
-    snapshot: &mut ProjectionSnapshot<T, K>,
-) where
-    T: Clone,
-    K: Clone + Eq + Hash,
-    KeyFn: Fn(&T) -> K,
-    ChildrenFn: Fn(&T) -> Children,
-    Children: IntoIterator<Item = T>,
-{
-    let node_key = key(node);
-    let child_nodes = children(node).into_iter().collect::<Vec<_>>();
-    let has_children = !child_nodes.is_empty();
-    let is_expanded = has_children && expanded.contains(&node_key);
-
-    snapshot.all_keys.push(node_key.clone());
-    snapshot
-        .parent_by_key
-        .insert(node_key.clone(), parent.clone());
-    if has_children {
-        snapshot.expandable_keys.push(node_key.clone());
-    }
-    if is_visible {
-        snapshot.visible_keys.push(node_key.clone());
-        snapshot.visible_nodes.push(ProjectedTreeNode {
-            key: node_key.clone(),
-            item: node.clone(),
-            depth,
-            parent: parent.clone(),
-            has_children,
-            is_expanded,
-        });
-    }
-
-    for child in &child_nodes {
-        visit_tree_node(
-            child,
-            Some(node_key.clone()),
-            depth + 1,
-            is_visible && is_expanded,
-            expanded,
-            key,
-            children,
-            snapshot,
-        );
-    }
 }
 
 fn apply_keyed_state<K>(

@@ -975,13 +975,13 @@ mod tests {
             init(cx);
             init(cx);
         });
-        assert!(app.read(|cx| is_installed(cx)));
+        assert!(app.read(is_installed));
     }
 
     #[test]
     fn is_installed_returns_false_before_init() {
         let app = TestApp::new();
-        assert!(!app.read(|cx| is_installed(cx)));
+        assert!(!app.read(is_installed));
     }
 
     // --- track_signal in non-tracking context is a no-op ---
