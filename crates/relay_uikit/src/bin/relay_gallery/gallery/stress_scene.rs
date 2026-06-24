@@ -18,8 +18,9 @@ use super::{
     shared::{scene_stack, section, strip},
 };
 
-pub(super) const COVERAGE_TITLES: [&str; 7] = [
+pub(super) const COVERAGE_TITLES: [&str; 8] = [
     "Input overflow",
+    "Mixed ASCII · CJK editing",
     "Long text",
     "Disabled and quiet states",
     "Disabled icon buttons",
@@ -39,6 +40,11 @@ pub(super) fn render(
         .child(section(
             cx,
             COVERAGE_TITLES[1],
+            mixed_cjk_editing(state, theme),
+        ))
+        .child(section(
+            cx,
+            COVERAGE_TITLES[2],
             div()
                 .flex()
                 .items_start()
@@ -49,7 +55,7 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
-            COVERAGE_TITLES[2],
+            COVERAGE_TITLES[3],
             strip()
                 .child(
                     Button::new("stress-disabled-primary", "Primary Action")
@@ -72,7 +78,7 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
-            COVERAGE_TITLES[3],
+            COVERAGE_TITLES[4],
             strip()
                 .child(
                     IconButton::new("stress-ib-disabled", IconName::Plus)
@@ -94,15 +100,15 @@ pub(super) fn render(
                         .aria_label("Open settings"),
                 ),
         ))
-        .child(section(cx, COVERAGE_TITLES[4], long_list(theme)))
+        .child(section(cx, COVERAGE_TITLES[5], long_list(theme)))
         .child(section(
             cx,
-            COVERAGE_TITLES[5],
+            COVERAGE_TITLES[6],
             cached_session_list(state.stress_session_list.clone()),
         ))
         .child(section(
             cx,
-            COVERAGE_TITLES[6],
+            COVERAGE_TITLES[7],
             scroll_surface_sample(theme),
         ))
 }
@@ -212,6 +218,78 @@ fn constrained_inputs(state: &GalleryState) -> impl IntoElement {
                             .suffix("ms")
                             .range(-99999, 99999)
                             .key_context("StressLongNumberInput"),
+                        ),
+                ),
+        )
+}
+
+fn mixed_cjk_editing(state: &GalleryState, theme: Theme) -> impl IntoElement {
+    div()
+        .flex()
+        .items_start()
+        .gap_4()
+        .flex_wrap()
+        .child(
+            div()
+                .w(px(320.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("IME candidate tracking"))
+                        .child(FieldDescription::new(
+                            "Switch between English and Chinese input mid-sentence. Candidate placement should stay anchored near the caret instead of drifting to a window corner.",
+                        ))
+                        .child(
+                            TextInput::bound(
+                                "stress-cjk-text-input",
+                                state.stress_cjk_text_focus.clone(),
+                                state.stress_cjk_text_input.clone(),
+                            )
+                            .leading_icon(IconName::MessageSquareText)
+                            .key_context("StressCjkTextInput"),
+                        ),
+                ),
+        )
+        .child(
+            div()
+                .w(px(360.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Mixed-language multiline note"))
+                        .child(FieldDescription::new(
+                            "Editing across ASCII/CJK boundaries should preserve line breaks, keep the caret visible, and avoid overflowing the field chrome.",
+                        ))
+                        .child(
+                            TextArea::bound(
+                                "stress-cjk-area-input",
+                                state.stress_cjk_area_focus.clone(),
+                                state.stress_cjk_area_input.clone(),
+                            )
+                            .min_rows(5)
+                            .key_context("StressCjkTextArea"),
+                        ),
+                )
+                .child(
+                    div()
+                        .rounded(px(radius::MD))
+                        .bg(theme.panel_alt)
+                        .px_3()
+                        .py_2()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(
+                            "This scenario is intentionally product-shaped: long paths, English identifiers, and Chinese review copy in the same editing session.",
                         ),
                 ),
         )
