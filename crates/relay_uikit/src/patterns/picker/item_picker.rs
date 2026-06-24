@@ -24,13 +24,18 @@ use super::picker_types::{PickerAction, PickerOption};
 ///
 /// `ItemPicker` is the product-facing picker trigger for "select one item, then
 /// maybe run a secondary action on that item". Like [`crate::Select`], it keeps
-/// selection and open-state ownership explicit.
+/// selection and open-state ownership explicit. Use [`ItemPicker::title`] and
+/// [`ItemPicker::icon`] when a product surface wants domain-specific
+/// presentation such as a branch switcher or project chooser without baking
+/// that vocabulary into the base primitive.
 #[derive(IntoElement)]
 pub struct ItemPicker<K>
 where
     K: Clone + Eq + Hash + PartialEq + ToString + 'static,
 {
     id: ElementId,
+    title: String,
+    icon: Option<IconName>,
     selected_key: Option<K>,
     items: Vec<PickerOption<K>>,
     actions: Vec<PickerAction>,
@@ -54,6 +59,8 @@ where
     pub fn new(id: impl Into<ElementId>, selected_key: K, items: Vec<PickerOption<K>>) -> Self {
         Self {
             id: id.into(),
+            title: "Select item".into(),
+            icon: None,
             selected_key: Some(selected_key),
             items,
             actions: Vec::new(),
@@ -78,6 +85,8 @@ where
     ) -> Self {
         Self {
             id: id.into(),
+            title: "Select item".into(),
+            icon: None,
             selected_key: None,
             items,
             actions: Vec::new(),
@@ -103,6 +112,18 @@ where
     /// Render the picker open or closed from a host-owned snapshot.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+
+    /// Override the panel title shown above the item list.
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    /// Add a leading icon to the trigger and panel header.
+    pub fn icon(mut self, icon: IconName) -> Self {
+        self.icon = Some(icon);
         self
     }
 
@@ -180,8 +201,8 @@ where
 
         self.items
             .iter()
-            .find(|branch| branch.key == key)
-            .map_or_else(|| key.to_string(), |branch| branch.label.to_string())
+            .find(|option| option.key == key)
+            .map_or_else(|| key.to_string(), |option| option.label.to_string())
     }
 
     fn current_selected_key(&self, cx: &App) -> Option<K> {
@@ -200,6 +221,8 @@ where
         let theme = *cx.theme();
         let Self {
             id,
+            title,
+            icon,
             selected_key,
             items,
             actions,
@@ -245,14 +268,16 @@ where
         let open = open_state
             .as_ref()
             .is_some_and(|open_state| open_state.get(cx));
+        let selected_option = selected_key
+            .as_ref()
+            .and_then(|selected_key| items.iter().find(|option| option.key == *selected_key));
         let selected_label = selected_key
             .as_ref()
             .map_or_else(String::new, |selected_key| {
-                items
-                    .iter()
-                    .find(|branch| branch.key == *selected_key)
-                    .map_or_else(|| selected_key.to_string(), |branch| branch.label.clone())
+                selected_option
+                    .map_or_else(|| selected_key.to_string(), |option| option.label.clone())
             });
+        let trigger_icon = selected_option.and_then(|option| option.icon).or(icon);
         let select_handler = if auto_dismiss || on_select.is_some() {
             let open_state = open_state.clone();
             Some(
@@ -318,11 +343,13 @@ where
                         window.prevent_default();
                     })
             })
-            .child(
-                Icon::new(IconName::Folder)
-                    .size(IconSize::Small)
-                    .color(theme.text_muted),
-            )
+            .when_some(trigger_icon, |this, icon| {
+                this.child(
+                    Icon::new(icon)
+                        .size(IconSize::Small)
+                        .color(theme.text_muted),
+                )
+            })
             .child(
                 div()
                     .min_w_0()
@@ -384,6 +411,8 @@ where
             picker_panel(PickerPanelProps {
                 id: id.clone(),
                 focus_handle: panel_focus.clone(),
+                title,
+                icon,
                 selected_key,
                 items,
                 actions,
@@ -508,10 +537,31 @@ mod tests {
     }
 
     #[test]
+    fn item_picker_defaults_title_to_select_item() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
+
+        assert_eq!(picker.title, "Select item");
+    }
+
+    #[test]
+    fn item_picker_title_builder_stores_title() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]).title("Switch branch");
+
+        assert_eq!(picker.title, "Switch branch");
+    }
+
+    #[test]
     fn item_picker_defaults_to_no_secondary_actions() {
         let picker = ItemPicker::new("item-picker", "main", vec![]);
 
         assert!(picker.actions.is_empty());
+    }
+
+    #[test]
+    fn item_picker_icon_builder_stores_icon() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]).icon(IconName::GitBranch);
+
+        assert_eq!(picker.icon, Some(IconName::GitBranch));
     }
 
     #[test]

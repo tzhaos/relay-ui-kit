@@ -5,6 +5,7 @@ pub struct PickerOption<K> {
     pub(super) key: K,
     pub(super) label: String,
     pub(super) detail: Option<String>,
+    pub(super) icon: Option<IconName>,
 }
 
 impl<K> PickerOption<K> {
@@ -14,12 +15,19 @@ impl<K> PickerOption<K> {
             key,
             label: label.into(),
             detail: None,
+            icon: None,
         }
     }
 
     /// Add supporting detail text below the main option label.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
+        self
+    }
+
+    /// Add a leading icon for trigger and panel presentation.
+    pub fn icon(mut self, icon: IconName) -> Self {
+        self.icon = Some(icon);
         self
     }
 }
@@ -85,5 +93,12 @@ mod tests {
     #[test]
     fn delete_picker_action_is_dangerous() {
         assert!(PickerActionKind::Delete.is_dangerous());
+    }
+
+    #[test]
+    fn picker_option_icon_builder_stores_icon() {
+        let option = PickerOption::new("main", "main").icon(IconName::GitBranch);
+
+        assert_eq!(option.icon, Some(IconName::GitBranch));
     }
 }

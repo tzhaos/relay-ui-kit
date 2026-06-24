@@ -45,6 +45,8 @@ where
 {
     pub(super) id: ElementId,
     pub(super) focus_handle: FocusHandle,
+    pub(super) title: String,
+    pub(super) icon: Option<IconName>,
     pub(super) selected_key: Option<K>,
     pub(super) items: Vec<PickerOption<K>>,
     pub(super) actions: Vec<PickerAction>,
@@ -60,6 +62,8 @@ where
     let PickerPanelProps {
         id,
         focus_handle,
+        title,
+        icon,
         selected_key,
         items,
         actions,
@@ -71,6 +75,8 @@ where
     PickerPanel {
         id,
         focus_handle,
+        title,
+        icon,
         selected_key,
         items,
         actions,
@@ -87,6 +93,8 @@ where
 {
     id: ElementId,
     focus_handle: FocusHandle,
+    title: String,
+    icon: Option<IconName>,
     selected_key: Option<K>,
     items: Vec<PickerOption<K>>,
     actions: Vec<PickerAction>,
@@ -159,6 +167,8 @@ where
         let Self {
             id,
             focus_handle,
+            title,
+            icon,
             selected_key,
             items,
             actions,
@@ -334,13 +344,15 @@ where
                             .text_size(px(11.0))
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(theme.text_muted)
-                            .child("SWITCH BRANCH"),
+                            .child(title.to_uppercase()),
                     )
-                    .child(
-                        Icon::new(IconName::Folder)
-                            .size(IconSize::Small)
-                            .color(theme.text_muted),
-                    ),
+                    .when_some(icon, |this, icon| {
+                        this.child(
+                            Icon::new(icon)
+                                .size(IconSize::Small)
+                                .color(theme.text_muted),
+                        )
+                    }),
             );
 
         for (index, item) in items.into_iter().enumerate() {
@@ -398,11 +410,13 @@ where
                                     .size(IconSize::Small)
                                     .color(theme.accent)
                                     .into_any_element()
-                            } else {
-                                Icon::new(IconName::Folder)
+                            } else if let Some(icon) = item.icon {
+                                Icon::new(icon)
                                     .size(IconSize::Small)
                                     .color(theme.text_muted)
                                     .into_any_element()
+                            } else {
+                                div().into_any_element()
                             }),
                     )
                     .child(

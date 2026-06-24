@@ -464,6 +464,8 @@ fn command_picker_patterns(
                             PatternBranch::Main,
                             pattern_branch_options(),
                         )
+                        .title("Switch branch")
+                        .icon(IconName::GitBranch)
                         .selected_with(SelectionSource::ordered_selection_model(
                             state.pattern_branch_selection.clone(),
                         ))
@@ -550,17 +552,20 @@ fn pattern_command_event(
 fn pattern_branch_options() -> Vec<PickerOption<PatternBranch>> {
     vec![
         PickerOption::new(PatternBranch::Main, PatternBranch::Main.label())
-            .detail(PatternBranch::Main.detail()),
+            .detail(PatternBranch::Main.detail())
+            .icon(IconName::GitBranch),
         PickerOption::new(
             PatternBranch::RelayRuntime,
             PatternBranch::RelayRuntime.label(),
         )
-        .detail(PatternBranch::RelayRuntime.detail()),
+        .detail(PatternBranch::RelayRuntime.detail())
+        .icon(IconName::GitBranch),
         PickerOption::new(
             PatternBranch::GalleryPatterns,
             PatternBranch::GalleryPatterns.label(),
         )
-        .detail(PatternBranch::GalleryPatterns.detail()),
+        .detail(PatternBranch::GalleryPatterns.detail())
+        .icon(IconName::GitBranch),
     ]
 }
 
