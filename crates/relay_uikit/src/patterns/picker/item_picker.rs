@@ -36,6 +36,7 @@ where
     actions: Vec<PickerAction>,
     open: bool,
     disabled: bool,
+    auto_dismiss: bool,
     selection: Option<SelectionSource<K>>,
     open_state: Option<OpenState>,
     aria_label: Option<String>,
@@ -58,6 +59,7 @@ where
             actions: Vec::new(),
             open: false,
             disabled: false,
+            auto_dismiss: true,
             selection: None,
             open_state: None,
             aria_label: None,
@@ -81,6 +83,7 @@ where
             actions: Vec::new(),
             open: false,
             disabled: false,
+            auto_dismiss: true,
             selection: Some(SelectionSource::binding(selected)),
             open_state: None,
             aria_label: None,
@@ -106,6 +109,12 @@ where
     /// Disable trigger activation and panel interaction.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Control whether item selection and action execution close the picker.
+    pub fn auto_dismiss(mut self, auto_dismiss: bool) -> Self {
+        self.auto_dismiss = auto_dismiss;
         self
     }
 
@@ -144,13 +153,13 @@ where
         self
     }
 
-    /// Observe item selection after shared selection/open-state updates run.
+    /// Observe item selection after shared selection and optional dismiss cleanup run.
     pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 
-    /// Observe secondary action selection from the picker panel.
+    /// Observe secondary action selection after optional dismiss cleanup runs.
     pub fn on_action(mut self, handler: impl Fn(String, &mut Window, &mut App) + 'static) -> Self {
         self.on_action = Some(std::rc::Rc::new(handler));
         self
@@ -196,6 +205,7 @@ where
             actions,
             open,
             disabled,
+            auto_dismiss,
             selection,
             open_state,
             aria_label,
@@ -243,8 +253,30 @@ where
                     .find(|branch| branch.key == *selected_key)
                     .map_or_else(|| selected_key.to_string(), |branch| branch.label.clone())
             });
-        let select_handler = on_select;
-        let action_handler = on_action;
+        let select_handler = if auto_dismiss || on_select.is_some() {
+            let open_state = open_state.clone();
+            Some(
+                std::rc::Rc::new(move |key: K, window: &mut Window, cx: &mut App| {
+                    if auto_dismiss && let Some(open_state) = &open_state {
+                        open_state.close(cx);
+                    }
+                    if let Some(handler) = &on_select {
+                        handler(key, window, cx);
+                    }
+                }) as SharedActionHandler<K>,
+            )
+        } else {
+            None
+        };
+        let action_handler = on_action.map(|handler| {
+            let open_state = open_state.clone();
+            std::rc::Rc::new(move |key: String, window: &mut Window, cx: &mut App| {
+                if auto_dismiss && let Some(open_state) = &open_state {
+                    open_state.close(cx);
+                }
+                handler(key, window, cx);
+            }) as SharedActionHandler<String>
+        });
         let dismiss_handler = on_dismiss;
         let toggle_handler: Option<SharedClickHandler> = on_toggle.map(std::rc::Rc::from);
         let trigger_clickable = !disabled && (open_state.is_some() || toggle_handler.is_some());
@@ -480,6 +512,20 @@ mod tests {
         let picker = ItemPicker::new("item-picker", "main", vec![]);
 
         assert!(picker.actions.is_empty());
+    }
+
+    #[test]
+    fn item_picker_auto_dismisses_by_default() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]);
+
+        assert!(picker.auto_dismiss);
+    }
+
+    #[test]
+    fn item_picker_can_disable_auto_dismiss() {
+        let picker = ItemPicker::new("item-picker", "main", vec![]).auto_dismiss(false);
+
+        assert!(!picker.auto_dismiss);
     }
 
     #[test]

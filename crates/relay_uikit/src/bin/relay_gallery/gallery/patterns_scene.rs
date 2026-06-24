@@ -470,10 +470,8 @@ fn command_picker_patterns(
                         .open_bound(state.command_popover_open.clone())
                         .actions(pattern_branch_actions())
                         .on_select({
-                            let open = state.command_popover_open.clone();
                             let log = state.overlay_event.clone();
                             move |key, _window, cx| {
-                                open.set(cx, false);
                                 log.set(cx, format!("Branch selected: {}", key.label()));
                             }
                         })
