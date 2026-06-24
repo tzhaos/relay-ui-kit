@@ -1478,11 +1478,19 @@ fn overlay_patterns(
                         .gap_2()
                         .child(Label::new("ContextMenu").strong())
                         .child(
-                            div()
-                                .text_xs()
-                                .text_color(theme.text_muted)
-                                .child("Static overlay sample"),
-                        ),
+                            Button::new("patterns-context-menu-open", "Open context menu")
+                                .ghost()
+                                .icon(IconName::Ellipsis)
+                                .on_click({
+                                    let open = state.pattern_context_open.clone();
+                                    move |_event, _window, cx| {
+                                        open.set(cx, true);
+                                    }
+                                }),
+                        )
+                        .child(div().text_xs().text_color(theme.text_muted).child(
+                            "Host-owned open state with action and dismissal close semantics.",
+                        )),
                 )
                 .child(
                     ContextMenu::new(
@@ -1495,8 +1503,15 @@ fn overlay_patterns(
                             menu_action(state, "Close", IconName::Archive).danger(),
                         ],
                     )
+                    .open_bound(state.pattern_context_open.clone())
                     .offset(24.0, 64.0)
-                    .min_width(190.0),
+                    .min_width(190.0)
+                    .on_dismiss({
+                        let overlay_event = state.overlay_event.clone();
+                        move |_window, cx| {
+                            overlay_event.set(cx, "Context menu dismissed".into());
+                        }
+                    }),
                 ),
         )
         .child(

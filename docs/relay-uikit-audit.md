@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 258 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 261 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -178,6 +178,7 @@ What is already good:
 - anchored overlays, menus, dialogs, confirm dialogs, and dropdown/context/popover surfaces all run inside gallery compositions;
 - shared open and dismiss adapters already prevent each overlay from inventing a bespoke state model.
 - `Menu` now exposes a reusable action-dismiss contract, so keyboard and pointer activation close bound overlays from the primitive layer instead of forcing each host to hand-roll `set(false)` cleanup.
+- `ContextMenu` now follows the same explicit controller shape as the other overlay wrappers instead of rendering as a permanently mounted sample-only surface.
 
 Remaining concerns:
 
@@ -227,6 +228,7 @@ Landed changes:
 - `ItemPicker` now treats title and iconography as host-owned presentation, while the gallery branch picker opts into branch-specific copy and `GitBranch` icons explicitly.
 - gallery settings and pattern scenes now use `open_bound` / `DropdownMenu::bound` directly instead of hand-written open/close bookkeeping.
 - `Menu` now owns action-dismiss propagation for nested submenu leaves, and `Select`, `DropdownMenu`, `ContextMenu`, plus the direct anchored-menu gallery sample all consume that shared contract.
+- `ContextMenu` now supports `open` / `open_bound` control and the gallery demonstrates a real open-dismiss-action loop instead of a permanently visible mock overlay.
 - gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
 - rustdoc was strengthened for high-frequency public surfaces:
   `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, `ConfirmDialog`,
