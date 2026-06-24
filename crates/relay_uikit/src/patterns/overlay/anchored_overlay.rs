@@ -1,7 +1,7 @@
 use gpui::{
-    Anchor, AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId,
-    InteractiveElement, IntoElement, LayoutId, Length, ParentElement, Pixels, Point, Position,
-    Style, Window, anchored, deferred, div, point, px, relative, size,
+    Anchor, AnyElement, App, Bounds, Element, ElementId, FocusHandle, GlobalElementId,
+    InspectorElementId, InteractiveElement, IntoElement, LayoutId, Length, ParentElement, Pixels,
+    Point, Position, Style, Window, anchored, deferred, div, point, px, relative, size,
 };
 
 use crate::{interaction::DismissHandler, theme};
@@ -16,12 +16,15 @@ pub struct AnchoredOverlay {
     attach: Anchor,
     offset: Point<Pixels>,
     full_width: bool,
+    focus_handle: Option<FocusHandle>,
     on_dismiss: Option<DismissHandler>,
 }
 
 #[derive(Default)]
 struct AnchoredOverlayState {
     trigger_bounds: Option<Bounds<Pixels>>,
+    previous_focus: Option<FocusHandle>,
+    was_open: bool,
 }
 
 pub struct AnchoredOverlayLayoutState {
@@ -45,6 +48,7 @@ impl AnchoredOverlay {
             attach: Anchor::BottomLeft,
             offset: point(px(0.0), px(0.0)),
             full_width: false,
+            focus_handle: None,
             on_dismiss: None,
         }
     }
@@ -77,10 +81,44 @@ impl AnchoredOverlay {
         self
     }
 
+    pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
+        self.focus_handle = Some(focus_handle);
+        self
+    }
+
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_dismiss = Some(Box::new(handler));
         self
     }
+}
+
+fn sync_overlay_focus_state(
+    state: &mut AnchoredOverlayState,
+    open: bool,
+    focus_handle: Option<&FocusHandle>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    if open && !state.was_open {
+        state.previous_focus = window.focused(cx);
+        if let Some(focus_handle) = focus_handle.cloned() {
+            window.on_next_frame(move |window, _cx| {
+                window.on_next_frame(move |window, cx| {
+                    window.focus(&focus_handle, cx);
+                });
+            });
+        }
+    } else if !open && state.was_open {
+        if let (Some(previous_focus), Some(focus_handle)) =
+            (state.previous_focus.as_ref(), focus_handle)
+            && focus_handle.contains_focused(window, cx)
+        {
+            window.focus(previous_focus, cx);
+        }
+        state.previous_focus = None;
+    }
+
+    state.was_open = open;
 }
 
 impl Element for AnchoredOverlay {
@@ -114,11 +152,19 @@ impl Element for AnchoredOverlay {
                 },
             );
         };
+        let overlay_focus = self.focus_handle.clone();
 
         window.with_element_state(
             global_id,
             |element_state: Option<AnchoredOverlayState>, window| {
-                let element_state = element_state.unwrap_or_default();
+                let mut element_state = element_state.unwrap_or_default();
+                sync_overlay_focus_state(
+                    &mut element_state,
+                    self.open,
+                    overlay_focus.as_ref(),
+                    window,
+                    cx,
+                );
                 let trigger_layout_id = self.trigger.request_layout(window, cx);
                 let mut content = None;
                 let mut content_layout_id = None;

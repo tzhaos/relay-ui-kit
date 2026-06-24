@@ -1,6 +1,6 @@
 use gpui::{AnyElement, App, ClickEvent, IntoElement, Window};
 
-use crate::{icon::IconName, interaction::ClickHandler};
+use crate::{icon::IconName, interaction::SharedClickHandler};
 
 /// One row in a [`super::Menu`].
 pub struct MenuItem {
@@ -15,7 +15,7 @@ pub struct MenuItem {
     pub(super) header: bool,
     pub(super) submenu: bool,
     pub(super) submenu_items: Vec<MenuItem>,
-    pub(super) on_click: Option<ClickHandler>,
+    pub(super) on_click: Option<SharedClickHandler>,
 }
 
 impl MenuItem {
@@ -117,7 +117,7 @@ impl MenuItem {
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
-        self.on_click = Some(Box::new(handler));
+        self.on_click = Some(std::rc::Rc::new(handler));
         self
     }
 }

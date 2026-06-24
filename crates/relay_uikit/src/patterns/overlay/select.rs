@@ -211,6 +211,14 @@ where
                 || open,
             )))
         });
+        let trigger_focus = window
+            .use_keyed_state((id.clone(), "trigger-focus"), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
+        let menu_focus = window
+            .use_keyed_state((id.clone(), "menu-focus"), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
         let selected_value = source.as_ref().and_then(|source| source.get(cx));
         let open = open_state
             .as_ref()
@@ -236,6 +244,7 @@ where
             .aria_expanded(open)
             .aria_label(aria_label)
             .when(!disabled, |this| this.tab_index(0))
+            .when(!disabled, |this| this.track_focus(&trigger_focus))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(if open {
@@ -358,9 +367,12 @@ where
         let mut overlay = AnchoredOverlay::new(
             id.clone(),
             trigger,
-            Menu::new((id.clone(), "menu"), items).min_width(220.0),
+            Menu::new((id.clone(), "menu"), items)
+                .min_width(220.0)
+                .focus_handle(menu_focus.clone()),
         )
-        .open(open);
+        .open(open)
+        .focus_handle(menu_focus);
 
         if auto_dismiss {
             let open_state = open_state.clone();

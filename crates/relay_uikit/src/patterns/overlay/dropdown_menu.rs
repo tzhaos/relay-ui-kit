@@ -79,13 +79,22 @@ impl DropdownMenu {
 }
 
 impl RenderOnce for DropdownMenu {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let menu_focus = window
+            .use_keyed_state((self.id.clone(), "menu-focus"), cx, |_, cx| {
+                cx.focus_handle()
+            })
+            .read(cx)
+            .clone();
         let menu_id = (self.id.clone(), "menu");
-        let menu = Menu::new(menu_id, self.items).min_width(self.min_width);
+        let menu = Menu::new(menu_id, self.items)
+            .min_width(self.min_width)
+            .focus_handle(menu_focus.clone());
         let open_binding = self.open_binding;
         let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
         let mut overlay = AnchoredOverlay::new(self.id, self.trigger, menu)
             .open(open)
+            .focus_handle(menu_focus)
             .offset(self.offset);
 
         if self.auto_dismiss {

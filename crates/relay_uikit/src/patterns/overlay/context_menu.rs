@@ -52,10 +52,21 @@ impl ContextMenu {
 }
 
 impl RenderOnce for ContextMenu {
-    fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
-        let mut ov = overlay(Menu::new(self.id, self.items).min_width(self.min_width))
-            .anchor(self.anchor)
-            .offset(self.left, self.top);
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let menu_focus = window
+            .use_keyed_state((self.id.clone(), "menu-focus"), cx, |_, cx| {
+                cx.focus_handle()
+            })
+            .read(cx)
+            .clone();
+        let mut ov = overlay(
+            Menu::new(self.id, self.items)
+                .min_width(self.min_width)
+                .focus_handle(menu_focus.clone()),
+        )
+        .anchor(self.anchor)
+        .offset(self.left, self.top)
+        .focus_handle(menu_focus);
 
         if let Some(handler) = self.on_dismiss {
             ov = ov.on_dismiss(handler);
