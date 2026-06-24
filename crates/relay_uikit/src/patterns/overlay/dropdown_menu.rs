@@ -1,7 +1,7 @@
 use gpui::{AnyElement, App, ElementId, IntoElement, Pixels, Point, RenderOnce, Window, point, px};
 use relay::Binding;
 
-use crate::interaction::DismissHandler;
+use crate::interaction::{DismissHandler, OpenState};
 
 use super::{AnchoredOverlay, Menu, MenuItem};
 
@@ -14,7 +14,7 @@ pub struct DropdownMenu {
     auto_dismiss: bool,
     min_width: f32,
     offset: Point<Pixels>,
-    open_binding: Option<Binding<bool>>,
+    open_state: Option<OpenState>,
     on_dismiss: Option<DismissHandler>,
 }
 
@@ -28,32 +28,23 @@ impl DropdownMenu {
             auto_dismiss: true,
             min_width: 180.0,
             offset: point(px(0.0), px(0.0)),
-            open_binding: None,
+            open_state: None,
             on_dismiss: None,
         }
     }
 
-    pub fn bound(
-        id: impl Into<ElementId>,
-        trigger: impl IntoElement,
-        items: Vec<MenuItem>,
-        binding: Binding<bool>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            trigger: trigger.into_any_element(),
-            items,
-            open: false,
-            auto_dismiss: true,
-            min_width: 180.0,
-            offset: point(px(0.0), px(0.0)),
-            open_binding: Some(binding),
-            on_dismiss: None,
-        }
-    }
-
+    /// Render the dropdown open or closed from a host-owned snapshot.
+    ///
+    /// This does not create internal ownership. Pair it with
+    /// [`DropdownMenu::open_bound`] when the trigger should control menu
+    /// visibility directly.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+
+    pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
+        self.open_state = Some(OpenState::binding(binding));
         self
     }
 
@@ -90,13 +81,13 @@ impl RenderOnce for DropdownMenu {
         let mut menu = Menu::new(menu_id, self.items)
             .min_width(self.min_width)
             .focus_handle(menu_focus.clone());
-        let open_binding = self.open_binding;
-        let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
+        let open_state = self.open_state;
+        let open = open_state.as_ref().map_or(self.open, |state| state.get(cx));
         if self.auto_dismiss
-            && let Some(binding) = open_binding.clone()
+            && let Some(open_state) = open_state.clone()
         {
             menu = menu.on_action_dismiss(move |_window, cx| {
-                binding.set(cx, false);
+                open_state.close(cx);
             });
         }
         let mut overlay = AnchoredOverlay::new(self.id, self.trigger, menu)
@@ -105,11 +96,11 @@ impl RenderOnce for DropdownMenu {
             .offset(self.offset);
 
         if self.auto_dismiss {
-            let dismiss_binding = open_binding.clone();
+            let open_state = open_state.clone();
             let user_dismiss = self.on_dismiss;
             overlay = overlay.on_dismiss(move |window, cx| {
-                if let Some(binding) = &dismiss_binding {
-                    binding.set(cx, false);
+                if let Some(open_state) = &open_state {
+                    open_state.close(cx);
                 }
                 if let Some(handler) = &user_dismiss {
                     handler(window, cx);
@@ -150,11 +141,19 @@ mod tests {
     }
 
     #[test]
-    fn dropdown_menu_bound_stores_open_binding() {
-        let mut app = gpui::TestApp::new();
-        let menu =
-            app.update(|cx| DropdownMenu::bound("dropdown", div(), vec![], cx.binding(false)));
+    fn dropdown_menu_defaults_to_no_open_controller() {
+        let menu = DropdownMenu::new("dropdown", div(), vec![]);
 
-        assert!(menu.open_binding.is_some());
+        assert!(menu.open_state.is_none());
+    }
+
+    #[test]
+    fn dropdown_menu_open_bound_stores_open_state() {
+        let mut app = gpui::TestApp::new();
+        let menu = app.update(|cx| {
+            DropdownMenu::new("dropdown", div(), vec![]).open_bound(cx.binding(false))
+        });
+
+        assert!(menu.open_state.is_some());
     }
 }

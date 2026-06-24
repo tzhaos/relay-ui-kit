@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 263 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 264 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -180,6 +180,7 @@ What is already good:
 - shared open and dismiss adapters already prevent each overlay from inventing a bespoke state model.
 - `Menu` now exposes a reusable action-dismiss contract, so keyboard and pointer activation close bound overlays from the primitive layer instead of forcing each host to hand-roll `set(false)` cleanup.
 - `ContextMenu` now follows the same explicit controller shape as the other overlay wrappers instead of rendering as a permanently mounted sample-only surface.
+- `DropdownMenu` now uses the same `open_bound` builder vocabulary as the rest of the overlay family instead of a one-off `bound(...)` constructor.
 
 Remaining concerns:
 
@@ -231,6 +232,7 @@ Landed changes:
 - `Menu` now owns action-dismiss propagation for nested submenu leaves, and `Select`, `DropdownMenu`, `ContextMenu`, plus the direct anchored-menu gallery sample all consume that shared contract.
 - `ContextMenu` now supports `open` / `open_bound` control and the gallery demonstrates a real open-dismiss-action loop instead of a permanently visible mock overlay.
 - `Select` and `ItemPicker` no longer synthesize hidden open-state fallback bindings during render, which tightens the controller contract around host-owned overlay state.
+- `DropdownMenu` now stores shared open control through `OpenState` and the gallery uses the same `new(...).open_bound(...)` pattern as the other overlay wrappers.
 - gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
 - rustdoc was strengthened for high-frequency public surfaces:
   `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, `ConfirmDialog`,

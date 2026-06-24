@@ -1346,7 +1346,7 @@ fn overlay_patterns(
         )))
         .child(
             div().w(px(220.0)).child(
-                DropdownMenu::bound(
+                DropdownMenu::new(
                     "patterns-dropdown",
                     Button::new("patterns-dropdown-btn", "Dropdown Menu")
                         .variant(relay_uikit::ButtonVariant::Secondary)
@@ -1367,8 +1367,8 @@ fn overlay_patterns(
                         MenuItem::separator(),
                         MenuItem::new("Delete").icon(IconName::Archive).danger(),
                     ],
-                    state.command_context_open.clone(),
                 )
+                .open_bound(state.command_context_open.clone())
                 .min_width(200.0),
             ),
         )
