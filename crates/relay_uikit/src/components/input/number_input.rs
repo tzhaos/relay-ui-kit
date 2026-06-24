@@ -39,31 +39,26 @@ enum NumberStep {
 
 struct EditableNumberValue {
     focus: FocusHandle,
-    before: String,
-    after: String,
-    focused: bool,
-    key_context: String,
-    binding: Option<Binding<TextInputState>>,
-    on_key: Option<KeyHandler>,
+    binding: Binding<TextInputState>,
 }
 
-/// A compact numeric input with optional Relay binding, inline editing, and stepper controls.
+/// A compact Relay-bound numeric input with optional inline editing and stepper controls.
 ///
 /// `NumberInput` keeps value ownership explicit:
 ///
-/// - use [`NumberInput::bound`] when the numeric value itself belongs to Relay;
-/// - add [`NumberInput::editable_bound`] or [`NumberInput::input_bound`] when the
-///   host also wants a real text-editing session for the rendered value;
-/// - use the host-owned constructors when the surrounding view already derives
-///   and reconciles its own snapshots.
+/// - the numeric value always belongs to Relay through [`NumberInput::bound`];
+/// - add [`NumberInput::input_bound`] when the host also wants a real
+///   text-editing session for the rendered value.
 #[derive(IntoElement)]
 pub struct NumberInput {
     id: ElementId,
-    value: i32,
-    value_binding: Option<Binding<i32>>,
+    value_binding: Binding<i32>,
     suffix: Option<String>,
     layout: NumberInputLayout,
     editable: Option<EditableNumberValue>,
+    input_focused: bool,
+    input_key_context: String,
+    input_on_key: Option<KeyHandler>,
     disabled: bool,
     min: Option<i32>,
     max: Option<i32>,
@@ -74,34 +69,17 @@ pub struct NumberInput {
 }
 
 impl NumberInput {
-    /// Create a host-owned numeric field.
-    pub fn new(id: impl Into<ElementId>, value: i32) -> Self {
-        Self {
-            id: id.into(),
-            value,
-            value_binding: None,
-            suffix: None,
-            layout: NumberInputLayout::ControlsAroundValue,
-            editable: None,
-            disabled: false,
-            min: None,
-            max: None,
-            step: 1,
-            on_change: None,
-            on_decrement: None,
-            on_increment: None,
-        }
-    }
-
     /// Create a Relay-bound numeric field backed by a [`Binding<i32>`].
     pub fn bound(id: impl Into<ElementId>, binding: Binding<i32>) -> Self {
         Self {
             id: id.into(),
-            value: 0,
-            value_binding: Some(binding),
+            value_binding: binding,
             suffix: None,
             layout: NumberInputLayout::ControlsAroundValue,
             editable: None,
+            input_focused: false,
+            input_key_context: "NumberInput".into(),
+            input_on_key: None,
             disabled: false,
             min: None,
             max: None,
@@ -155,48 +133,15 @@ impl NumberInput {
         self
     }
 
-    /// Enable host-owned inline editing driven by a snapshot of [`TextInputState`].
-    pub fn editable(mut self, focus: FocusHandle, state: &TextInputState) -> Self {
-        let (before, after) = state.split();
-        self.editable = Some(EditableNumberValue {
-            focus,
-            before: before.to_string(),
-            after: after.to_string(),
-            focused: false,
-            key_context: "NumberInput".into(),
-            binding: None,
-            on_key: None,
-        });
-        self
-    }
-
-    pub fn input(self, focus: FocusHandle, state: &TextInputState) -> Self {
-        self.editable(focus, state)
-    }
-
     /// Enable Relay-bound inline editing driven by a [`Binding<TextInputState>`].
-    pub fn editable_bound(mut self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
-        self.editable = Some(EditableNumberValue {
-            focus,
-            before: String::new(),
-            after: String::new(),
-            focused: false,
-            key_context: "NumberInput".into(),
-            binding: Some(binding),
-            on_key: None,
-        });
+    pub fn input_bound(mut self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
+        self.editable = Some(EditableNumberValue { focus, binding });
         self
-    }
-
-    pub fn input_bound(self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
-        self.editable_bound(focus, binding)
     }
 
     /// Force the focused visual treatment for the editable field.
     pub fn focused(mut self, focused: bool) -> Self {
-        if let Some(editable) = &mut self.editable {
-            editable.focused = focused;
-        }
+        self.input_focused = focused;
         self
     }
 
@@ -205,9 +150,7 @@ impl NumberInput {
     /// This accepts owned strings so higher-level product surfaces can derive
     /// editing contexts from runtime state.
     pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
-        if let Some(editable) = &mut self.editable {
-            editable.key_context = key_context.into();
-        }
+        self.input_key_context = key_context.into();
         self
     }
 
@@ -216,9 +159,7 @@ impl NumberInput {
         mut self,
         handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static,
     ) -> Self {
-        if let Some(editable) = &mut self.editable {
-            editable.on_key = Some(Box::new(handler));
-        }
+        self.input_on_key = Some(Box::new(handler));
         self
     }
 
@@ -251,11 +192,13 @@ impl RenderOnce for NumberInput {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let NumberInput {
             id,
-            value: current_value,
             value_binding,
             suffix,
             layout,
             editable,
+            input_focused,
+            input_key_context,
+            input_on_key,
             disabled,
             min,
             max,
@@ -265,29 +208,18 @@ impl RenderOnce for NumberInput {
             on_increment,
         } = self;
         let theme = *cx.theme();
-        let pointer = editable.as_ref().and_then(|editable| {
-            editable.binding.as_ref().map(|_| {
-                window.use_keyed_state((id.clone(), "pointer-selection"), cx, |_, _| {
-                    PointerSelectionState::default()
-                })
+        let pointer = editable.as_ref().map(|_| {
+            window.use_keyed_state((id.clone(), "pointer-selection"), cx, |_, _| {
+                PointerSelectionState::default()
             })
         });
-        let current_value = value_binding
-            .as_ref()
-            .map_or(current_value, |binding| binding.get(cx));
-        let editable_text_binding = editable
-            .as_ref()
-            .and_then(|editable| editable.binding.clone());
+        let current_value = value_binding.get(cx);
+        let editable_text_binding = editable.as_ref().map(|editable| editable.binding.clone());
         let value_id = format!("{id}-value");
-        let value = match editable {
-            Some(mut editable) => {
-                editable.focused = editable.focused || editable.focus.is_focused(window);
-                if let Some(binding) = &editable.binding {
-                    let state = binding.get(cx);
-                    let (before, after) = state.split();
-                    editable.before = before.to_string();
-                    editable.after = after.to_string();
-                }
+        let value = match (editable, pointer) {
+            (Some(editable), Some(pointer)) => {
+                let is_focused = input_focused || editable.focus.is_focused(window);
+                let show_fallback = editable.binding.get(cx).is_empty() && !is_focused;
                 editable_number_value(
                     value_id,
                     editable,
@@ -298,11 +230,16 @@ impl RenderOnce for NumberInput {
                     value_binding.clone(),
                     min,
                     max,
+                    disabled,
+                    is_focused,
+                    show_fallback,
+                    input_key_context,
+                    input_on_key,
                     on_change.clone(),
                 )
                 .into_any_element()
             }
-            None => {
+            (Some(_), None) | (None, _) => {
                 number_value(current_value, suffix, theme.text, theme.text_muted).into_any_element()
             }
         };
@@ -318,6 +255,7 @@ impl RenderOnce for NumberInput {
             min,
             max,
             step,
+            disabled,
             theme.hover,
             theme.text_muted,
         );
@@ -333,6 +271,7 @@ impl RenderOnce for NumberInput {
             min,
             max,
             step,
+            disabled,
             theme.hover,
             theme.text_muted,
         );
@@ -406,31 +345,33 @@ fn number_value(
 fn editable_number_value(
     id: impl Into<ElementId>,
     editable: EditableNumberValue,
-    pointer: Option<gpui::Entity<PointerSelectionState>>,
+    pointer: gpui::Entity<PointerSelectionState>,
     fallback: i32,
     suffix: Option<String>,
     theme: crate::Theme,
-    value_binding: Option<Binding<i32>>,
+    value_binding: Binding<i32>,
     min: Option<i32>,
     max: Option<i32>,
+    disabled: bool,
+    is_focused: bool,
+    show_fallback: bool,
+    key_context: String,
+    on_key: Option<KeyHandler>,
     on_change: Option<SharedChangeHandler<i32>>,
 ) -> impl IntoElement {
     let id = id.into();
     let focus_for_click = editable.focus.clone();
     let focus_for_mouse_down = editable.focus.clone();
-    let is_focused = editable.focused;
     let text_binding = editable.binding;
-    let on_key = editable.on_key;
-    let show_fallback = editable.before.is_empty() && editable.after.is_empty() && !is_focused;
     let allow_negative = min.is_none_or(|min| min < 0);
-    let handle_key = text_binding.is_some() || on_key.is_some();
+    let handle_key = !disabled;
     let editor_style = SingleLineInputStyle {
         text_color: theme.text,
         placeholder_color: theme.text_muted,
         selection_color: theme.selection,
         cursor_color: theme.accent,
     };
-    let after_edit = text_binding.as_ref().map(|_| {
+    let after_edit = {
         let value_binding = value_binding.clone();
         let on_change = on_change.clone();
         std::rc::Rc::new(
@@ -448,7 +389,7 @@ fn editable_number_value(
                 );
             },
         ) as AfterEdit
-    });
+    };
 
     div()
         .id(id.clone())
@@ -466,59 +407,44 @@ fn editable_number_value(
         .font_weight(FontWeight::MEDIUM)
         .track_focus(&editable.focus)
         .tab_index(0)
-        .key_context(editable.key_context.as_str())
-        .cursor(gpui::CursorStyle::IBeam)
+        .key_context(key_context.as_str())
         .when(is_focused, |this| this.bg(theme.accent_bg))
-        .when(show_fallback, |this| {
-            this.text_color(theme.text_muted)
-                .child(fallback.to_string())
+        .when(disabled, |this| {
+            this.opacity(DISABLED_OPACITY)
+                .cursor(gpui::CursorStyle::OperationNotAllowed)
         })
-        .when(!show_fallback, |this| {
-            if let (Some(text_binding), Some(pointer)) = (text_binding.clone(), pointer.clone()) {
-                this.text_color(theme.text)
-                    .child(single_line_input(SingleLineInputProps {
-                        base: PlatformInputBase {
-                            id: (id.clone(), "editor").into(),
-                            focus: editable.focus.clone(),
-                            binding: text_binding,
-                            pointer,
-                            style: editor_style,
-                            placeholder: fallback.to_string(),
-                            show_placeholder: show_fallback,
-                            disabled: false,
-                        },
-                        mode: PlatformInputMode::Integer { allow_negative },
-                        after_edit: after_edit.clone(),
-                    }))
-            } else {
-                this.text_color(theme.text)
-                    .child(editable.before)
-                    .when(is_focused, |this| {
-                        this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
-                    })
-                    .child(editable.after)
-            }
-        })
+        .when(!disabled, |this| this.cursor(gpui::CursorStyle::IBeam))
+        .text_color(theme.text)
+        .child(single_line_input(SingleLineInputProps {
+            base: PlatformInputBase {
+                id: (id.clone(), "editor").into(),
+                focus: editable.focus.clone(),
+                binding: text_binding.clone(),
+                pointer,
+                style: editor_style,
+                placeholder: fallback.to_string(),
+                show_placeholder: show_fallback,
+                disabled,
+            },
+            mode: PlatformInputMode::Integer { allow_negative },
+            after_edit: Some(after_edit),
+        }))
         .when_some(suffix, |this, suffix| {
             this.child(div().text_xs().text_color(theme.text_muted).child(suffix))
         })
         .when(handle_key, |this| {
             this.on_key_down(move |event, window, cx| {
-                let mut consumed = false;
-                if let Some(binding) = &text_binding {
-                    consumed = handle_bound_integer_platform_key(
-                        binding,
-                        &value_binding,
-                        &on_change,
-                        event,
-                        fallback,
-                        min,
-                        max,
-                        allow_negative,
-                        window,
-                        cx,
-                    );
-                }
+                let consumed = handle_bound_integer_platform_key(
+                    &text_binding,
+                    &value_binding,
+                    &on_change,
+                    event,
+                    fallback,
+                    min,
+                    max,
+                    window,
+                    cx,
+                );
                 if let Some(on_key) = &on_key {
                     on_key(event, window, cx);
                 }
@@ -527,14 +453,16 @@ fn editable_number_value(
                 }
             })
         })
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            window.focus(&focus_for_mouse_down, cx);
-        })
-        .on_mouse_down_out(|_, window, _cx| {
-            window.blur();
-        })
-        .on_click(move |_, window, cx| {
-            window.focus(&focus_for_click, cx);
+        .when(!disabled, |this| {
+            this.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                window.focus(&focus_for_mouse_down, cx);
+            })
+            .on_mouse_down_out(|_, window, _cx| {
+                window.blur();
+            })
+            .on_click(move |_, window, cx| {
+                window.focus(&focus_for_click, cx);
+            })
         })
 }
 
@@ -546,7 +474,7 @@ fn stepper(
     id: impl Into<ElementId>,
     icon: IconName,
     handler: Option<ClickHandler>,
-    value_binding: Option<Binding<i32>>,
+    value_binding: Binding<i32>,
     text_binding: Option<Binding<TextInputState>>,
     on_change: Option<SharedChangeHandler<i32>>,
     direction: NumberStep,
@@ -554,10 +482,11 @@ fn stepper(
     min: Option<i32>,
     max: Option<i32>,
     step: i32,
+    disabled: bool,
     hover_bg: gpui::Hsla,
     color: gpui::Hsla,
 ) -> impl IntoElement {
-    let interactive = handler.is_some() || value_binding.is_some();
+    let interactive = !disabled;
 
     div()
         .id(id)
@@ -575,9 +504,7 @@ fn stepper(
                 .on_click(move |event, window, cx| {
                     let next = stepped_value(current_value, direction, step, min, max);
                     if next != current_value {
-                        if let Some(binding) = &value_binding {
-                            binding.set(cx, next);
-                        }
+                        value_binding.set(cx, next);
                         if let Some(binding) = &text_binding {
                             sync_text_binding(binding, cx, next);
                         }
@@ -600,17 +527,15 @@ fn stepper(
 )]
 fn handle_bound_integer_platform_key(
     text_binding: &Binding<TextInputState>,
-    value_binding: &Option<Binding<i32>>,
+    value_binding: &Binding<i32>,
     on_change: &Option<SharedChangeHandler<i32>>,
     event: &KeyDownEvent,
     current_value: i32,
     min: Option<i32>,
     max: Option<i32>,
-    allow_negative: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> bool {
-    let _allow_negative = allow_negative;
     let mut consumed = false;
     let mut should_parse = false;
     let mut should_sync_text = false;
@@ -658,7 +583,7 @@ fn handle_bound_integer_platform_key(
 )]
 fn apply_parsed_integer_value(
     text_binding: &Binding<TextInputState>,
-    value_binding: &Option<Binding<i32>>,
+    value_binding: &Binding<i32>,
     on_change: &Option<SharedChangeHandler<i32>>,
     current_value: i32,
     min: Option<i32>,
@@ -671,9 +596,7 @@ fn apply_parsed_integer_value(
         return;
     };
 
-    if let Some(binding) = value_binding {
-        binding.set(cx, value);
-    }
+    value_binding.set(cx, value);
     if should_sync_text {
         sync_text_binding(text_binding, cx, value);
     }
@@ -730,21 +653,24 @@ mod tests {
 
     #[test]
     fn number_input_keeps_optional_suffix() {
-        let input = NumberInput::new("number", 14).suffix("px");
+        let mut app = TestApp::new();
+        let input = app.update(|cx| NumberInput::bound("number", cx.binding(14)).suffix("px"));
 
         assert_eq!(input.suffix.as_deref(), Some("px"));
     }
 
     #[test]
     fn number_input_defaults_to_controls_around_value() {
-        let input = NumberInput::new("number", 14);
+        let mut app = TestApp::new();
+        let input = app.update(|cx| NumberInput::bound("number", cx.binding(14)));
 
         assert_eq!(input.layout, NumberInputLayout::ControlsAroundValue);
     }
 
     #[test]
     fn number_input_starts_read_only() {
-        let input = NumberInput::new("number", 14);
+        let mut app = TestApp::new();
+        let input = app.update(|cx| NumberInput::bound("number", cx.binding(14)));
 
         assert!(input.editable.is_none());
     }
@@ -754,7 +680,8 @@ mod tests {
         let mut app = TestApp::new();
         let input = app.update(|cx| NumberInput::bound("number", cx.binding(14)));
 
-        assert!(input.value_binding.is_some());
+        let value = app.read(|cx| input.value_binding.get(cx));
+        assert_eq!(value, 14);
     }
 
     #[test]
@@ -767,30 +694,43 @@ mod tests {
             )
         });
 
-        assert!(
-            input
-                .editable
-                .and_then(|editable| editable.binding)
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn editable_number_input_key_context_accepts_owned_strings() {
-        let mut app = TestApp::new();
-        let input = app.update(|cx| {
-            NumberInput::new("number", 14)
-                .editable(cx.focus_handle(), &TextInputState::with_text("14"))
-                .key_context(format!("NumberInput mode={}", "density"))
-        });
-
-        assert_eq!(
+        let value = app.read(|cx| {
             input
                 .editable
                 .as_ref()
-                .map(|editable| editable.key_context.as_str()),
-            Some("NumberInput mode=density")
-        );
+                .map(|editable| editable.binding.get(cx).value().to_string())
+        });
+        assert_eq!(value.as_deref(), Some("14"));
+    }
+
+    #[test]
+    fn number_input_retains_key_context_set_before_input_binding() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            NumberInput::bound("number", cx.binding(14))
+                .key_context(format!("NumberInput mode={}", "density"))
+                .input_bound(
+                    cx.focus_handle(),
+                    cx.binding(TextInputState::with_text("14")),
+                )
+        });
+
+        assert_eq!(input.input_key_context, "NumberInput mode=density");
+    }
+
+    #[test]
+    fn number_input_retains_focus_override_set_before_input_binding() {
+        let mut app = TestApp::new();
+        let input = app.update(|cx| {
+            NumberInput::bound("number", cx.binding(14))
+                .focused(true)
+                .input_bound(
+                    cx.focus_handle(),
+                    cx.binding(TextInputState::with_text("14")),
+                )
+        });
+
+        assert!(input.input_focused);
     }
 
     #[test]

@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 265 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 269 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -128,6 +128,9 @@ What is already good:
 - IME-aware methods are wired through GPUI `InputHandler`;
 - `TextInputState` has deep unit coverage for cursor movement, selection, word motion, deletion, composition, and UTF-16 range conversion;
 - `NumberInput` now supports less restrictive `key_context` configuration;
+- `SearchField`, `TextArea`, and editable `NumberInput` now stay on the Relay-bound editing path instead of carrying preview-only snapshot constructors and fallback rendering branches;
+- `SearchField` now clears its bound value by default and treats `Escape` as a real "clear search" action when content is present, so hosts do not need to wire the basic product behavior by hand;
+- `NumberInput` now keeps disabled semantics honest across both stepper buttons and inline editing, and its editable configuration no longer depends on builder call order;
 - the latest batch removed unnecessary `&'static str` constraints from text and numeric input public APIs.
 
 Remaining concerns:
@@ -220,11 +223,17 @@ Remaining concerns:
 
 ## What Was Fixed In The Latest Batch
 
-The latest UIKit cleanup batch focused on removing unnecessary static public contracts, deleting dead interaction aliases, and making the gallery/documentation story more truthful.
+The latest UIKit cleanup batch focused on input-family productization: removing preview-only constructors, tightening editing ownership around live Relay bindings, and closing real interaction gaps that the gallery had been masking with host glue.
 
 Landed changes:
 
 - `TextInput`, `SearchField`, `TextArea`, and editable `NumberInput` now accept owned `String` key contexts instead of forcing `&'static str`.
+- `SearchField` now clears its bound `TextInputState` by default, and non-empty bound search queries clear on `Escape` instead of requiring host-owned cleanup code.
+- `SearchField` and `TextArea` no longer expose host-owned snapshot constructors or carry fallback preview rendering branches.
+- `NumberInput` no longer exposes host-owned numeric or inline-editing constructors; the product path is now Relay-bound value ownership plus optional `input_bound(...)` text editing.
+- `NumberInput` editable configuration now survives builder call-order changes, so `focused`, `key_context`, and `on_key` are not silently dropped when they are set before `input_bound(...)`.
+- disabled `NumberInput` now blocks both stepper activation and inline text editing instead of only dimming the chrome.
+- the core gallery search sample now relies on component-owned clear behavior and uses `.on_clear(...)` only for product side effects.
 - `SplitPane` and `OutputSurface` now accept general `ElementId` inputs instead of forcing static string ids.
 - `ItemPicker` no longer ships branch-specific default action rows; hosts now opt into secondary actions explicitly.
 - `ItemPicker` now closes on selection and action handling by default, and the gallery picker scene relies on that component-owned contract instead of manual host cleanup.

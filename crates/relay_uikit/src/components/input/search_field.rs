@@ -2,7 +2,7 @@
 
 use gpui::{
     App, ClickEvent, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use relay::Binding;
@@ -23,38 +23,22 @@ use super::{
 
 /// A focusable search field with a leading magnifier icon and optional clear action.
 ///
-/// Use [`SearchField::bound`] when the field should keep a live Relay editing
-/// session. Use [`SearchField::new`] when the host already derives a snapshot
-/// and only needs the product chrome, focus, and clear affordance.
+/// `SearchField` always renders against a live [`Binding<TextInputState>`] so
+/// desktop text editing, selection, and IME behavior stay on the real Relay
+/// editing path instead of a host-owned preview snapshot.
 #[derive(IntoElement)]
 pub struct SearchField {
     id: ElementId,
     focus: FocusHandle,
-    value: String,
     placeholder: String,
     disabled: bool,
     key_context: String,
-    binding: Option<Binding<TextInputState>>,
+    binding: Binding<TextInputState>,
     on_key: Option<KeyCaptureHandler>,
     on_clear: Option<ClickHandler>,
 }
 
 impl SearchField {
-    /// Create a host-owned search field.
-    pub fn new(id: impl Into<ElementId>, focus: FocusHandle) -> Self {
-        Self {
-            id: id.into(),
-            focus,
-            value: String::new(),
-            placeholder: "Search".into(),
-            disabled: false,
-            key_context: "SearchField".into(),
-            binding: None,
-            on_key: None,
-            on_clear: None,
-        }
-    }
-
     /// Create a Relay-bound search field backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
@@ -64,20 +48,13 @@ impl SearchField {
         Self {
             id: id.into(),
             focus,
-            value: String::new(),
             placeholder: "Search".into(),
             disabled: false,
             key_context: "SearchField".into(),
-            binding: Some(binding),
+            binding,
             on_key: None,
             on_clear: None,
         }
-    }
-
-    /// Seed a host-owned value for non-bound previews.
-    pub fn value(mut self, value: impl Into<String>) -> Self {
-        self.value = value.into();
-        self
     }
 
     /// Override the placeholder copy shown when the field is empty.
@@ -128,58 +105,16 @@ impl RenderOnce for SearchField {
         let root_id = self.id.clone();
         let placeholder = self.placeholder.clone();
         let focus = self.focus.clone();
-        let pointer = binding.as_ref().map(|_| {
-            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
-                PointerSelectionState::default()
-            })
+        let pointer = window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+            PointerSelectionState::default()
         });
-        let (before_str, sel_str, after_str, cursor_visible, is_empty) = match binding.as_ref() {
-            Some(b) => {
-                let state = b.get(cx);
-                let val = state.value().to_string();
-                let is_empty = val.is_empty();
-                let sel_range = state.selection_range();
-                if let Some((start, end)) = sel_range {
-                    let before = val[..start].to_string();
-                    let selected = val[start..end].to_string();
-                    let after = val[end..].to_string();
-                    (before, selected, after, false, is_empty)
-                } else {
-                    let (before, after) = state.split();
-                    (
-                        before.to_string(),
-                        String::new(),
-                        after.to_string(),
-                        is_focused,
-                        is_empty,
-                    )
-                }
-            }
-            None => {
-                let val = self.value.clone();
-                (
-                    val,
-                    String::new(),
-                    String::new(),
-                    is_focused,
-                    self.value.is_empty(),
-                )
-            }
-        };
-        let placeholder_text = if is_empty {
-            self.placeholder.clone()
-        } else {
-            String::new()
-        };
-        let text_color = if is_empty {
-            theme.text_muted
-        } else {
-            theme.text
-        };
+        let is_empty = binding.get(cx).is_empty();
+        let show_placeholder = is_empty && !is_focused;
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
+        let focus_for_clear = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
+        let handle_key = !self.disabled;
         let disabled = self.disabled;
         let on_clear = self.on_clear;
         let editor_style = SingleLineInputStyle {
@@ -206,6 +141,7 @@ impl RenderOnce for SearchField {
             })
             .track_focus(&self.focus)
             .tab_index(0)
+            .role(Role::TextInput)
             .key_context(self.key_context.as_str())
             .when(disabled, |this| {
                 this.opacity(DISABLED_OPACITY)
@@ -228,62 +164,24 @@ impl RenderOnce for SearchField {
                     .flex()
                     .items_center()
                     .text_sm()
-                    .text_color(text_color)
-                    .when(is_empty, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(SingleLineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder: is_empty,
-                                    disabled,
-                                },
-                                mode: PlatformInputMode::Text,
-                                after_edit: None,
-                            }))
-                        } else {
-                            this.child(placeholder_text)
-                        }
-                    })
-                    .when(!is_empty, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(single_line_input(SingleLineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder: is_empty,
-                                    disabled,
-                                },
-                                mode: PlatformInputMode::Text,
-                                after_edit: None,
-                            }))
-                        } else {
-                            this.child(div().child(before_str))
-                                .when(!sel_str.is_empty(), |this| {
-                                    this.child(
-                                        div()
-                                            .bg(theme.selection)
-                                            .text_color(theme.text)
-                                            .child(sel_str),
-                                    )
-                                })
-                                .when(cursor_visible, |this| {
-                                    this.child(div().w(px(1.5)).h(px(16.0)).bg(theme.accent))
-                                })
-                                .child(div().child(after_str))
-                        }
-                    }),
+                    .child(single_line_input(SingleLineInputProps {
+                        base: PlatformInputBase {
+                            id: (root_id.clone(), "editor").into(),
+                            focus: focus.clone(),
+                            binding: binding.clone(),
+                            pointer,
+                            style: editor_style,
+                            placeholder: placeholder.clone(),
+                            show_placeholder,
+                            disabled,
+                        },
+                        mode: PlatformInputMode::Text,
+                        after_edit: None,
+                    })),
             )
             .when(!is_empty && !disabled, |this| {
                 let on_clear_for_click = on_clear.map(std::rc::Rc::new);
+                let binding_for_clear = binding.clone();
                 this.child(
                     div()
                         .id("search-clear")
@@ -298,6 +196,8 @@ impl RenderOnce for SearchField {
                             window.prevent_default();
                         })
                         .on_click(move |event, window, cx| {
+                            clear_search_binding(&binding_for_clear, cx);
+                            window.focus(&focus_for_clear, cx);
                             if let Some(handler) = &on_clear_for_click {
                                 handler(event, window, cx);
                             }
@@ -311,15 +211,9 @@ impl RenderOnce for SearchField {
                 )
             })
             .when(handle_key, |this| {
+                let binding_for_key = binding.clone();
                 this.on_key_down(move |event, window, cx| {
-                    let mut consumed = false;
-                    if let Some(binding) = &binding {
-                        binding.update(cx, |state| {
-                            let action = state.handle_platform_key(event);
-                            consumed = action.should_notify();
-                            consumed
-                        });
-                    }
+                    let mut consumed = handle_bound_search_key(&binding_for_key, event, cx);
                     if let Some(on_key) = &on_key
                         && on_key(event, window, cx)
                     {
@@ -342,9 +236,41 @@ impl RenderOnce for SearchField {
     }
 }
 
+fn clear_search_binding(binding: &Binding<TextInputState>, cx: &mut App) -> bool {
+    let mut cleared = false;
+    binding.update(cx, |state| {
+        if state.is_empty() {
+            cleared = false;
+            false
+        } else {
+            state.clear();
+            cleared = true;
+            true
+        }
+    });
+    cleared
+}
+
+fn handle_bound_search_key(
+    binding: &Binding<TextInputState>,
+    event: &KeyDownEvent,
+    cx: &mut App,
+) -> bool {
+    if event.keystroke.key == "escape" {
+        return clear_search_binding(binding, cx);
+    }
+
+    let mut consumed = false;
+    binding.update(cx, |state| {
+        consumed = state.handle_platform_key(event).should_notify();
+        consumed
+    });
+    consumed
+}
+
 #[cfg(test)]
 mod tests {
-    use gpui::TestApp;
+    use gpui::{KeyDownEvent, Keystroke, Modifiers, TestApp};
     use relay::ReactiveAppExt;
 
     use super::*;
@@ -360,17 +286,67 @@ mod tests {
             )
         });
 
-        assert!(field.binding.is_some());
+        let value = app.read(|cx| field.binding.get(cx).value().to_string());
+        assert_eq!(value, "relay");
     }
 
     #[test]
     fn key_context_accepts_owned_strings() {
         let mut app = TestApp::new();
         let field = app.update(|cx| {
-            SearchField::new("search", cx.focus_handle())
-                .key_context(format!("SearchField pane={}", "left"))
+            SearchField::bound(
+                "search",
+                cx.focus_handle(),
+                cx.binding(TextInputState::new()),
+            )
+            .key_context(format!("SearchField pane={}", "left"))
         });
 
         assert_eq!(field.key_context, "SearchField pane=left");
+    }
+
+    #[test]
+    fn clear_button_default_logic_clears_bound_state() {
+        let mut app = TestApp::new();
+        let binding = app.update(|cx| cx.binding(TextInputState::with_text("relay")));
+
+        app.update(|cx| clear_search_binding(&binding, cx));
+
+        let value = app.read(|cx| binding.get(cx).value().to_string());
+        assert_eq!(value, "");
+    }
+
+    #[test]
+    fn escape_clears_non_empty_bound_search() {
+        let mut app = TestApp::new();
+        let binding = app.update(|cx| cx.binding(TextInputState::with_text("relay")));
+
+        let consumed = app.update(|cx| handle_bound_search_key(&binding, &key("escape", None), cx));
+        let value = app.read(|cx| binding.get(cx).value().to_string());
+
+        assert!(consumed);
+        assert_eq!(value, "");
+    }
+
+    #[test]
+    fn escape_bubbles_when_bound_search_is_already_empty() {
+        let mut app = TestApp::new();
+        let binding = app.update(|cx| cx.binding(TextInputState::new()));
+
+        let consumed = app.update(|cx| handle_bound_search_key(&binding, &key("escape", None), cx));
+
+        assert!(!consumed);
+    }
+
+    fn key(name: &str, ch: Option<&str>) -> KeyDownEvent {
+        KeyDownEvent {
+            keystroke: Keystroke {
+                key: name.to_string(),
+                key_char: ch.map(|value| value.to_string()),
+                modifiers: Modifiers::default(),
+            },
+            is_held: false,
+            prefer_character_input: false,
+        }
     }
 }

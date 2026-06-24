@@ -499,7 +499,6 @@ fn field_primitives_sample(
 fn search_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     let h = host.clone();
     let clear_host = h.clone();
-    let search_input = state.search_input.clone();
     div()
         .flex()
         .flex_col()
@@ -513,10 +512,6 @@ fn search_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                 )
                 .placeholder("Filter items...")
                 .on_clear(move |_, _, cx| {
-                    search_input.update(cx, |state| {
-                        state.clear();
-                        true
-                    });
                     clear_host.update(cx, |this, cx| {
                         this.add_feedback_toast(cx, "Search cleared");
                     });

@@ -130,7 +130,8 @@ Includes `TextInput`, `SearchField`, `TextArea`, `NumberInput`, and shared input
 
 Must guarantee:
 
-- host-owned and relay-bound editing flows;
+- Relay-bound editing flows as the primary product path, with host-driven
+  updates funneled through the same binding state;
 - selection, caret, composition, and IME correctness;
 - keyboard editing/navigation parity;
 - validation and partial-value handling where numeric parsing is involved;

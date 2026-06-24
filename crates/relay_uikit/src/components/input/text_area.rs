@@ -20,47 +20,26 @@ use super::{
     },
 };
 
-/// A multi-line text area that can be host-owned or Relay-bound.
+/// A multi-line text area with Relay-bound desktop editing semantics.
 ///
-/// Use [`TextArea::bound`] when the field should keep a live Relay editing
-/// session, selection, and IME state. Use [`TextArea::new`] when a parent view
-/// already owns a derived snapshot of [`TextInputState`].
+/// `TextArea` always renders against a live [`Binding<TextInputState>`] so
+/// multiline selection, composition, and IME behavior remain on the real Relay
+/// editing path.
 #[derive(IntoElement)]
 pub struct TextArea {
     id: ElementId,
     focus: FocusHandle,
-    before: String,
-    after: String,
     placeholder: String,
     focused: bool,
     disabled: bool,
     min_rows: usize,
     bordered: bool,
     key_context: String,
-    binding: Option<Binding<TextInputState>>,
+    binding: Binding<TextInputState>,
     on_key: Option<KeyHandler>,
 }
 
 impl TextArea {
-    /// Create a host-owned text area from a snapshot of [`TextInputState`].
-    pub fn new(id: impl Into<ElementId>, focus: FocusHandle, state: &TextInputState) -> Self {
-        let (before, after) = state.split();
-        Self {
-            id: id.into(),
-            focus,
-            before: before.to_string(),
-            after: after.to_string(),
-            placeholder: String::new(),
-            focused: false,
-            disabled: false,
-            min_rows: 3,
-            bordered: true,
-            key_context: "TextArea".into(),
-            binding: None,
-            on_key: None,
-        }
-    }
-
     /// Create a Relay-bound text area backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
@@ -70,15 +49,13 @@ impl TextArea {
         Self {
             id: id.into(),
             focus,
-            before: String::new(),
-            after: String::new(),
             placeholder: String::new(),
             focused: false,
             disabled: false,
             min_rows: 3,
             bordered: true,
             key_context: "TextArea".into(),
-            binding: Some(binding),
+            binding,
             on_key: None,
         }
     }
@@ -140,31 +117,10 @@ impl RenderOnce for TextArea {
         let root_id = self.id.clone();
         let placeholder = self.placeholder.clone();
         let focus = self.focus.clone();
-        let pointer = binding.as_ref().map(|_| {
-            window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
-                PointerSelectionState::default()
-            })
+        let pointer = window.use_keyed_state((root_id.clone(), "pointer-selection"), cx, |_, _| {
+            PointerSelectionState::default()
         });
-        let (before, selection, after, _cursor_visible) = match binding.as_ref() {
-            Some(binding) => {
-                let state = binding.get(cx);
-                let sel_range = state.selection_range();
-                let value = state.value().to_string();
-                if let Some((start, end)) = sel_range {
-                    (
-                        value[..start].to_string(),
-                        value[start..end].to_string(),
-                        value[end..].to_string(),
-                        false,
-                    )
-                } else {
-                    let (before, after) = state.split();
-                    (before.to_string(), String::new(), after.to_string(), true)
-                }
-            }
-            None => (self.before, String::new(), self.after, false),
-        };
-        let has_selection = !selection.is_empty();
+        let show_placeholder = binding.get(cx).is_empty() && !is_focused;
         let border = if is_focused {
             theme.accent
         } else {
@@ -173,9 +129,7 @@ impl RenderOnce for TextArea {
         let focus_for_click = self.focus.clone();
         let focus_for_mouse_down = self.focus.clone();
         let on_key = self.on_key;
-        let handle_key = !self.disabled && (binding.is_some() || on_key.is_some());
-        let show_placeholder =
-            before.is_empty() && after.is_empty() && !has_selection && !is_focused;
+        let handle_key = !self.disabled;
         let min_height = self.min_rows as f32 * 20.0 + 16.0;
         let disabled = self.disabled;
         let editor_style = SingleLineInputStyle {
@@ -215,60 +169,27 @@ impl RenderOnce for TextArea {
                     .relative()
                     .text_sm()
                     .line_height(px(20.0))
-                    .when(show_placeholder, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(multiline_input(MultilineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder,
-                                    disabled,
-                                },
-                                min_rows: self.min_rows,
-                            }))
-                        } else {
-                            this.text_color(theme.text_muted).child(placeholder.clone())
-                        }
-                    })
-                    .when(!show_placeholder, |this| {
-                        if let (Some(binding), Some(pointer)) = (binding.clone(), pointer.clone()) {
-                            this.child(multiline_input(MultilineInputProps {
-                                base: PlatformInputBase {
-                                    id: (root_id.clone(), "editor").into(),
-                                    focus: focus.clone(),
-                                    binding,
-                                    pointer,
-                                    style: editor_style,
-                                    placeholder: placeholder.clone(),
-                                    show_placeholder,
-                                    disabled,
-                                },
-                                min_rows: self.min_rows,
-                            }))
-                        } else {
-                            this.text_color(theme.text).children(text_area_lines(
-                                before,
-                                after,
-                                is_focused,
-                                theme.accent,
-                            ))
-                        }
-                    }),
+                    .child(multiline_input(MultilineInputProps {
+                        base: PlatformInputBase {
+                            id: (root_id.clone(), "editor").into(),
+                            focus: focus.clone(),
+                            binding: binding.clone(),
+                            pointer,
+                            style: editor_style,
+                            placeholder: placeholder.clone(),
+                            show_placeholder,
+                            disabled,
+                        },
+                        min_rows: self.min_rows,
+                    })),
             )
             .when(handle_key, |this| {
                 this.on_key_down(move |event, window, cx| {
                     let mut consumed = false;
-                    if let Some(binding) = &binding {
-                        binding.update(cx, |state| {
-                            let action = state.handle_platform_multiline_key(event);
-                            consumed = action.should_notify();
-                            consumed
-                        });
-                    }
+                    binding.update(cx, |state| {
+                        consumed = state.handle_platform_multiline_key(event).should_notify();
+                        consumed
+                    });
                     if let Some(on_key) = &on_key {
                         on_key(event, window, cx);
                     }
@@ -286,44 +207,6 @@ impl RenderOnce for TextArea {
                 })
             })
     }
-}
-
-fn text_area_lines(
-    before: String,
-    after: String,
-    focused: bool,
-    caret_color: gpui::Hsla,
-) -> Vec<gpui::AnyElement> {
-    let mut before_lines = before.split('\n').map(str::to_string).collect::<Vec<_>>();
-    let mut after_lines = after.split('\n').map(str::to_string).collect::<Vec<_>>();
-    let cursor_prefix = before_lines.pop().unwrap_or_default();
-    let cursor_suffix = after_lines.first().cloned().unwrap_or_default();
-    if !after_lines.is_empty() {
-        after_lines.remove(0);
-    }
-
-    let mut lines = Vec::with_capacity(before_lines.len() + after_lines.len() + 1);
-    lines.extend(before_lines.into_iter().map(line_element));
-    lines.push(
-        div()
-            .min_h(px(20.0))
-            .flex()
-            .items_center()
-            .child(cursor_prefix)
-            .when(focused, |this| this.child(caret(caret_color)))
-            .child(cursor_suffix)
-            .into_any_element(),
-    );
-    lines.extend(after_lines.into_iter().map(line_element));
-    lines
-}
-
-fn line_element(line: String) -> gpui::AnyElement {
-    div().min_h(px(20.0)).child(line).into_any_element()
-}
-
-fn caret(color: gpui::Hsla) -> impl IntoElement {
-    div().w(px(1.5)).h(px(16.0)).bg(color)
 }
 
 #[cfg(test)]
@@ -344,14 +227,15 @@ mod tests {
             )
         });
 
-        assert!(area.binding.is_some());
+        let value = app.read(|cx| area.binding.get(cx).value().to_string());
+        assert_eq!(value, "relay");
     }
 
     #[test]
     fn key_context_accepts_owned_strings() {
         let mut app = TestApp::new();
         let area = app.update(|cx| {
-            TextArea::new("area", cx.focus_handle(), &TextInputState::new())
+            TextArea::bound("area", cx.focus_handle(), cx.binding(TextInputState::new()))
                 .key_context(format!("TextArea section={}", "notes"))
         });
 
