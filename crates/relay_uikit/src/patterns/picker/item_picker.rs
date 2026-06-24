@@ -199,6 +199,14 @@ where
                 || open,
             )))
         });
+        let trigger_focus = window
+            .use_keyed_state((id.clone(), "trigger-focus"), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
+        let panel_focus = window
+            .use_keyed_state((id.clone(), "panel-focus"), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
         let selected_key = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
@@ -234,6 +242,7 @@ where
             .aria_expanded(open)
             .aria_label(aria_label)
             .when(!disabled, |this| this.tab_index(0))
+            .when(!disabled, |this| this.track_focus(&trigger_focus))
             .rounded(px(radius::MD))
             .border_1()
             .border_color(if open {
@@ -319,9 +328,11 @@ where
             });
 
         let mut overlay = AnchoredOverlay::new(
-            id,
+            id.clone(),
             trigger,
             branch_picker_panel(
+                id.clone(),
+                panel_focus.clone(),
                 selected_key,
                 items,
                 actions,
@@ -330,7 +341,8 @@ where
                 action_handler,
             ),
         )
-        .open(open);
+        .open(open)
+        .focus_handle(panel_focus);
 
         let open_state = open_state.clone();
         if let Some(dismiss_handler) = dismiss_handler {
