@@ -1,13 +1,29 @@
-//! Core reusable components with no Relay product workflow state.
+//! Product-grade leaf components for Relay desktop surfaces.
 //!
-//! These are the base primitives that higher-level patterns depend on.
-//! A component in this layer is expected to be product-grade before it is used
-//! as a foundation elsewhere, which means:
+//! This layer owns the reusable building blocks that higher-level patterns are
+//! allowed to depend on: buttons, choices, inputs, lists, display primitives,
+//! and feedback surfaces.
 //!
-//! - its ownership model is explicit;
-//! - keyboard and pointer interaction are intentionally defined;
-//! - accessibility semantics are present where the host cannot infer them;
-//! - constrained layout and disabled-state behavior are treated as first-class.
+//! Components in this module should solve local UI concerns well:
+//!
+//! - paint, sizing, and spacing;
+//! - pointer and keyboard interaction;
+//! - focus affordance and tabbability;
+//! - accessibility semantics the host cannot infer for itself;
+//! - resilience under long labels, empty values, and disabled state.
+//!
+//! They should *not* own broader workflow state such as:
+//!
+//! - which dialog is open;
+//! - which resource is loading;
+//! - how a workbench pane is orchestrated.
+//!
+//! That separation is what keeps [`crate::patterns`] composable instead of
+//! forcing product code to tunnel through bespoke component-local controllers.
+//!
+//! Most families in this layer intentionally support either host-owned snapshot
+//! usage, Relay-bound usage, or both. The relevant module docs call out which
+//! ownership style is expected for each family.
 
 pub mod button;
 pub(crate) mod button_like;

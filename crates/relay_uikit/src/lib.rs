@@ -1,34 +1,62 @@
-//! Relay UIKit for GPUI.
+//! Relay's product UI toolkit for GPUI desktop applications.
 //!
-//! This crate groups Relay's GPUI visual tokens, controls, reusable interaction
-//! patterns, and gallery binary into one UI package.
+//! `relay_uikit` is not a bag of isolated widgets. It is the UI contract that
+//! Relay wants application code to build on top of. The crate is organized into
+//! three layers:
 //!
-//! Components render ordinary GPUI elements and can be wired in two styles:
+//! - [`components`]: low-level controls and display primitives such as buttons,
+//!   inputs, labels, lists, and feedback surfaces.
+//! - [`patterns`]: product-shaped compositions such as overlays, pickers,
+//!   command surfaces, output panes, and shell chrome.
+//! - [`interaction`]: type-erased adapters that let UIKit stay decoupled from
+//!   any particular app entity while still speaking Relay's state vocabulary.
 //!
-//! - host-owned state, where the app passes a value snapshot and mutates its
-//!   own GPUI entity from event callbacks;
-//! - relay-bound state, where form controls receive a [`relay::Binding`] and
-//!   update that binding directly for common two-way interactions.
+//! # State ownership model
 //!
-//! The two styles can be mixed during migration. App-specific workflows can
-//! keep using GPUI entities and callbacks, while simple fields such as toggles,
-//! sliders, selects, and text inputs can move to relay bindings.
+//! UIKit surfaces are expected to make ownership explicit instead of hiding a
+//! second state system inside the component.
+//!
+//! The common modes are:
+//!
+//! - host-owned snapshot plus callback: the host passes the current value and
+//!   updates its own entity or signal in response to events;
+//! - Relay-bound control state: the component receives a [`relay::Binding`]
+//!   when simple two-way editing is the right model;
+//! - Relay selection or open adapters: keyed selection and overlay lifecycle
+//!   flow through [`interaction::SelectionSource`],
+//!   [`interaction::SelectionBinding`], and [`interaction::OpenState`].
+//!
+//! These styles are intentionally composable. A workbench can keep workflow
+//! state in GPUI entities while letting leaf controls bind directly to Relay
+//! primitives for ordinary editing and disclosure behavior.
 //!
 //! # Product-grade contract
 //!
-//! `relay_uikit` is meant to be a production desktop UI toolkit, not a gallery
-//! of one-off demos. Exported components and patterns should converge on the
-//! same contract:
+//! Every exported family is expected to converge on the same baseline:
 //!
-//! - explicit ownership for value, selection, and open state;
-//! - pointer and keyboard parity for actionable controls;
-//! - correct focus and dismissal behavior;
+//! - explicit value, selection, and open-state ownership;
+//! - pointer and keyboard parity for actionable surfaces;
+//! - predictable focus entry, exit, and restoration rules;
 //! - accessibility semantics that match the rendered affordance;
-//! - resilience under long content, empty states, and host-driven mutations;
-//! - tests and gallery scenarios that encode the intended behavior.
+//! - resilience under long content, empty data, and host-driven mutation;
+//! - tests and gallery scenes that prove behavior under real composition.
 //!
-//! The long-form version of that contract lives in
-//! `docs/relay-uikit-guidelines.md` at the workspace root.
+//! In other words, the bar is not "renders in the gallery once". The bar is
+//! "safe to keep building product surfaces on without replacing the primitive
+//! later".
+//!
+//! # Learning the crate
+//!
+//! Start with the family modules:
+//!
+//! - [`components`] for leaf primitives;
+//! - [`patterns`] for higher-level compositions;
+//! - [`interaction`] for the shared controller vocabulary used across both.
+//!
+//! The long-form design and review criteria live in the workspace docs:
+//!
+//! - `docs/relay-uikit-guidelines.md`
+//! - `docs/relay-uikit-audit.md`
 
 pub(crate) mod component_prelude;
 pub mod components;

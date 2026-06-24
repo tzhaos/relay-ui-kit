@@ -1,13 +1,26 @@
-//! Relay patterns layer for GPUI components.
+//! Product-shaped compositions built on top of [`crate::components`].
 //!
-//! This layer depends on core and provides reusable command, display, layout,
-//! navigation, overlay, scroll, and composite patterns.
+//! The patterns layer is where Relay's UI primitives get assembled into
+//! reusable desktop surfaces: menus, dialogs, command launchers, output panes,
+//! app shell chrome, and other workbench-facing compositions.
 //!
-//! Patterns are where component correctness is tested against realistic product
-//! composition: selection churn, overlay lifecycle, async surfaces, retained row
-//! identity, and multi-pane workbench layouts. They should not reintroduce a
-//! second state model; instead they adapt Relay bindings, open state, and
-//! selection sources into reusable UI assemblies.
+//! The purpose of this layer is *not* to hide controller state inside opaque
+//! widgets. Instead, patterns should adapt Relay's shared state vocabulary into
+//! realistic UI assemblies:
+//!
+//! - [`crate::interaction::OpenState`] for overlays and disclosure;
+//! - [`crate::interaction::SelectionSource`] and
+//!   [`crate::interaction::SelectionBinding`] for keyed selection;
+//! - retained GPUI and Relay identities where row reuse matters;
+//! - plain callbacks where the host needs to keep workflow ownership.
+//!
+//! Patterns are also where product-grade behavior gets pressure-tested against
+//! real composition concerns: focus churn, repeated open-close cycles, async
+//! refresh, layout constraints, list reconciliation, and multi-pane workbench
+//! assembly.
+//!
+//! If a reusable surface can only work inside the gallery, it does not belong
+//! here yet.
 
 pub mod command;
 pub mod display;

@@ -1,4 +1,21 @@
-//! Interactive surface controls.
+//! Reusable controls for settings, tool panels, and compact desktop surfaces.
+//!
+//! This module groups controls that are more structured than a single action,
+//! but still remain leaf-level UI rather than full product patterns. Common
+//! examples include:
+//!
+//! - compact setting controls such as [`Slider`], [`Stepper`], and
+//!   [`Disclosure`];
+//! - keyed selection controls such as [`SegmentedControl`] and [`FilterChip`];
+//! - presentational helpers such as [`PanelHeader`] and [`ToolbarGroup`];
+//! - theme and color controls used in settings and appearance flows.
+//!
+//! The contract for this family is intentionally strict:
+//!
+//! - state ownership must stay obvious;
+//! - keyboard behavior must match desktop expectations;
+//! - controls must survive constrained sidebars and dense forms;
+//! - no control should invent app-specific workflow state of its own.
 
 mod color_picker;
 mod disclosure;
