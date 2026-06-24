@@ -8,6 +8,7 @@ pub struct MenuItem {
     pub(super) detail: Option<String>,
     pub(super) icon: Option<IconName>,
     pub(super) trailing: Option<AnyElement>,
+    pub(super) checkable: bool,
     pub(super) checked: bool,
     pub(super) danger: bool,
     pub(super) disabled: bool,
@@ -26,6 +27,7 @@ impl MenuItem {
             detail: None,
             icon: None,
             trailing: None,
+            checkable: false,
             checked: false,
             danger: false,
             disabled: false,
@@ -44,6 +46,7 @@ impl MenuItem {
             detail: None,
             icon: None,
             trailing: None,
+            checkable: false,
             checked: false,
             danger: false,
             disabled: false,
@@ -62,6 +65,7 @@ impl MenuItem {
             detail: None,
             icon: None,
             trailing: None,
+            checkable: false,
             checked: false,
             danger: false,
             disabled: true,
@@ -92,7 +96,11 @@ impl MenuItem {
     }
 
     /// Mark the row as currently selected or checked.
+    ///
+    /// This also marks the row as a checkbox-style menu item for assistive
+    /// technologies, even when `checked` is `false`.
     pub fn checked(mut self, checked: bool) -> Self {
+        self.checkable = true;
         self.checked = checked;
         self
     }
@@ -156,5 +164,13 @@ mod tests {
 
         assert!(item.header);
         assert!(item.disabled);
+    }
+
+    #[test]
+    fn checked_builder_marks_item_as_checkable_even_when_false() {
+        let item = MenuItem::new("Auto save").checked(false);
+
+        assert!(item.checkable);
+        assert!(!item.checked);
     }
 }

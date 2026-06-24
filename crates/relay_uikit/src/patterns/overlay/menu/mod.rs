@@ -3,7 +3,7 @@ mod item;
 use gpui::{
     App, Bounds, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
     KeyDownEvent, ParentElement, Pixels, RenderOnce, Role, StatefulInteractiveElement, Styled,
-    Window, canvas, div, prelude::FluentBuilder, px,
+    Toggled, Window, canvas, div, prelude::FluentBuilder, px,
 };
 
 pub use item::MenuItem;
@@ -482,6 +482,7 @@ impl RenderOnce for Menu {
                 detail,
                 icon,
                 trailing,
+                checkable,
                 checked,
                 danger,
                 disabled,
@@ -535,12 +536,14 @@ impl RenderOnce for Menu {
                 .gap_2()
                 .rounded(px(radius::MD))
                 .text_sm()
-                .role(if checked {
+                .role(if checkable {
                     Role::MenuItemCheckBox
                 } else {
                     Role::MenuItem
                 })
                 .aria_label(label.clone())
+                .when(checkable, |this| this.aria_toggled(Toggled::from(checked)))
+                .when(has_submenu, |this| this.aria_expanded(submenu_visible))
                 .text_color(fg)
                 .when(disabled, |this| this.opacity(DISABLED_OPACITY))
                 .when(row_active || submenu_visible, |this| this.bg(theme.hover))
