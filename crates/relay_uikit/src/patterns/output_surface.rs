@@ -8,6 +8,11 @@ use gpui::{
 use crate::theme::{ActiveTheme, Theme, mono_family, space};
 
 /// A terminal frame that hosts a real terminal/PTY projection.
+///
+/// Use this as the outer shell around [`crate::OutputLog`], a terminal view, or
+/// any other scrollable command-output surface. Connectivity stays explicit so
+/// the host can show stale output while marking the underlying session as
+/// disconnected.
 #[derive(IntoElement)]
 pub struct OutputSurface {
     id: ElementId,

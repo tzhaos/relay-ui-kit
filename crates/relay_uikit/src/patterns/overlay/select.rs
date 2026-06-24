@@ -26,6 +26,7 @@ pub struct SelectOption<T> {
 }
 
 impl<T> SelectOption<T> {
+    /// Create an option with a stable value and visible label.
     pub fn new(value: T, label: impl Into<String>) -> Self {
         Self {
             value,
@@ -35,11 +36,13 @@ impl<T> SelectOption<T> {
         }
     }
 
+    /// Add supporting detail text inside the menu row.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
         self
     }
 
+    /// Add a leading icon inside the menu row.
     pub fn icon(mut self, icon: IconName) -> Self {
         self.icon = Some(icon);
         self
@@ -47,6 +50,11 @@ impl<T> SelectOption<T> {
 }
 
 /// A compact select trigger plus optional dropdown menu.
+///
+/// `Select` keeps selection and open-state ownership explicit. Use
+/// [`Select::bound`] when the chosen value belongs to Relay or host state, and
+/// [`Select::open_bound`] when the surrounding surface wants to coordinate
+/// overlay lifetime directly.
 #[derive(IntoElement)]
 pub struct Select<T>
 where
@@ -71,6 +79,7 @@ impl<T> Select<T>
 where
     T: Clone + Eq + Hash + PartialEq + 'static,
 {
+    /// Create a select from a host-owned selected value and option list.
     pub fn new(id: impl Into<ElementId>, selected_value: T, options: Vec<SelectOption<T>>) -> Self {
         Self {
             id: id.into(),
@@ -89,6 +98,7 @@ where
         }
     }
 
+    /// Create a select whose chosen value is driven by a [`Binding<T>`].
     pub fn bound(
         id: impl Into<ElementId>,
         binding: Binding<T>,
@@ -111,36 +121,43 @@ where
         }
     }
 
+    /// Render the dropdown open or closed from a host-owned snapshot.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
+    /// Disable trigger activation and menu interaction.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    /// Bind overlay lifetime to shared Relay/host open state.
     pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
         self.open_state = Some(OpenState::binding(binding));
         self
     }
 
+    /// Override the trigger label when nothing is selected.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
         self
     }
 
+    /// Override the accessible name for the combobox trigger.
     pub fn aria_label(mut self, label: impl Into<String>) -> Self {
         self.aria_label = Some(label.into());
         self
     }
 
+    /// Control whether dismissing the menu also closes the shared open state.
     pub fn auto_dismiss(mut self, auto_dismiss: bool) -> Self {
         self.auto_dismiss = auto_dismiss;
         self
     }
 
+    /// Observe trigger activation after shared open-state toggling runs.
     pub fn on_toggle(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -149,11 +166,13 @@ where
         self
     }
 
+    /// Observe option selection after shared selection/open-state updates run.
     pub fn on_select(mut self, handler: impl Fn(T, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Box::new(handler));
         self
     }
 
+    /// Observe overlay dismissal after shared open-state cleanup runs.
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_dismiss = Some(Box::new(handler));
         self

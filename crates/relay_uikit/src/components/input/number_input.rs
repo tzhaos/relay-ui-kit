@@ -25,7 +25,9 @@ use super::{
 /// Layout strategy for the stepper controls around a [`NumberInput`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberInputLayout {
+    /// Keep decrement and increment controls on opposite sides of the value.
     ControlsAroundValue,
+    /// Group both controls on the trailing edge.
     ControlsTrailing,
 }
 
@@ -46,6 +48,14 @@ struct EditableNumberValue {
 }
 
 /// A compact numeric input with optional Relay binding, inline editing, and stepper controls.
+///
+/// `NumberInput` keeps value ownership explicit:
+///
+/// - use [`NumberInput::bound`] when the numeric value itself belongs to Relay;
+/// - add [`NumberInput::editable_bound`] or [`NumberInput::input_bound`] when the
+///   host also wants a real text-editing session for the rendered value;
+/// - use the host-owned constructors when the surrounding view already derives
+///   and reconciles its own snapshots.
 #[derive(IntoElement)]
 pub struct NumberInput {
     id: ElementId,
@@ -120,22 +130,26 @@ impl NumberInput {
         self
     }
 
+    /// Clamp the value between an inclusive minimum and maximum.
     pub fn range(mut self, min: i32, max: i32) -> Self {
         self.min = Some(min);
         self.max = Some(max);
         self
     }
 
+    /// Set an inclusive minimum.
     pub fn min(mut self, min: i32) -> Self {
         self.min = Some(min);
         self
     }
 
+    /// Set an inclusive maximum.
     pub fn max(mut self, max: i32) -> Self {
         self.max = Some(max);
         self
     }
 
+    /// Override the step size used by the controls and keyboard handling.
     pub fn step(mut self, step: i32) -> Self {
         self.step = step.max(1);
         self
@@ -187,6 +201,9 @@ impl NumberInput {
     }
 
     /// Override the GPUI key-dispatch context used while the editable field is focused.
+    ///
+    /// This accepts owned strings so higher-level product surfaces can derive
+    /// editing contexts from runtime state.
     pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
         if let Some(editable) = &mut self.editable {
             editable.key_context = key_context.into();
@@ -205,11 +222,13 @@ impl NumberInput {
         self
     }
 
+    /// Observe committed numeric value changes from buttons or inline editing.
     pub fn on_change(mut self, handler: impl Fn(i32, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(std::rc::Rc::new(handler));
         self
     }
 
+    /// Observe decrement button activation after value updates are applied.
     pub fn on_decrement(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -218,6 +237,7 @@ impl NumberInput {
         self
     }
 
+    /// Observe increment button activation after value updates are applied.
     pub fn on_increment(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

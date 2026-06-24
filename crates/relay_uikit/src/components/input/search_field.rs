@@ -22,6 +22,10 @@ use super::{
 };
 
 /// A focusable search field with a leading magnifier icon and optional clear action.
+///
+/// Use [`SearchField::bound`] when the field should keep a live Relay editing
+/// session. Use [`SearchField::new`] when the host already derives a snapshot
+/// and only needs the product chrome, focus, and clear affordance.
 #[derive(IntoElement)]
 pub struct SearchField {
     id: ElementId,
@@ -89,6 +93,9 @@ impl SearchField {
     }
 
     /// Override the GPUI key-dispatch context used while this field is focused.
+    ///
+    /// This accepts owned strings so product surfaces can derive contexts from
+    /// runtime ids or pane roles.
     pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
         self.key_context = key_context.into();
         self

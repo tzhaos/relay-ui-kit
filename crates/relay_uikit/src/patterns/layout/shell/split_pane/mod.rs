@@ -103,6 +103,7 @@ impl SplitPane {
         self
     }
 
+    /// Observe live resize previews as the divider moves.
     pub fn on_resize(mut self, handler: impl Fn(f32, &mut Window, &mut App) + 'static) -> Self {
         self.on_resize = Some(std::rc::Rc::new(handler));
         self

@@ -21,6 +21,10 @@ use super::picker_panel::{BranchPickerPanelProps, branch_picker_panel, default_p
 use super::picker_types::{PickerAction, PickerOption};
 
 /// Compact branch selector for title bars and pane toolbars.
+///
+/// `ItemPicker` is the product-facing picker trigger for "select one item, then
+/// maybe run a secondary action on that item". Like [`crate::Select`], it keeps
+/// selection and open-state ownership explicit.
 #[derive(IntoElement)]
 pub struct ItemPicker<K>
 where
@@ -45,6 +49,7 @@ impl<K> ItemPicker<K>
 where
     K: Clone + Eq + Hash + PartialEq + ToString + 'static,
 {
+    /// Create a picker from a host-owned selected key and option list.
     pub fn new(id: impl Into<ElementId>, selected_key: K, items: Vec<PickerOption<K>>) -> Self {
         Self {
             id: id.into(),
@@ -63,6 +68,7 @@ where
         }
     }
 
+    /// Create a picker whose selected key is driven by a [`Binding<K>`].
     pub fn bound(
         id: impl Into<ElementId>,
         items: Vec<PickerOption<K>>,
@@ -85,40 +91,48 @@ where
         }
     }
 
+    /// Bind overlay lifetime to shared Relay/host open state.
     pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
         self.open_state = Some(OpenState::binding(binding));
         self
     }
 
+    /// Render the picker open or closed from a host-owned snapshot.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
+    /// Disable trigger activation and panel interaction.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    /// Drive selection from a shared selection adapter.
     pub fn selected_with(mut self, selection: SelectionSource<K>) -> Self {
         self.selection = Some(selection);
         self
     }
 
+    /// Drive selection from a plain [`Selector<K>`].
     pub fn selected_by(self, selector: Selector<K>) -> Self {
         self.selected_with(SelectionSource::selector(selector))
     }
 
+    /// Override the action rows shown under the item list.
     pub fn actions(mut self, actions: Vec<PickerAction>) -> Self {
         self.actions = actions;
         self
     }
 
+    /// Override the accessible name for the combobox trigger.
     pub fn aria_label(mut self, label: impl Into<String>) -> Self {
         self.aria_label = Some(label.into());
         self
     }
 
+    /// Observe trigger activation after shared open-state toggling runs.
     pub fn on_toggle(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -127,16 +141,19 @@ where
         self
     }
 
+    /// Observe item selection after shared selection/open-state updates run.
     pub fn on_select(mut self, handler: impl Fn(K, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(std::rc::Rc::new(handler));
         self
     }
 
+    /// Observe secondary action selection from the picker panel.
     pub fn on_action(mut self, handler: impl Fn(String, &mut Window, &mut App) + 'static) -> Self {
         self.on_action = Some(std::rc::Rc::new(handler));
         self
     }
 
+    /// Observe panel dismissal after shared open-state cleanup runs.
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_dismiss = Some(std::rc::Rc::new(handler));
         self
