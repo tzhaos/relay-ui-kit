@@ -1,14 +1,16 @@
 //! Core kit gallery — every component wired to relay signals with toast feedback.
 
 use gpui::{
-    App, Context, Entity, IntoElement, ParentElement, Role, Styled, div, prelude::FluentBuilder, px,
+    App, Context, Entity, IntoElement, ParentElement, Role, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 use relay_uikit::{
     ActiveTheme, Badge, Button, ButtonVariant, Checkbox, ColorField, ColorSwatch, CountBadge,
-    Disclosure, Divider, FilterBar, FilterChip, Icon, IconButton, IconName, IconSize, Label,
-    LabelSize, ListItem, NavRow, NumberInput, PanelHeader, Radio, SearchField, SectionedList,
-    SectionedListGroup, Segment, SegmentedControl, Slider, Stepper, TextInput, TextInputState,
-    Theme, ThemePreviewKind, Toggle, ToolbarGroup, TreeNode, TreeRow, TreeView,
+    Disclosure, Divider, FieldDescription, FieldLabel, FilterBar, FilterChip, ForEach, Icon,
+    IconButton, IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput, PanelHeader,
+    Radio, SearchField, SectionedList, SectionedListGroup, Segment, SegmentedControl, Slider,
+    StatusDot, Stepper, TextInput, TextInputState, Theme, ThemePreviewKind, Toggle, Tone,
+    ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::GalleryScenesApp;
@@ -18,7 +20,7 @@ use super::{CoreTreeNodeKey, GalleryContentTab, GalleryState};
 pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
-    window: &gpui::Window,
+    window: &Window,
     _theme: Theme,
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
@@ -38,6 +40,11 @@ pub(super) fn render(
             cx,
             "Text Input",
             text_input_sample(state, name_focused),
+        ))
+        .child(section(
+            cx,
+            "Field Anatomy & Reactive Lists",
+            field_primitives_sample(state, host, window, cx),
         ))
         .child(section(cx, "Search & Filter", search_sample(state, host)))
         .child(section(
@@ -62,7 +69,7 @@ pub(super) fn render(
 fn toast(
     host: Entity<GalleryScenesApp>,
     msg: impl Into<String>,
-) -> impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut App) {
+) -> impl Fn(&gpui::ClickEvent, &mut Window, &mut App) {
     let msg = msg.into();
     move |_, _, cx: &mut App| {
         host.update(cx, |this, cx| this.add_feedback_toast(cx, msg.clone()));
@@ -180,10 +187,10 @@ fn chrome_sample(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
         .gap_3()
         .child(
             strip()
-                .child(Badge::new("ACTIVE").tone(relay_uikit::Tone::Accent).soft())
-                .child(Badge::new("READONLY").tone(relay_uikit::Tone::Secondary))
-                .child(CountBadge::new(7).tone(relay_uikit::Tone::Accent))
-                .child(CountBadge::new(128).tone(relay_uikit::Tone::Warning))
+                .child(Badge::new("ACTIVE").tone(Tone::Accent).soft())
+                .child(Badge::new("READONLY").tone(Tone::Secondary))
+                .child(CountBadge::new(7).tone(Tone::Accent))
+                .child(CountBadge::new(128).tone(Tone::Warning))
                 .child(ColorSwatch::new("chrome-accent-swatch", accent))
                 .child(ColorField::new("chrome-accent-field", accent, "#16A34A")),
         )
@@ -326,6 +333,161 @@ fn text_input_sample(state: &GalleryState, focused: bool) -> impl IntoElement {
         )
 }
 
+fn field_primitives_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    window: &Window,
+    cx: &App,
+) -> impl IntoElement {
+    let theme = *cx.theme();
+    let branch_focused = state.core_branch_focus.is_focused(window);
+    let quick_item_count = state.core_quick_items.read(cx, |items| items.len());
+    let quick_items_empty = quick_item_count == 0;
+
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_4()
+        .child(
+            div()
+                .max_w(px(360.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Default branch"))
+                        .child(FieldDescription::new(
+                            "Low-level field primitives stay separate so product surfaces can place help text, validation, and inputs without the constraints of SettingsRow.",
+                        ))
+                        .child(
+                            div().pt_1().child(
+                                TextInput::bound(
+                                    "core-branch-input",
+                                    state.core_branch_focus.clone(),
+                                    state.core_branch_input.clone(),
+                                )
+                                .placeholder("relay_v2")
+                                .focused(branch_focused),
+                            ),
+                        ),
+                )
+                .child(
+                    div()
+                        .rounded(px(10.0))
+                        .border_1()
+                        .border_color(theme.border)
+                        .bg(theme.inset)
+                        .p_3()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Why this matters"))
+                        .child(FieldDescription::new(
+                            "These primitives are the escape hatch for dense multi-column forms, inline validation, and any layout where a single canned row is too limiting.",
+                        )),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    strip()
+                        .child(
+                            Button::new("core-quick-rotate", "Rotate")
+                                .ghost()
+                                .icon(IconName::RefreshCw)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.rotate_core_quick_items(cx);
+                                        });
+                                    }
+                                }),
+                        )
+                        .child(
+                            Button::new("core-quick-add", "Add slice")
+                                .ghost()
+                                .icon(IconName::Plus)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.add_core_quick_item(cx);
+                                        });
+                                    }
+                                }),
+                        )
+                        .child(
+                            Button::new("core-quick-remove", "Remove first")
+                                .ghost()
+                                .icon(IconName::Archive)
+                                .disabled(quick_items_empty)
+                                .on_click({
+                                    let host = host.clone();
+                                    move |_event, _window, cx| {
+                                        host.update(cx, |this, cx| {
+                                            this.remove_core_quick_item(cx);
+                                        });
+                                    }
+                                }),
+                        ),
+                )
+                .child(
+                    div()
+                        .rounded(px(10.0))
+                        .border_1()
+                        .border_color(theme.border)
+                        .bg(theme.chrome)
+                        .p_2()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .when(quick_items_empty, |this| {
+                            this.child(
+                                div()
+                                    .rounded(px(8.0))
+                                    .bg(theme.panel)
+                                    .p_3()
+                                    .text_xs()
+                                    .text_color(theme.text_muted)
+                                    .child("No quick items remain. Add one to validate empty-state recovery."),
+                            )
+                        })
+                        .child(
+                            ForEach::new("core-quick-items", state.core_quick_items.clone())
+                                .key(|item| item.id as usize)
+                                .render_item(move |item, _window, _cx| {
+                                    ListItem::new(format!("core-quick-item-{}", item.id))
+                                        .start_slot(StatusDot::new(item.tone))
+                                        .child(item.label.clone())
+                                        .end_slot(
+                                            Badge::new(core_quick_item_tone_label(item.tone))
+                                                .tone(item.tone)
+                                                .soft(),
+                                        )
+                                        .into_any_element()
+                                }),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.text_muted)
+                        .child(format!(
+                            "ForEach is the cheap reactive path for product rows backed directly by a signal. {quick_item_count} item{} live.",
+                            if quick_item_count == 1 { "" } else { "s" }
+                        )),
+                ),
+        )
+}
+
 fn search_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
     let h = host.clone();
     let clear_host = h.clone();
@@ -372,6 +534,17 @@ fn search_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
         )
 }
 
+fn core_quick_item_tone_label(tone: Tone) -> &'static str {
+    match tone {
+        Tone::Accent => "Active",
+        Tone::Info => "Info",
+        Tone::Warning => "Review",
+        Tone::Secondary => "Queued",
+        Tone::Danger => "Blocked",
+        Tone::Muted => "Muted",
+    }
+}
+
 // ── Number / Slider / Stepper ─────────────────────────────────────────────
 
 fn number_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl IntoElement {
@@ -390,7 +563,7 @@ fn number_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
                     .suffix("px")
                     .on_change({
                         let h = host.clone();
-                        move |v: i32, _: &mut gpui::Window, cx: &mut App| {
+                        move |v: i32, _: &mut Window, cx: &mut App| {
                             h.update(cx, |this, cx| {
                                 this.add_feedback_toast(cx, format!("Font size: {v}px"))
                             });
@@ -401,7 +574,7 @@ fn number_sample(state: &GalleryState, host: &Entity<GalleryScenesApp>) -> impl 
         .child(strip().child(
             Slider::bound("demo-slider", state.contrast.clone(), 0.0, 100.0).on_change({
                 let h = host.clone();
-                move |v: f32, _: &mut gpui::Window, cx: &mut App| {
+                move |v: f32, _: &mut Window, cx: &mut App| {
                     h.update(cx, |this, cx| {
                         this.add_feedback_toast(cx, format!("Contrast: {:.0}%", v))
                     });
@@ -530,11 +703,11 @@ fn structured_collection_sample(
 fn sectioned_list_sample() -> impl IntoElement {
     let pinned = SectionedListGroup::new("Pinned")
         .count(2)
-        .trailing(CountBadge::new(2).tone(relay_uikit::Tone::Accent))
+        .trailing(CountBadge::new(2).tone(Tone::Accent))
         .child(
             ListItem::new("sectioned-pinned-session")
                 .start_slot(Icon::new(IconName::Terminal).size(IconSize::Small))
-                .end_slot(Badge::new("LIVE").tone(relay_uikit::Tone::Accent).soft())
+                .end_slot(Badge::new("LIVE").tone(Tone::Accent).soft())
                 .child("relay_v2 migration"),
         )
         .child(

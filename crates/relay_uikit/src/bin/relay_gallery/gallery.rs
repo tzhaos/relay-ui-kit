@@ -15,7 +15,7 @@ use relay::{
     view::{ReactiveView, StateScope, reactive_render},
 };
 use relay_uikit::patterns::{OutputLine, OutputLineStyle, ScrollSurface};
-use relay_uikit::{ActiveTheme, TextInputState, ThemePreviewKind, space};
+use relay_uikit::{ActiveTheme, SplitPaneState, TextInputState, ThemePreviewKind, Tone, space};
 
 mod core_scene;
 mod patterns_scene;
@@ -81,6 +81,23 @@ pub enum CoreTreeNodeKey {
     Components,
     ButtonRs,
     TextInputRs,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CoreQuickItem {
+    pub id: u64,
+    pub label: String,
+    pub tone: Tone,
+}
+
+impl CoreQuickItem {
+    fn new(id: u64, label: impl Into<String>, tone: Tone) -> Self {
+        Self {
+            id,
+            label: label.into(),
+            tone,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -180,6 +197,9 @@ pub struct GalleryState {
     pub name_focus: FocusHandle,
     pub search_input: Binding<TextInputState>,
     pub search_focus: FocusHandle,
+    pub core_branch_input: Binding<TextInputState>,
+    pub core_branch_focus: FocusHandle,
+    pub core_quick_items: Signal<Vec<CoreQuickItem>>,
     pub composer_input: Binding<TextInputState>,
     pub composer_focus: FocusHandle,
     pub ui_font_size_input: Binding<TextInputState>,
@@ -194,6 +214,7 @@ pub struct GalleryState {
     pub contrast: Binding<f32>,
     pub command_popover_open: Binding<bool>,
     pub command_context_open: Binding<bool>,
+    pub pattern_anchor_open: Binding<bool>,
     pub pattern_dialog_open: Binding<bool>,
     pub pattern_confirm_open: Binding<bool>,
     pub pattern_row_selection: Selector<PatternRowKind>,
@@ -212,6 +233,7 @@ pub struct GalleryState {
     pub core_tree_src_open: Binding<bool>,
     pub core_tree_components_open: Binding<bool>,
     pub core_tree_selected: Binding<CoreTreeNodeKey>,
+    pub pattern_vertical_split: Entity<SplitPaneState>,
     pub settings_dirty: Memo<bool>,
 }
 
@@ -261,6 +283,13 @@ impl GalleryState {
             name_focus: cx.focus_handle(),
             search_input: cx.binding(TextInputState::new()),
             search_focus: cx.focus_handle(),
+            core_branch_input: cx.binding(TextInputState::with_text("relay_v2")),
+            core_branch_focus: cx.focus_handle(),
+            core_quick_items: cx.signal(vec![
+                CoreQuickItem::new(1, "Review", Tone::Accent),
+                CoreQuickItem::new(2, "Gallery", Tone::Info),
+                CoreQuickItem::new(3, "Cleanup", Tone::Warning),
+            ]),
             composer_input: cx.binding(TextInputState::with_text(
                 "Summarize the remaining product gaps in relay_uikit and propose the next migration slice.",
             )),
@@ -277,6 +306,7 @@ impl GalleryState {
             contrast: cx.binding(60.0),
             command_popover_open: cx.binding(false),
             command_context_open: cx.binding(false),
+            pattern_anchor_open: cx.binding(false),
             pattern_dialog_open: cx.binding(false),
             pattern_confirm_open: cx.binding(false),
             pattern_row_selection: cx.selector(Some(PatternRowKind::Task)),
@@ -295,6 +325,7 @@ impl GalleryState {
             core_tree_src_open: cx.binding(true),
             core_tree_components_open: cx.binding(true),
             core_tree_selected: cx.binding(CoreTreeNodeKey::ButtonRs),
+            pattern_vertical_split: cx.new(|_| SplitPaneState::new(112.0)),
             settings_dirty,
         }
     }
@@ -321,6 +352,39 @@ fn refreshed_pattern_output_lines(revision: u64) -> Vec<OutputLine> {
 }
 
 impl GalleryScenesApp {
+    pub fn rotate_core_quick_items(&mut self, cx: &mut App) {
+        self.state.core_quick_items.update(cx, |items| {
+            if items.len() < 2 {
+                return false;
+            }
+            items.rotate_left(1);
+            true
+        });
+    }
+
+    pub fn add_core_quick_item(&mut self, cx: &mut App) {
+        self.state.feedback_toast_serial = self.state.feedback_toast_serial.wrapping_add(1);
+        let id = self.state.feedback_toast_serial;
+        let tone = match id % 3 {
+            0 => Tone::Accent,
+            1 => Tone::Info,
+            _ => Tone::Warning,
+        };
+        self.state
+            .core_quick_items
+            .push(cx, CoreQuickItem::new(id, format!("Slice {id}"), tone));
+    }
+
+    pub fn remove_core_quick_item(&mut self, cx: &mut App) {
+        self.state.core_quick_items.update(cx, |items| {
+            if items.is_empty() {
+                return false;
+            }
+            items.remove(0);
+            true
+        });
+    }
+
     pub fn reload_pattern_output(&mut self, cx: &mut App) {
         self.state.pattern_output_refresh_serial =
             self.state.pattern_output_refresh_serial.wrapping_add(1);

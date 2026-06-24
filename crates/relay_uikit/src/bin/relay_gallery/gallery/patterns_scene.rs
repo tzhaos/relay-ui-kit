@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, AnyView, App, ClickEvent, Context, Entity, IntoElement, ParentElement, Render,
-    Styled, Window, div, px,
+    Anchor, AnyElement, AnyView, App, ClickEvent, Context, Entity, InteractiveElement, IntoElement,
+    ParentElement, Render, Styled, Window, WindowControlArea, div, point, px,
 };
 use relay::{
     KeyedSubViews, OrderedSelectionModel, ReactiveAppExt, ReactiveView, SelectionReconcilePolicy,
@@ -18,13 +18,14 @@ use relay_uikit::patterns::{
     navigation::{Tab, Tabs},
     output_resource_snapshot,
     overlay::{
-        ConfirmDialog, ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption,
-        TooltipBody,
+        AnchoredOverlay, ConfirmDialog, ContextMenu, Dialog, DropdownMenu, Menu, MenuItem, Select,
+        SelectOption, TooltipBody,
     },
 };
 use relay_uikit::{
-    ActiveTheme, Button, IconButton, IconName, Label, LabelSize, ListItem, ListItemSpacing,
-    StatusDot, TextArea, Theme, ThemePreviewKind, Tone,
+    ActiveTheme, Button, Divider, IconButton, IconName, Label, LabelSize, ListItem,
+    ListItemSpacing, Pane, PaneSurface, PaneWidth, PanelHeader, SplitAxis, SplitPane, StatusBar,
+    StatusDot, StatusItem, TextArea, Theme, ThemePreviewKind, Tone, WindowControls,
     interaction::{SelectionBinding, SelectionSource},
 };
 
@@ -41,34 +42,10 @@ pub(super) fn render(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     let overlay_event_text = state.overlay_event.get(cx);
-
-    let mut stack = scene_stack()
-        .child(section(
-            cx,
-            "Layout patterns",
-            layout_patterns(state, theme),
-        ))
-        .child(section(
-            cx,
-            "Display patterns",
-            display_patterns(state, theme),
-        ))
-        .child(section(
-            cx,
-            "Navigation patterns",
-            navigation_patterns(state),
-        ));
+    let layout_body = layout_patterns(state, theme, cx);
+    let display_body = display_patterns(state, theme);
+    let navigation_body = navigation_patterns(state);
     let overlay_body = overlay_patterns(state, theme, &overlay_event_text, cx);
-    stack = stack.child(section(cx, "Overlay patterns", overlay_body));
-
-    if state.pattern_dialog_open.get(cx) {
-        stack = stack.child(settings_dialog(state));
-    }
-    if state.pattern_confirm_open.get(cx) {
-        stack = stack.child(confirm_dialog(state));
-    }
-
-    // Composite pattern demos — extract bodies first to avoid borrow conflicts
     let rows_body = row_patterns(state, cx);
     let tabs_body = tab_patterns(state, cx);
     let composer_body = composer_sample(state, host, cx);
@@ -79,6 +56,18 @@ pub(super) fn render(
     let picker_body = picker_sample(state);
     let viewer_body = viewer_patterns(state, cx);
 
+    let mut stack = scene_stack()
+        .child(section(cx, "Layout patterns", layout_body))
+        .child(section(cx, "Display patterns", display_body))
+        .child(section(cx, "Navigation patterns", navigation_body));
+    stack = stack.child(section(cx, "Overlay patterns", overlay_body));
+
+    if state.pattern_dialog_open.get(cx) {
+        stack = stack.child(settings_dialog(state));
+    }
+    if state.pattern_confirm_open.get(cx) {
+        stack = stack.child(confirm_dialog(state));
+    }
     stack = stack
         .child(section(cx, "Task Row & Session Row", rows_body))
         .child(section(cx, "Tab Strip & Toolbar", tabs_body))
@@ -876,7 +865,23 @@ const VIEWER_DIFF_BEFORE: &str =
 const VIEWER_DIFF_AFTER: &str = "pub fn launch_agent() {\n    enqueue(\"relay_v2\");\n    log(\"ready\");\n    notify(\"agent started\");\n}\n";
 const VIEWER_REVIEW_MARKDOWN: &str = "# Relay UIKit Review\n\n- Productize every exported component.\n- Keep focus, keyboard, and pointer behavior aligned.\n- Remove compatibility aliases instead of preserving them.\n\n> Gallery scenes should behave like real desktop surfaces.";
 
-fn layout_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
+fn layout_patterns(
+    state: &GalleryState,
+    theme: Theme,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let split_status = {
+        let split_state = state.pattern_vertical_split.read(cx);
+        if split_state.is_resizing() {
+            format!("Vertical split preview: {:.0}px", split_state.first_size())
+        } else {
+            format!(
+                "Vertical split committed: {:.0}px",
+                split_state.committed_first_size()
+            )
+        }
+    };
+
     div()
         .flex()
         .flex_col()
@@ -906,17 +911,264 @@ fn layout_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
                 ),
         )
         .child(
-            strip()
+            div()
+                .h(px(360.0))
+                .rounded(px(10.0))
+                .border_1()
+                .border_color(theme.border)
+                .bg(theme.app_bg)
+                .overflow_hidden()
+                .flex()
+                .flex_col()
                 .child(
-                    Button::new("layout-left-action", "Focus")
-                        .icon(IconName::PanelLeft)
-                        .on_click(pattern_event(state, "Layout toolbar focused")),
+                    div()
+                        .h(px(34.0))
+                        .border_b_1()
+                        .border_color(theme.border)
+                        .bg(theme.chrome)
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            div()
+                                .h_full()
+                                .min_w_0()
+                                .flex_1()
+                                .px_3()
+                                .flex()
+                                .items_center()
+                                .gap_3()
+                                .window_control_area(WindowControlArea::Drag)
+                                .child(Label::new("Relay workbench shell").strong())
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .text_xs()
+                                        .truncate()
+                                        .text_color(theme.text_muted)
+                                        .child(
+                                            "Direct Pane, SplitPane, PaneSurface, and WindowControls composition",
+                                        ),
+                                ),
+                        )
+                        .child(WindowControls::new()),
                 )
                 .child(
-                    Button::new("layout-right-action", "Refresh")
-                        .icon(IconName::RefreshCw)
-                        .on_click(pattern_event(state, "Layout toolbar refreshed")),
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .flex()
+                        .child(
+                            Pane::new(
+                                PaneWidth::Fixed(196.0),
+                                div()
+                                    .p_2()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(
+                                        ListItem::new("patterns-shell-nav-agent")
+                                            .selected(true)
+                                            .start_slot(StatusDot::new(Tone::Accent))
+                                            .child("Agent work")
+                                            .end_slot(Label::new("LIVE").size(LabelSize::Small)),
+                                    )
+                                    .child(
+                                        ListItem::new("patterns-shell-nav-gallery")
+                                            .start_slot(StatusDot::new(Tone::Info))
+                                            .child("Gallery migration"),
+                                    )
+                                    .child(
+                                        ListItem::new("patterns-shell-nav-cleanup")
+                                            .start_slot(StatusDot::new(Tone::Warning))
+                                            .child("Cleanup backlog"),
+                                    ),
+                            )
+                            .surface(PaneSurface::Chrome)
+                            .header(PanelHeader::new("Navigator").icon(IconName::LayoutGrid)),
+                        )
+                        .child(Divider::vertical())
+                        .child(
+                            Pane::new(
+                                PaneWidth::Flex,
+                                SplitPane::new(
+                                    "patterns-shell-vertical-split",
+                                    Pane::new(
+                                        PaneWidth::Flex,
+                                        div()
+                                            .p_4()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_2()
+                                            .child(Label::new("Preview region").strong())
+                                            .child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(theme.text_secondary)
+                                                    .child(
+                                                        "Inset surfaces are for focused content where the parent shell should still frame the task.",
+                                                    ),
+                                            )
+                                            .child(
+                                                div()
+                                                    .rounded(px(8.0))
+                                                    .border_1()
+                                                    .border_color(theme.border)
+                                                    .bg(theme.panel)
+                                                    .p_3()
+                                                    .text_xs()
+                                                    .text_color(theme.text_muted)
+                                                    .child(
+                                                        "Drag the split handle to validate host-owned resize state and keyboard-accessible handle behavior.",
+                                                    ),
+                                            ),
+                                    )
+                                    .surface(PaneSurface::Inset),
+                                    Pane::new(
+                                        PaneWidth::Flex,
+                                        div()
+                                            .p_3()
+                                            .flex()
+                                            .flex_col()
+                                            .gap_2()
+                                            .child(Label::new("Console strip").strong())
+                                            .child(
+                                                div()
+                                                    .rounded(px(8.0))
+                                                    .border_1()
+                                                    .border_color(theme.border)
+                                                    .bg(theme.chrome)
+                                                    .p_3()
+                                                    .text_xs()
+                                                    .text_color(theme.text_muted)
+                                                    .child(
+                                                        "Transparent pane surfaces let the child decide how much chrome it needs while inheriting the shell background.",
+                                                    ),
+                                            ),
+                                    )
+                                    .surface(PaneSurface::Transparent),
+                                )
+                                .axis(SplitAxis::Vertical)
+                                .state(state.pattern_vertical_split.clone())
+                                .min_sizes(108.0, 120.0)
+                                .on_resize({
+                                    let overlay_event = state.overlay_event.clone();
+                                    move |size, _window, cx| {
+                                        overlay_event.set(
+                                            cx,
+                                            format!("Workbench split preview: {:.0}px", size),
+                                        );
+                                    }
+                                })
+                                .on_resize_end({
+                                    let overlay_event = state.overlay_event.clone();
+                                    move |_window, cx| {
+                                        overlay_event
+                                            .set(cx, "Workbench split committed".into());
+                                    }
+                                }),
+                            )
+                            .surface(PaneSurface::Panel)
+                            .header(
+                                PanelHeader::new("Workbench")
+                                    .icon(IconName::Terminal)
+                                    .trailing(
+                                        PaneToolbar::new()
+                                            .action(
+                                                IconButton::new(
+                                                    "patterns-shell-search",
+                                                    IconName::Search,
+                                                )
+                                                .aria_label("Search workbench"),
+                                            )
+                                            .action(
+                                                IconButton::new(
+                                                    "patterns-shell-refresh",
+                                                    IconName::RefreshCw,
+                                                )
+                                                .aria_label("Refresh workbench"),
+                                            )
+                                            .action(
+                                                IconButton::new(
+                                                    "patterns-shell-more",
+                                                    IconName::Ellipsis,
+                                                )
+                                                .aria_label("Open workbench actions"),
+                                            ),
+                                    ),
+                            ),
+                        )
+                        .child(Divider::vertical())
+                        .child(
+                            Pane::new(
+                                PaneWidth::Fixed(236.0),
+                                div()
+                                    .p_3()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .child(KeyValue::new("Branch", "relay_v2"))
+                                    .child(KeyValue::new("Layer", "patterns/layout"))
+                                    .child(KeyValue::new("Surface", "Inset inspector"))
+                                    .child(KeyValue::new("State", "host-owned split")),
+                            )
+                            .surface(PaneSurface::Inset)
+                            .header(PanelHeader::new("Inspector").icon(IconName::Settings)),
+                        ),
+                )
+                .child(
+                    StatusBar::new()
+                        .left(
+                            StatusItem::new("Surface", "Workbench")
+                                .icon(IconName::Terminal)
+                                .tone(Tone::Info),
+                        )
+                        .left(StatusItem::new("Split", "Vertical").tone(Tone::Secondary))
+                        .right(StatusItem::new("Resize", split_status.clone()).tone(Tone::Accent)),
                 ),
+        )
+        .child(
+            strip()
+                .child(
+                    Button::new("layout-split-compact", "Compact console")
+                        .icon(IconName::Terminal)
+                        .on_click({
+                            let split_state = state.pattern_vertical_split.clone();
+                            let overlay_event = state.overlay_event.clone();
+                            move |_event, _window, cx| {
+                                split_state.update(cx, |state, _cx| {
+                                    state.set_first_size(112.0);
+                                });
+                                overlay_event.set(
+                                    cx,
+                                    "Workbench split reset to editor-heavy layout".into(),
+                                );
+                            }
+                        }),
+                )
+                .child(
+                    Button::new("layout-split-balance", "Balance split")
+                        .icon(IconName::RefreshCw)
+                        .on_click({
+                            let split_state = state.pattern_vertical_split.clone();
+                            let overlay_event = state.overlay_event.clone();
+                            move |_event, _window, cx| {
+                                split_state.update(cx, |state, _cx| {
+                                    state.set_first_size(164.0);
+                                });
+                                overlay_event
+                                    .set(cx, "Workbench split balanced for review".into());
+                            }
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(theme.text_muted)
+                .child(format!(
+                    "PaneWidth, PaneSurface, SplitAxis, and WindowControls now land together in one app-like shell instead of isolated snippets. {split_status}"
+                )),
         )
 }
 
@@ -996,7 +1248,7 @@ fn overlay_patterns(
 ) -> impl IntoElement + use<> {
     div()
         .relative()
-        .min_h(px(188.0))
+        .min_h(px(236.0))
         .flex()
         .items_start()
         .gap_4()
@@ -1041,6 +1293,69 @@ fn overlay_patterns(
                     let open = state.command_context_open.clone();
                     move |_window, cx| {
                         open.set(cx, false);
+                    }
+                }),
+            ),
+        )
+        .child(
+            div().w(px(240.0)).child(
+                AnchoredOverlay::new(
+                    "patterns-anchored-menu",
+                    Button::new("patterns-anchored-menu-trigger", "Anchored Menu")
+                        .variant(relay_uikit::ButtonVariant::Secondary)
+                        .icon(IconName::ChevronDown)
+                        .on_click({
+                            let open = state.pattern_anchor_open.clone();
+                            move |_event, _window, cx| {
+                                open.update(cx, |value| {
+                                    *value = !*value;
+                                    true
+                                });
+                            }
+                        }),
+                    Menu::new(
+                        "patterns-direct-menu",
+                        vec![
+                            MenuItem::header("Review lanes"),
+                            anchored_menu_action(
+                                state,
+                                "Review in current split",
+                                IconName::Terminal,
+                            )
+                            .detail("Keep the current worktree context")
+                            .checked(true),
+                            MenuItem::new("Assign lane")
+                                .icon(IconName::LayoutGrid)
+                                .submenu_items(vec![
+                                    anchored_menu_action(
+                                        state,
+                                        "Assign lane: agent",
+                                        IconName::Bot,
+                                    ),
+                                    anchored_menu_action(
+                                        state,
+                                        "Assign lane: gallery",
+                                        IconName::FileText,
+                                    ),
+                                ]),
+                            MenuItem::separator(),
+                            anchored_menu_action(state, "Archive review slice", IconName::Archive)
+                                .danger(),
+                        ],
+                    )
+                    .min_width(228.0),
+                )
+                .open(state.pattern_anchor_open.get(cx))
+                .anchor(Anchor::TopLeft)
+                .attach(Anchor::BottomLeft)
+                .offset(point(px(0.0), px(6.0)))
+                .full_width(true)
+                .on_dismiss({
+                    let open = state.pattern_anchor_open.clone();
+                    let overlay_event = state.overlay_event.clone();
+                    move |_window, cx| {
+                        open.set(cx, false);
+                        overlay_event.set(cx, "Anchored overlay dismissed".into());
                     }
                 }),
             ),
@@ -1176,6 +1491,18 @@ fn menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> Men
     MenuItem::new(label)
         .icon(icon)
         .on_click(pattern_event(state, label))
+}
+
+fn anchored_menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> MenuItem {
+    let menu_open = state.pattern_anchor_open.clone();
+    let overlay_event = state.overlay_event.clone();
+
+    MenuItem::new(label)
+        .icon(icon)
+        .on_click(move |_event, _window, cx| {
+            menu_open.set(cx, false);
+            overlay_event.set(cx, format!("Anchored menu: {label}"));
+        })
 }
 
 fn pattern_event(
