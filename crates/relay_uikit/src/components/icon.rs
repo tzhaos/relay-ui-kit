@@ -99,6 +99,51 @@ impl IconName {
         };
         format!("icons/{file}.svg").into()
     }
+
+    /// A generic human-readable label for icon-only affordances.
+    ///
+    /// Hosts should still provide a more specific label when the action depends
+    /// on surrounding product context, but this keeps icon-only controls from
+    /// falling back to an unlabeled state.
+    pub fn label(self) -> &'static str {
+        match self {
+            IconName::Archive => "Archive",
+            IconName::ArrowLeft => "Previous",
+            IconName::ArrowRight => "Next",
+            IconName::Bot => "Assistant",
+            IconName::CalendarClock => "Schedule",
+            IconName::Check => "Confirm",
+            IconName::ChevronDown => "Open menu",
+            IconName::ChevronRight => "Open submenu",
+            IconName::CircleDot => "Selected",
+            IconName::Ellipsis => "More actions",
+            IconName::FileDiff => "Diff",
+            IconName::FileText => "File",
+            IconName::Folder => "Folder",
+            IconName::FolderPlus => "New folder",
+            IconName::Funnel => "Filter",
+            IconName::GitBranch => "Git branch",
+            IconName::LayoutGrid => "Grid",
+            IconName::List => "List",
+            IconName::ListChecks => "Tasks",
+            IconName::ListFilter => "Filtered list",
+            IconName::MessageSquareText => "Conversation",
+            IconName::Minus => "Remove",
+            IconName::PanelLeft => "Toggle panel",
+            IconName::Pencil => "Edit",
+            IconName::Play => "Run",
+            IconName::Plus => "Add",
+            IconName::RefreshCw => "Refresh",
+            IconName::RotateCcw => "Reset",
+            IconName::Search => "Search",
+            IconName::Settings => "Settings",
+            IconName::SlidersHorizontal => "Adjust controls",
+            IconName::Terminal => "Terminal",
+            IconName::Trash2 => "Delete",
+            IconName::X => "Close",
+            IconName::Zap => "Quick action",
+        }
+    }
 }
 
 /// Asset source backing the kit's icons. Embeds every SVG under
@@ -286,5 +331,11 @@ mod tests {
                 "missing embedded svg for {name:?}"
             );
         }
+    }
+
+    #[test]
+    fn icon_label_is_human_readable() {
+        assert_eq!(IconName::Ellipsis.label(), "More actions");
+        assert_eq!(IconName::PanelLeft.label(), "Toggle panel");
     }
 }

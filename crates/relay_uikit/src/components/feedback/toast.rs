@@ -133,6 +133,7 @@ impl RenderOnce for Toast {
                 let on_dismiss_for_key = on_dismiss.clone();
                 IconButton::new(close_id, IconName::X)
                     .size(IconSize::XSmall)
+                    .aria_label("Dismiss notification")
                     .on_click(move |event, window, cx| {
                         if let Some(handler) = &on_close_for_key {
                             handler(event, window, cx);

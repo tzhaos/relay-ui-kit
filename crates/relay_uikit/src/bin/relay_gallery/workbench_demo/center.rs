@@ -72,13 +72,17 @@ pub(super) fn center_pane(
                         PaneToolbar::new()
                             .action(
                                 IconButton::new("workbench-refresh", IconName::RefreshCw)
+                                    .aria_label("Refresh terminal output")
                                     .active(output_loading)
                                     .disabled(output_loading)
                                     .on_click(cx.listener(|this, _event, _window, cx| {
                                         this.state.refresh_terminal_output(cx);
                                     })),
                             )
-                            .action(IconButton::new("workbench-more", IconName::Ellipsis)),
+                            .action(
+                                IconButton::new("workbench-more", IconName::Ellipsis)
+                                    .aria_label("Open terminal actions"),
+                            ),
                     ),
             ),
     )

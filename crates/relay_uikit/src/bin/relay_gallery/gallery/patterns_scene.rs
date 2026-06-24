@@ -140,8 +140,14 @@ fn tab_patterns(
                     .flex()
                     .items_center()
                     .gap_1()
-                    .child(IconButton::new("pat-tab-search", IconName::Search))
-                    .child(IconButton::new("pat-tab-more", IconName::Ellipsis)),
+                    .child(
+                        IconButton::new("pat-tab-search", IconName::Search)
+                            .aria_label("Search tab content"),
+                    )
+                    .child(
+                        IconButton::new("pat-tab-more", IconName::Ellipsis)
+                            .aria_label("Open tab actions"),
+                    ),
             ),
     )
 }
@@ -951,9 +957,18 @@ fn layout_patterns(
                         ]))
                         .trailing(
                             PaneToolbar::new()
-                                .action(IconButton::new("toolbar-search", IconName::Search))
-                                .action(IconButton::new("toolbar-refresh", IconName::RefreshCw))
-                                .action(IconButton::new("toolbar-more", IconName::Ellipsis)),
+                                .action(
+                                    IconButton::new("toolbar-search", IconName::Search)
+                                        .aria_label("Search workspace"),
+                                )
+                                .action(
+                                    IconButton::new("toolbar-refresh", IconName::RefreshCw)
+                                        .aria_label("Refresh workspace"),
+                                )
+                                .action(
+                                    IconButton::new("toolbar-more", IconName::Ellipsis)
+                                        .aria_label("Open workspace actions"),
+                                ),
                         ),
                 ),
         )

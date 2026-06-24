@@ -18,6 +18,7 @@ pub struct Toggle {
     id: ElementId,
     on: bool,
     label: Option<String>,
+    aria_label: Option<String>,
     disabled: bool,
     binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
@@ -29,6 +30,7 @@ impl Toggle {
             id: id.into(),
             on,
             label: None,
+            aria_label: None,
             disabled: false,
             binding: None,
             on_click: None,
@@ -40,6 +42,7 @@ impl Toggle {
             id: id.into(),
             on: false,
             label: None,
+            aria_label: None,
             disabled: false,
             binding: Some(binding),
             on_click: None,
@@ -48,6 +51,11 @@ impl Toggle {
 
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    pub fn aria_label(mut self, label: impl Into<String>) -> Self {
+        self.aria_label = Some(label.into());
         self
     }
 
@@ -68,6 +76,8 @@ impl Toggle {
 impl RenderOnce for Toggle {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let label = self.label;
+        let aria_label = self.aria_label.or_else(|| label.clone());
         let binding = self.binding;
         let on = binding.as_ref().map_or(self.on, |binding| binding.get(cx));
         let track_bg = if on {
@@ -99,6 +109,7 @@ impl RenderOnce for Toggle {
             .gap_2()
             .role(Role::Switch)
             .tab_index(0)
+            .when_some(aria_label, |this, label| this.aria_label(label))
             .aria_toggled(Toggled::from(on))
             .when(disabled, |this| {
                 this.opacity(DISABLED_OPACITY)
@@ -111,7 +122,7 @@ impl RenderOnce for Toggle {
                     })
             })
             .child(track)
-            .when_some(self.label, |this, label| {
+            .when_some(label, |this, label| {
                 this.child(div().text_sm().text_color(theme.text).child(label))
             })
             .when(interactive, |this| {
@@ -164,5 +175,12 @@ mod tests {
         let toggle = app.update(|cx| Toggle::bound("toggle", cx.binding(false)));
 
         assert!(toggle.binding.is_some());
+    }
+
+    #[test]
+    fn toggle_can_store_explicit_aria_label() {
+        let toggle = Toggle::new("toggle", false).aria_label("Toggle notifications");
+
+        assert_eq!(toggle.aria_label.as_deref(), Some("Toggle notifications"));
     }
 }

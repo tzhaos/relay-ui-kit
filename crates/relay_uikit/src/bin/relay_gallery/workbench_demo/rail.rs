@@ -61,22 +61,22 @@ pub(super) fn left_rail(
             .child(
                 PaneToolbar::new()
                     .action(
-                        IconButton::new("workbench-task-prev", IconName::ArrowLeft).on_click(
-                            move |_event, _window, cx| {
+                        IconButton::new("workbench-task-prev", IconName::ArrowLeft)
+                            .aria_label("Previous task")
+                            .on_click(move |_event, _window, cx| {
                                 previous_task.update(cx, |list, cx| {
                                     list.activate_previous(cx);
                                 });
-                            },
-                        ),
+                            }),
                     )
                     .action(
-                        IconButton::new("workbench-task-next", IconName::ArrowRight).on_click(
-                            move |_event, _window, cx| {
+                        IconButton::new("workbench-task-next", IconName::ArrowRight)
+                            .aria_label("Next task")
+                            .on_click(move |_event, _window, cx| {
                                 next_task.update(cx, |list, cx| {
                                     list.activate_next(cx);
                                 });
-                            },
-                        ),
+                            }),
                     )
                     .action(
                         Button::new("workbench-task-remove", "Remove")

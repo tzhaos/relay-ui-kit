@@ -57,10 +57,12 @@ pub(super) fn right_context(
                         "Context".into(),
                         tab.label().into(),
                     ]))
-                    .trailing(PaneToolbar::new().action(IconButton::new(
-                        "workbench-context-settings",
-                        IconName::Settings,
-                    ))),
+                    .trailing(
+                        PaneToolbar::new().action(
+                            IconButton::new("workbench-context-settings", IconName::Settings)
+                                .aria_label("Context settings"),
+                        ),
+                    ),
             ),
     )
 }

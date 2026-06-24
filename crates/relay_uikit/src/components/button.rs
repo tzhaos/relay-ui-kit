@@ -242,6 +242,10 @@ impl IconButton {
     }
 }
 
+fn resolved_icon_button_label(icon: IconName, aria_label: Option<String>) -> String {
+    aria_label.unwrap_or_else(|| icon.label().to_string())
+}
+
 impl RenderOnce for IconButton {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
@@ -250,6 +254,7 @@ impl RenderOnce for IconButton {
         } else {
             theme.text_muted
         };
+        let aria_label = resolved_icon_button_label(self.icon, self.aria_label);
 
         let mut button = ButtonLike::new(
             self.id,
@@ -275,9 +280,7 @@ impl RenderOnce for IconButton {
             button = button.track_focus(focus_handle);
         }
 
-        if let Some(label) = self.aria_label {
-            button = button.aria_label(label);
-        }
+        button = button.aria_label(aria_label);
 
         button.child(Icon::new(self.icon).size(self.size).color(fg))
     }
@@ -299,5 +302,21 @@ mod tests {
         let button = IconButton::new("button", IconName::ChevronDown).aria_expanded(false);
 
         assert_eq!(button.aria_expanded, Some(false));
+    }
+
+    #[test]
+    fn icon_button_uses_icon_name_as_default_aria_label() {
+        assert_eq!(
+            resolved_icon_button_label(IconName::Ellipsis, None),
+            "More actions"
+        );
+    }
+
+    #[test]
+    fn icon_button_prefers_explicit_aria_label() {
+        assert_eq!(
+            resolved_icon_button_label(IconName::Ellipsis, Some("Open terminal menu".into())),
+            "Open terminal menu"
+        );
     }
 }

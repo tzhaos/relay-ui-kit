@@ -67,18 +67,21 @@ pub(super) fn render(
                 .child(
                     IconButton::new("stress-ib-disabled", IconName::Plus)
                         .size(IconSize::Small)
+                        .aria_label("Add item")
                         .disabled(true),
                 )
                 .child(
                     IconButton::new("stress-ib-active-disabled", IconName::PanelLeft)
                         .active(true)
                         .size(IconSize::Small)
+                        .aria_label("Toggle panel")
                         .disabled(true),
                 )
                 .child(
                     IconButton::new("stress-ib-active", IconName::Settings)
                         .active(true)
-                        .size(IconSize::Small),
+                        .size(IconSize::Small)
+                        .aria_label("Open settings"),
                 ),
         ))
         .child(section(cx, "Dense rows", long_list(theme)))
