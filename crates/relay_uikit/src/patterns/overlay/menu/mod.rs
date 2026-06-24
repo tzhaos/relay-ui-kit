@@ -1,15 +1,16 @@
 mod item;
 
 use gpui::{
-    App, Bounds, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    ParentElement, Pixels, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, canvas,
-    div, prelude::FluentBuilder, px,
+    App, Bounds, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, ParentElement, Pixels, RenderOnce, Role, StatefulInteractiveElement, Styled,
+    Window, canvas, div, prelude::FluentBuilder, px,
 };
 
 pub use item::MenuItem;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
+    interaction::SharedDismissHandler,
     motion::{MotionDirection, MotionExt},
     theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, radius, space},
 };
@@ -120,6 +121,7 @@ pub struct Menu {
     items: Vec<MenuItem>,
     min_width: f32,
     focus_handle: Option<FocusHandle>,
+    action_dismiss: Option<SharedDismissHandler>,
 }
 
 impl Menu {
@@ -130,6 +132,7 @@ impl Menu {
             items,
             min_width: 180.0,
             focus_handle: None,
+            action_dismiss: None,
         }
     }
 
@@ -142,6 +145,20 @@ impl Menu {
     /// Track panel focus with a host-owned or overlay-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
+        self
+    }
+
+    /// Close the surrounding menu surface after an actionable row runs.
+    ///
+    /// Submenu rows never invoke this hook. Nested submenus inherit the same
+    /// dismiss behavior so a leaf action can close the root overlay.
+    pub fn on_action_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.action_dismiss = Some(std::rc::Rc::new(handler));
+        self
+    }
+
+    fn with_action_dismiss(mut self, action_dismiss: Option<SharedDismissHandler>) -> Self {
+        self.action_dismiss = action_dismiss;
         self
     }
 }
@@ -220,6 +237,30 @@ fn moved_active_index(
     }
 }
 
+fn activate_menu_action(
+    interactive: bool,
+    has_submenu: bool,
+    handler: Option<&crate::interaction::SharedClickHandler>,
+    action_dismiss: Option<&SharedDismissHandler>,
+    event: &ClickEvent,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    if !interactive || has_submenu {
+        return false;
+    }
+
+    let Some(handler) = handler else {
+        return false;
+    };
+
+    handler(event, window, cx);
+    if let Some(action_dismiss) = action_dismiss {
+        action_dismiss(window, cx);
+    }
+    true
+}
+
 impl RenderOnce for Menu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
@@ -228,6 +269,7 @@ impl RenderOnce for Menu {
             items,
             min_width,
             focus_handle,
+            action_dismiss,
         } = self;
         let state =
             window.use_keyed_state((id.clone(), "menu-state"), cx, |_, _| MenuState::default());
@@ -319,6 +361,7 @@ impl RenderOnce for Menu {
             .on_key_down({
                 let state = state.clone();
                 let keyboard_items = keyboard_items.clone();
+                let action_dismiss = action_dismiss.clone();
                 move |event: &KeyDownEvent, window, cx| {
                     let snapshot = state.read(cx).snapshot();
                     let active_index =
@@ -403,8 +446,16 @@ impl RenderOnce for Menu {
                                             cx.notify();
                                         }
                                     });
-                                } else if let Some(handler) = &item.on_click {
-                                    handler(&gpui::ClickEvent::default(), window, cx);
+                                } else {
+                                    let _ = activate_menu_action(
+                                        item.interactive,
+                                        item.has_submenu,
+                                        item.on_click.as_ref(),
+                                        action_dismiss.as_ref(),
+                                        &ClickEvent::default(),
+                                        window,
+                                        cx,
+                                    );
                                 }
                                 cx.stop_propagation();
                             }
@@ -472,6 +523,7 @@ impl RenderOnce for Menu {
             let state_for_hover = state.clone();
             let state_for_click = state.clone();
             let state_for_measure = state.clone();
+            let action_dismiss_for_click = action_dismiss.clone();
             let mut row_content = div()
                 .id(("menu-item", index))
                 .relative()
@@ -534,15 +586,21 @@ impl RenderOnce for Menu {
                         cx.stop_propagation();
                     })
                 })
-                .when_some(
-                    on_click.filter(|_| interactive && !has_submenu),
-                    |this, handler| {
-                        this.on_click(move |event, window, cx| {
-                            handler(event, window, cx);
-                            cx.stop_propagation();
-                        })
-                    },
-                );
+                .when(interactive && !has_submenu, |this| {
+                    let on_click = on_click.clone();
+                    this.on_click(move |event, window, cx| {
+                        let _ = activate_menu_action(
+                            interactive,
+                            has_submenu,
+                            on_click.as_ref(),
+                            action_dismiss_for_click.as_ref(),
+                            event,
+                            window,
+                            cx,
+                        );
+                        cx.stop_propagation();
+                    })
+                });
 
             if submenu_visible {
                 row_content = row_content.child(
@@ -577,9 +635,13 @@ impl RenderOnce for Menu {
             .items_start()
             .child(panel)
             .when_some(open_submenu, |this, (index, submenu_items, offset)| {
-                this.child(div().mt(offset).ml(px(-BORDER_WIDTH)).child(
-                    Menu::new(("submenu", index), submenu_items).min_width(SUBMENU_MIN_WIDTH),
-                ))
+                this.child(
+                    div().mt(offset).ml(px(-BORDER_WIDTH)).child(
+                        Menu::new(("submenu", index), submenu_items)
+                            .min_width(SUBMENU_MIN_WIDTH)
+                            .with_action_dismiss(action_dismiss.clone()),
+                    ),
+                )
             })
             .motion_slide_in(MotionDirection::FromTop, true)
     }
@@ -649,9 +711,19 @@ fn menu_header(label: String, color: gpui::Hsla) -> impl IntoElement {
 
 #[cfg(test)]
 mod tests {
-    use gpui::{bounds, point, size};
+    use std::{cell::RefCell, rc::Rc};
+
+    use gpui::{Context, IntoElement, Render, TestApp, Window, bounds, div, point, px, size};
 
     use super::*;
+
+    struct TestHost;
+
+    impl Render for TestHost {
+        fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
 
     #[test]
     fn menu_state_has_no_open_submenu_by_default() {
@@ -763,5 +835,76 @@ mod tests {
             Some(3)
         );
         assert_eq!(moved_active_index(&items, None, MenuMove::Last), Some(3));
+    }
+
+    #[test]
+    fn activate_menu_action_runs_handler_then_dismisses() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, _cx| TestHost);
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let action_log = log.clone();
+        let dismiss_log = log.clone();
+        let handler: crate::interaction::SharedClickHandler = Rc::new(
+            move |_event: &ClickEvent, _window: &mut Window, _cx: &mut App| {
+                action_log.borrow_mut().push("action");
+            },
+        );
+        let dismiss: SharedDismissHandler = Rc::new(move |_window: &mut Window, _cx: &mut App| {
+            dismiss_log.borrow_mut().push("dismiss");
+        });
+
+        window.draw();
+        window.update(|_view, window, cx| {
+            assert!(activate_menu_action(
+                true,
+                false,
+                Some(&handler),
+                Some(&dismiss),
+                &ClickEvent::default(),
+                window,
+                cx,
+            ));
+        });
+
+        assert_eq!(log.borrow().as_slice(), ["action", "dismiss"]);
+    }
+
+    #[test]
+    fn activate_menu_action_skips_submenu_rows() {
+        let mut app = TestApp::new();
+        let mut window = app.open_window(|_, _cx| TestHost);
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let action_log = log.clone();
+        let dismiss_log = log.clone();
+        let handler: crate::interaction::SharedClickHandler = Rc::new(
+            move |_event: &ClickEvent, _window: &mut Window, _cx: &mut App| {
+                action_log.borrow_mut().push("action");
+            },
+        );
+        let dismiss: SharedDismissHandler = Rc::new(move |_window: &mut Window, _cx: &mut App| {
+            dismiss_log.borrow_mut().push("dismiss");
+        });
+
+        window.draw();
+        window.update(|_view, window, cx| {
+            assert!(!activate_menu_action(
+                true,
+                true,
+                Some(&handler),
+                Some(&dismiss),
+                &ClickEvent::default(),
+                window,
+                cx,
+            ));
+        });
+
+        assert!(log.borrow().is_empty());
+    }
+
+    #[test]
+    fn menu_action_dismiss_builder_stores_handler() {
+        let menu = Menu::new("menu", vec![]).on_action_dismiss(|_window, _cx| {});
+
+        assert!(menu.action_dismiss.is_some());
     }
 }

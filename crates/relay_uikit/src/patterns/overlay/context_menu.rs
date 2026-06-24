@@ -59,17 +59,24 @@ impl RenderOnce for ContextMenu {
             })
             .read(cx)
             .clone();
-        let mut ov = overlay(
-            Menu::new(self.id, self.items)
-                .min_width(self.min_width)
-                .focus_handle(menu_focus.clone()),
-        )
-        .anchor(self.anchor)
-        .offset(self.left, self.top)
-        .focus_handle(menu_focus);
+        let dismiss_handler = self.on_dismiss.map(std::rc::Rc::new);
+        let mut menu = Menu::new(self.id, self.items)
+            .min_width(self.min_width)
+            .focus_handle(menu_focus.clone());
+        if let Some(handler) = dismiss_handler.clone() {
+            menu = menu.on_action_dismiss(move |window, cx| {
+                handler(window, cx);
+            });
+        }
+        let mut ov = overlay(menu)
+            .anchor(self.anchor)
+            .offset(self.left, self.top)
+            .focus_handle(menu_focus);
 
-        if let Some(handler) = self.on_dismiss {
-            ov = ov.on_dismiss(handler);
+        if let Some(handler) = dismiss_handler {
+            ov = ov.on_dismiss(move |window, cx| {
+                handler(window, cx);
+            });
         } else {
             // Always wire dismiss so overlay closes on click-outside / Escape
             ov = ov.on_dismiss(|_window, _cx| {});

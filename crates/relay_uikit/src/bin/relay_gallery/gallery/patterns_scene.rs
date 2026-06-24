@@ -1418,7 +1418,13 @@ fn overlay_patterns(
                                 .danger(),
                         ],
                     )
-                    .min_width(228.0),
+                    .min_width(228.0)
+                    .on_action_dismiss({
+                        let open = state.pattern_anchor_open.clone();
+                        move |_window, cx| {
+                            open.set(cx, false);
+                        }
+                    }),
                 )
                 .open(state.pattern_anchor_open.get(cx))
                 .anchor(Anchor::TopLeft)
@@ -1575,13 +1581,11 @@ fn menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> Men
 }
 
 fn anchored_menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> MenuItem {
-    let menu_open = state.pattern_anchor_open.clone();
     let overlay_event = state.overlay_event.clone();
 
     MenuItem::new(label)
         .icon(icon)
         .on_click(move |_event, _window, cx| {
-            menu_open.set(cx, false);
             overlay_event.set(cx, format!("Anchored menu: {label}"));
         })
 }

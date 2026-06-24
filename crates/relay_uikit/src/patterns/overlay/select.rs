@@ -368,14 +368,10 @@ where
             }
             if can_select {
                 let source = source.clone();
-                let open_state = open_state.clone();
                 let handler = select_handler.clone();
                 item = item.on_click(move |_event, window, cx| {
                     if let Some(source) = &source {
                         source.select(cx, value.clone());
-                    }
-                    if let Some(open_state) = &open_state {
-                        open_state.close(cx);
                     }
                     if let Some(handler) = &handler {
                         handler(value.clone(), window, cx);
@@ -385,15 +381,18 @@ where
             items.push(item);
         }
 
-        let mut overlay = AnchoredOverlay::new(
-            id.clone(),
-            trigger,
-            Menu::new((id.clone(), "menu"), items)
-                .min_width(220.0)
-                .focus_handle(menu_focus.clone()),
-        )
-        .open(open)
-        .focus_handle(menu_focus);
+        let mut menu = Menu::new((id.clone(), "menu"), items)
+            .min_width(220.0)
+            .focus_handle(menu_focus.clone());
+        if auto_dismiss && let Some(open_state) = open_state.clone() {
+            menu = menu.on_action_dismiss(move |_window, cx| {
+                open_state.close(cx);
+            });
+        }
+
+        let mut overlay = AnchoredOverlay::new(id.clone(), trigger, menu)
+            .open(open)
+            .focus_handle(menu_focus);
 
         if auto_dismiss {
             let open_state = open_state.clone();

@@ -87,11 +87,18 @@ impl RenderOnce for DropdownMenu {
             .read(cx)
             .clone();
         let menu_id = (self.id.clone(), "menu");
-        let menu = Menu::new(menu_id, self.items)
+        let mut menu = Menu::new(menu_id, self.items)
             .min_width(self.min_width)
             .focus_handle(menu_focus.clone());
         let open_binding = self.open_binding;
         let open = open_binding.as_ref().map_or(self.open, |b| b.get(cx));
+        if self.auto_dismiss
+            && let Some(binding) = open_binding.clone()
+        {
+            menu = menu.on_action_dismiss(move |_window, cx| {
+                binding.set(cx, false);
+            });
+        }
         let mut overlay = AnchoredOverlay::new(self.id, self.trigger, menu)
             .open(open)
             .focus_handle(menu_focus)
