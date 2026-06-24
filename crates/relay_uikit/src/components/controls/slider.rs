@@ -242,9 +242,9 @@ impl RenderOnce for Slider {
                         let handler = on_change.clone();
                         this.on_key_down(move |event: &KeyDownEvent, window, cx| {
                             let key = event.keystroke.key.as_str();
-                            if key == "arrow-left" || key == "arrow-right" {
+                            if let Some(direction) = slider_key_direction(key) {
                                 let current = binding.as_ref().map_or(value, |b| b.get(cx));
-                                let new_value = if key == "arrow-left" {
+                                let new_value = if direction < 0 {
                                     (current - step).max(min)
                                 } else {
                                     (current + step).min(max)
@@ -303,6 +303,14 @@ fn step_button(
         .child(Icon::new(icon).size(IconSize::Small).color(color))
 }
 
+fn slider_key_direction(key: &str) -> Option<i32> {
+    match key {
+        "left" => Some(-1),
+        "right" => Some(1),
+        _ => None,
+    }
+}
+
 fn slider_ratio(value: f32, min: f32, max: f32) -> f32 {
     if max <= min {
         return 0.0;
@@ -354,5 +362,13 @@ mod tests {
         let slider = Slider::new("slider", 50.0, 0.0, 100.0);
 
         assert!(!slider.disabled);
+    }
+
+    #[test]
+    fn slider_key_direction_uses_gpui_arrow_key_names() {
+        assert_eq!(slider_key_direction("left"), Some(-1));
+        assert_eq!(slider_key_direction("right"), Some(1));
+        assert_eq!(slider_key_direction("arrow-left"), None);
+        assert_eq!(slider_key_direction("arrow-right"), None);
     }
 }

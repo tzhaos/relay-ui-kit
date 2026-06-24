@@ -194,30 +194,14 @@ where
             let handler = handler.clone();
             row = row.on_key_down(move |event: &KeyDownEvent, window, cx| {
                 let key = event.keystroke.key.as_str();
-                if key == "arrow-left" || key == "arrow-right" {
-                    let current = selection
-                        .as_ref()
-                        .and_then(|selection| selection.get(cx))
-                        .or_else(|| active.clone());
-                    let current_idx = current
-                        .as_ref()
-                        .and_then(|current| {
-                            segment_keys
-                                .iter()
-                                .position(|segment_key| segment_key == current)
-                        })
-                        .unwrap_or(0);
-                    let next_idx = if key == "arrow-left" {
-                        if current_idx == 0 {
-                            segment_keys.len().saturating_sub(1)
-                        } else {
-                            current_idx - 1
-                        }
-                    } else if current_idx + 1 >= segment_keys.len() {
-                        0
-                    } else {
-                        current_idx + 1
-                    };
+                if let Some(next_idx) = next_segment_index(
+                    segment_keys.len(),
+                    active.clone(),
+                    &segment_keys,
+                    selection.as_ref(),
+                    cx,
+                    key,
+                ) {
                     let next_key = segment_keys[next_idx].clone();
                     if let Some(selection) = &selection {
                         selection.select(cx, next_key.clone());
@@ -232,6 +216,53 @@ where
 
         row
     }
+}
+
+fn segment_navigation_step(key: &str) -> Option<isize> {
+    match key {
+        "left" => Some(-1),
+        "right" => Some(1),
+        _ => None,
+    }
+}
+
+fn next_segment_index<K>(
+    len: usize,
+    fallback_active: Option<K>,
+    segment_keys: &[K],
+    selection: Option<&SelectionSource<K>>,
+    cx: &App,
+    key: &str,
+) -> Option<usize>
+where
+    K: Clone + Eq + Hash + PartialEq + 'static,
+{
+    let step = segment_navigation_step(key)?;
+    if len == 0 {
+        return None;
+    }
+    let current = selection
+        .and_then(|selection| selection.get(cx))
+        .or(fallback_active);
+    let current_idx = current
+        .as_ref()
+        .and_then(|current| {
+            segment_keys
+                .iter()
+                .position(|segment_key| segment_key == current)
+        })
+        .unwrap_or(0);
+    Some(if step < 0 {
+        if current_idx == 0 {
+            len.saturating_sub(1)
+        } else {
+            current_idx - 1
+        }
+    } else if current_idx + 1 >= len {
+        0
+    } else {
+        current_idx + 1
+    })
 }
 
 #[cfg(test)]
@@ -260,5 +291,13 @@ mod tests {
         let control = SegmentedControl::new("segmented", vec![Segment::new("one", "One")]);
 
         assert!(!control.disabled);
+    }
+
+    #[test]
+    fn segment_navigation_step_uses_gpui_arrow_key_names() {
+        assert_eq!(segment_navigation_step("left"), Some(-1));
+        assert_eq!(segment_navigation_step("right"), Some(1));
+        assert_eq!(segment_navigation_step("arrow-left"), None);
+        assert_eq!(segment_navigation_step("arrow-right"), None);
     }
 }

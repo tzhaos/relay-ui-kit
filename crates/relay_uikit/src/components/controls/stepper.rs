@@ -290,10 +290,8 @@ fn stepper_value(
                 .hover(move |style| style.bg(hover_bg))
                 .on_key_down(move |event: &KeyDownEvent, _window, cx| {
                     let key = event.keystroke.key.as_str();
-                    let delta: i32 = match key {
-                        "arrow-up" => 1,
-                        "arrow-down" => -1,
-                        _ => return,
+                    let Some(delta) = stepper_key_delta(key) else {
+                        return;
                     };
                     if let Some(binding) = &binding {
                         binding.update(cx, |value| {
@@ -305,6 +303,14 @@ fn stepper_value(
                 })
         })
         .child(value)
+}
+
+fn stepper_key_delta(key: &str) -> Option<i32> {
+    match key {
+        "up" => Some(1),
+        "down" => Some(-1),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -331,5 +337,13 @@ mod tests {
         assert_eq!(clamp_value(8, 5, Some(0), Some(10)), 10);
         assert_eq!(clamp_value(5, 2, None, None), 7);
         assert_eq!(clamp_value(5, -3, None, None), 2);
+    }
+
+    #[test]
+    fn stepper_key_delta_uses_gpui_arrow_key_names() {
+        assert_eq!(stepper_key_delta("up"), Some(1));
+        assert_eq!(stepper_key_delta("down"), Some(-1));
+        assert_eq!(stepper_key_delta("arrow-up"), None);
+        assert_eq!(stepper_key_delta("arrow-down"), None);
     }
 }
