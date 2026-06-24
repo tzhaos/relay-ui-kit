@@ -1,3 +1,5 @@
+//! Terminal-style content framing for logs, PTY projections, and command output panes.
+
 use gpui::{
     AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
@@ -14,6 +16,7 @@ pub struct OutputSurface {
 }
 
 impl OutputSurface {
+    /// Create a connected output surface with scrollable content.
     pub fn new(id: impl Into<ElementId>, content: impl IntoElement) -> Self {
         Self {
             id: id.into(),
@@ -22,6 +25,7 @@ impl OutputSurface {
         }
     }
 
+    /// Create an empty, disconnected output surface placeholder.
     pub fn empty(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
@@ -30,6 +34,7 @@ impl OutputSurface {
         }
     }
 
+    /// Override whether the session behind the surface is currently connected.
     pub fn connected(mut self, connected: bool) -> Self {
         self.connected = connected;
         self

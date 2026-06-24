@@ -1,3 +1,5 @@
+//! Compact numeric entry with optional text editing and stepper affordances.
+
 use gpui::{
     App, ClickEvent, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement,
     KeyDownEvent, MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled,
@@ -20,6 +22,7 @@ use super::{
     state::{InputActionKind, InputValueKind},
 };
 
+/// Layout strategy for the stepper controls around a [`NumberInput`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NumberInputLayout {
     ControlsAroundValue,
@@ -42,7 +45,7 @@ struct EditableNumberValue {
     on_key: Option<KeyHandler>,
 }
 
-/// A compact numeric input with optional stepper callbacks.
+/// A compact numeric input with optional Relay binding, inline editing, and stepper controls.
 #[derive(IntoElement)]
 pub struct NumberInput {
     id: ElementId,
@@ -61,6 +64,7 @@ pub struct NumberInput {
 }
 
 impl NumberInput {
+    /// Create a host-owned numeric field.
     pub fn new(id: impl Into<ElementId>, value: i32) -> Self {
         Self {
             id: id.into(),
@@ -79,6 +83,7 @@ impl NumberInput {
         }
     }
 
+    /// Create a Relay-bound numeric field backed by a [`Binding<i32>`].
     pub fn bound(id: impl Into<ElementId>, binding: Binding<i32>) -> Self {
         Self {
             id: id.into(),
@@ -97,11 +102,13 @@ impl NumberInput {
         }
     }
 
+    /// Render a non-editable suffix after the numeric value.
     pub fn suffix(mut self, suffix: impl Into<String>) -> Self {
         self.suffix = Some(suffix.into());
         self
     }
 
+    /// Choose whether stepper controls surround the value or trail it.
     pub fn layout(mut self, layout: NumberInputLayout) -> Self {
         self.layout = layout;
         self
@@ -134,6 +141,7 @@ impl NumberInput {
         self
     }
 
+    /// Enable host-owned inline editing driven by a snapshot of [`TextInputState`].
     pub fn editable(mut self, focus: FocusHandle, state: &TextInputState) -> Self {
         let (before, after) = state.split();
         self.editable = Some(EditableNumberValue {
@@ -152,6 +160,7 @@ impl NumberInput {
         self.editable(focus, state)
     }
 
+    /// Enable Relay-bound inline editing driven by a [`Binding<TextInputState>`].
     pub fn editable_bound(mut self, focus: FocusHandle, binding: Binding<TextInputState>) -> Self {
         self.editable = Some(EditableNumberValue {
             focus,
@@ -169,6 +178,7 @@ impl NumberInput {
         self.editable_bound(focus, binding)
     }
 
+    /// Force the focused visual treatment for the editable field.
     pub fn focused(mut self, focused: bool) -> Self {
         if let Some(editable) = &mut self.editable {
             editable.focused = focused;
@@ -184,6 +194,7 @@ impl NumberInput {
         self
     }
 
+    /// Observe raw `keydown` events after Relay's built-in numeric editing behavior runs.
     pub fn on_key(
         mut self,
         handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static,

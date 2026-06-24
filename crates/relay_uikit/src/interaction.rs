@@ -33,6 +33,7 @@ pub type SharedClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) + 's
 
 /// Fires when an overlay or dialog is dismissed (click-outside, Escape key).
 pub type DismissHandler = Box<dyn Fn(&mut Window, &mut App) + 'static>;
+/// Shared variant of [`DismissHandler`] for dismissal logic reused by multiple elements.
 pub type SharedDismissHandler = Rc<dyn Fn(&mut Window, &mut App) + 'static>;
 
 // ---------------------------------------------------------------------------
@@ -233,6 +234,7 @@ where
 /// Generic action dispatch.  Use when a component emits a single action value
 /// (e.g. a button press with associated data).
 pub type ActionHandler<T> = Box<dyn Fn(T, &mut Window, &mut App) + 'static>;
+/// Shared variant of [`ActionHandler`] for action dispatch reused across sub-elements.
 pub type SharedActionHandler<T> = Rc<dyn Fn(T, &mut Window, &mut App) + 'static>;
 
 /// Shared value-change notification cloned into multiple sub-elements.

@@ -1,3 +1,5 @@
+//! Search-focused single-line text entry with built-in leading icon and clear affordance.
+
 use gpui::{
     App, ClickEvent, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
@@ -18,7 +20,7 @@ use super::{
     },
 };
 
-/// A focusable search/filter well with a leading magnifier icon.
+/// A focusable search field with a leading magnifier icon and optional clear action.
 #[derive(IntoElement)]
 pub struct SearchField {
     id: ElementId,
@@ -33,6 +35,7 @@ pub struct SearchField {
 }
 
 impl SearchField {
+    /// Create a host-owned search field.
     pub fn new(id: impl Into<ElementId>, focus: FocusHandle) -> Self {
         Self {
             id: id.into(),
@@ -47,6 +50,7 @@ impl SearchField {
         }
     }
 
+    /// Create a Relay-bound search field backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
         focus: FocusHandle,
@@ -65,11 +69,13 @@ impl SearchField {
         }
     }
 
+    /// Seed a host-owned value for non-bound previews.
     pub fn value(mut self, value: impl Into<String>) -> Self {
         self.value = value.into();
         self
     }
 
+    /// Override the placeholder copy shown when the field is empty.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
         self
@@ -87,6 +93,7 @@ impl SearchField {
         self
     }
 
+    /// Intercept `keydown` events and report whether the host consumed them.
     pub fn on_key(
         mut self,
         handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) -> bool + 'static,
@@ -95,6 +102,7 @@ impl SearchField {
         self
     }
 
+    /// Wire the trailing clear affordance.
     pub fn on_clear(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

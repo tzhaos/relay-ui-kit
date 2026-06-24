@@ -1,3 +1,5 @@
+//! Resizable two-pane shell layout for Relay desktop surfaces.
+
 use gpui::{
     AnyElement, App, ElementId, Entity, InteractiveElement, IntoElement, ParentElement, RenderOnce,
     Styled, Window, div, prelude::FluentBuilder, px,
@@ -23,7 +25,9 @@ pub use state::SplitPaneState;
 /// Split direction for [`SplitPane`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SplitAxis {
+    /// Lay out panes left-to-right with a vertical divider.
     Horizontal,
+    /// Lay out panes top-to-bottom with a horizontal divider.
     Vertical,
 }
 
@@ -43,6 +47,7 @@ pub struct SplitPane {
 }
 
 impl SplitPane {
+    /// Create a split pane with two children and a stable root [`ElementId`].
     pub fn new(
         id: impl Into<ElementId>,
         first: impl IntoElement,
@@ -62,16 +67,19 @@ impl SplitPane {
         }
     }
 
+    /// Choose the axis used to place the two panes.
     pub fn axis(mut self, axis: SplitAxis) -> Self {
         self.axis = axis;
         self
     }
 
+    /// Set the initial size for the first pane before any drag state is restored.
     pub fn first_size(mut self, first_size: f32) -> Self {
         self.first_size = first_size;
         self
     }
 
+    /// Persist resize state in a host-owned [`SplitPaneState`] entity.
     pub fn state(mut self, state: Entity<SplitPaneState>) -> Self {
         self.state = Some(state);
         self
@@ -100,6 +108,7 @@ impl SplitPane {
         self
     }
 
+    /// Observe the end of a drag or keyboard resize interaction.
     pub fn on_resize_end(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_resize_end = Some(std::rc::Rc::new(handler));
         self

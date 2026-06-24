@@ -1,3 +1,5 @@
+//! Multi-line text entry with Relay-aware selection, IME, and placeholder handling.
+
 use gpui::{
     App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
@@ -15,7 +17,7 @@ use super::{
     platform_input::{PointerSelectionState, SingleLineInputStyle, multiline_input},
 };
 
-/// A multi-line text area view. The host owns the editable state.
+/// A multi-line text area that can be host-owned or Relay-bound.
 #[derive(IntoElement)]
 pub struct TextArea {
     id: ElementId,
@@ -33,6 +35,7 @@ pub struct TextArea {
 }
 
 impl TextArea {
+    /// Create a host-owned text area from a snapshot of [`TextInputState`].
     pub fn new(id: impl Into<ElementId>, focus: FocusHandle, state: &TextInputState) -> Self {
         let (before, after) = state.split();
         Self {
@@ -51,6 +54,7 @@ impl TextArea {
         }
     }
 
+    /// Create a Relay-bound text area backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
         focus: FocusHandle,
@@ -72,11 +76,13 @@ impl TextArea {
         }
     }
 
+    /// Render placeholder text when the current value is empty and unfocused.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
         self
     }
 
+    /// Force the focused visual treatment without moving actual GPUI focus.
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
         self
@@ -93,6 +99,7 @@ impl TextArea {
         self
     }
 
+    /// Toggle the outer field chrome while keeping text layout unchanged.
     pub fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
         self
@@ -104,6 +111,7 @@ impl TextArea {
         self
     }
 
+    /// Observe raw `keydown` events after Relay's built-in multiline editing behavior runs.
     pub fn on_key(
         mut self,
         handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static,

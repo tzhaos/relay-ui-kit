@@ -1,3 +1,12 @@
+//! Single-line text entry for Relay desktop surfaces.
+//!
+//! [`TextInput`] supports two ownership models:
+//!
+//! - host-owned snapshots via [`TextInput::new`], useful when a parent view is
+//!   already reconciling its own editing state; and
+//! - relay-bound editing via [`TextInput::bound`], which delegates the full
+//!   editing session to a [`relay::Binding`] of [`TextInputState`].
+
 use gpui::{
     App, ElementId, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
@@ -18,7 +27,7 @@ use super::{
     },
 };
 
-/// A single-line text input view. The host owns the editable state.
+/// A single-line text input that can be host-owned or Relay-bound.
 #[derive(IntoElement)]
 pub struct TextInput {
     id: ElementId,
@@ -35,6 +44,7 @@ pub struct TextInput {
 }
 
 impl TextInput {
+    /// Create a host-owned text input from a snapshot of [`TextInputState`].
     pub fn new(id: impl Into<ElementId>, focus: FocusHandle, state: &TextInputState) -> Self {
         let (before, after) = state.split();
         Self {
@@ -52,6 +62,7 @@ impl TextInput {
         }
     }
 
+    /// Create a Relay-bound text input backed by a [`Binding<TextInputState>`].
     pub fn bound(
         id: impl Into<ElementId>,
         focus: FocusHandle,
@@ -72,16 +83,19 @@ impl TextInput {
         }
     }
 
+    /// Render placeholder text when the current value is empty.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = placeholder.into();
         self
     }
 
+    /// Show a leading icon inside the input chrome.
     pub fn leading_icon(mut self, icon: IconName) -> Self {
         self.leading_icon = Some(icon);
         self
     }
 
+    /// Force the focused visual treatment without moving actual GPUI focus.
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
         self
@@ -99,6 +113,7 @@ impl TextInput {
         self
     }
 
+    /// Observe raw `keydown` events after Relay's built-in editing behavior runs.
     pub fn on_key(
         mut self,
         handler: impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static,
