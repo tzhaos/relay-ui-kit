@@ -8,8 +8,9 @@ use relay::{
 };
 use relay_uikit::patterns::ScrollSurface;
 use relay_uikit::{
-    ActiveTheme, Button, ButtonVariant, IconButton, IconName, IconSize, Label, LabelSize, ListItem,
-    ListItemSpacing, StatusDot, Theme, Tone, TreeRow, radius,
+    ActiveTheme, Button, ButtonVariant, FieldDescription, FieldLabel, IconButton, IconName,
+    IconSize, Label, LabelSize, ListItem, ListItemSpacing, NumberInput, NumberInputLayout,
+    SearchField, StatusDot, TextArea, TextInput, Theme, Tone, TreeRow, radius,
 };
 
 use super::{
@@ -24,6 +25,7 @@ pub(super) fn render(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     scene_stack()
+        .child(section(cx, "Input overflow", constrained_inputs(state)))
         .child(section(
             cx,
             "Long text",
@@ -86,6 +88,116 @@ pub(super) fn render(
             cached_session_list(state.stress_session_list.clone()),
         ))
         .child(section(cx, "Scroll surface", scroll_surface_sample(theme)))
+}
+
+fn constrained_inputs(state: &GalleryState) -> impl IntoElement {
+    div()
+        .flex()
+        .items_start()
+        .gap_4()
+        .flex_wrap()
+        .child(
+            div()
+                .w(px(320.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Long single-line input"))
+                        .child(
+                            FieldDescription::new(
+                                "The caret should stay visible while the content scrolls horizontally inside the field.",
+                            ),
+                        )
+                        .child(
+                            TextInput::bound(
+                                "stress-long-text-input",
+                                state.stress_long_text_focus.clone(),
+                                state.stress_long_text_input.clone(),
+                            )
+                            .leading_icon(IconName::Terminal)
+                            .key_context("StressLongTextInput"),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Long search field"))
+                        .child(
+                            FieldDescription::new(
+                                "The clear affordance and text selection should remain usable in constrained widths.",
+                            ),
+                        )
+                        .child(
+                            SearchField::bound(
+                                "stress-long-search-input",
+                                state.stress_long_search_focus.clone(),
+                                state.stress_long_search_input.clone(),
+                            )
+                            .key_context("StressLongSearchField"),
+                        ),
+                ),
+        )
+        .child(
+            div()
+                .w(px(320.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Multiline note area"))
+                        .child(
+                            FieldDescription::new(
+                                "Multiline content should stay inside the field, keep line breaks, and remain editable.",
+                            ),
+                        )
+                        .child(
+                            TextArea::bound(
+                                "stress-long-area-input",
+                                state.stress_long_area_focus.clone(),
+                                state.stress_long_area_input.clone(),
+                            )
+                            .min_rows(4)
+                            .key_context("StressLongTextArea"),
+                        ),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(FieldLabel::new("Editable number field"))
+                        .child(
+                            FieldDescription::new(
+                                "Numeric editing should keep the value and editable text in sync under a tight width.",
+                            ),
+                        )
+                        .child(
+                            NumberInput::bound(
+                                "stress-long-number-input",
+                                state.stress_long_number_value.clone(),
+                            )
+                            .input_bound(
+                                state.stress_long_number_focus.clone(),
+                                state.stress_long_number_input.clone(),
+                            )
+                            .layout(NumberInputLayout::ControlsTrailing)
+                            .suffix("ms")
+                            .range(-99999, 99999)
+                            .key_context("StressLongNumberInput"),
+                        ),
+                ),
+        )
 }
 
 fn long_labels() -> impl IntoElement {

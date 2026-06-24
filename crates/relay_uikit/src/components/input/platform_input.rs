@@ -1286,3 +1286,55 @@ fn is_valid_partial_integer(value: &str, allow_negative: bool) -> bool {
 fn normalize_multiline_text(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_multiline_text_coalesces_crlf_and_cr() {
+        assert_eq!(
+            normalize_multiline_text("one\r\ntwo\rthree"),
+            "one\ntwo\nthree"
+        );
+    }
+
+    #[test]
+    fn line_segments_preserve_trailing_empty_line() {
+        let segments = line_segments("alpha\nbeta\n");
+
+        assert_eq!(
+            segments,
+            vec![
+                (0, 5, 6, "alpha".to_string()),
+                (6, 10, 11, "beta".to_string()),
+                (11, 11, 11, String::new()),
+            ]
+        );
+    }
+
+    #[test]
+    fn line_position_for_offset_maps_trailing_newline_to_empty_row() {
+        let lines = vec![
+            MultilineLayoutLine {
+                start: 0,
+                content_end: 5,
+                next_start: 6,
+                y: px(0.0),
+                line: ShapedLine::default(),
+            },
+            MultilineLayoutLine {
+                start: 6,
+                content_end: 6,
+                next_start: 6,
+                y: px(22.0),
+                line: ShapedLine::default(),
+            },
+        ];
+
+        assert_eq!(line_position_for_offset(&lines, 0), Some((0, 0)));
+        assert_eq!(line_position_for_offset(&lines, 5), Some((0, 5)));
+        assert_eq!(line_position_for_offset(&lines, 6), Some((1, 0)));
+        assert_eq!(line_position_for_offset(&lines, 10), Some((1, 0)));
+    }
+}
