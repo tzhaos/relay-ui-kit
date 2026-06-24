@@ -4,15 +4,16 @@ use gpui::{
     App, Context, Entity, IntoElement, ParentElement, Role, Styled, div, prelude::FluentBuilder, px,
 };
 use relay_uikit::{
-    Button, ButtonVariant, Checkbox, Disclosure, Divider, FilterBar, FilterChip, Icon, IconButton,
-    IconName, IconSize, Label, LabelSize, ListItem, NavRow, NumberInput, Radio, SearchField,
-    Segment, SegmentedControl, Slider, Stepper, TextInput, TextInputState, Theme, ThemePreviewKind,
-    Toggle, TreeRow,
+    ActiveTheme, Badge, Button, ButtonVariant, Checkbox, ColorField, ColorSwatch, CountBadge,
+    Disclosure, Divider, FilterBar, FilterChip, Icon, IconButton, IconName, IconSize, Label,
+    LabelSize, ListItem, NavRow, NumberInput, PanelHeader, Radio, SearchField, SectionedList,
+    SectionedListGroup, Segment, SegmentedControl, Slider, Stepper, TextInput, TextInputState,
+    Theme, ThemePreviewKind, Toggle, ToolbarGroup, TreeNode, TreeRow, TreeView,
 };
 
 use super::GalleryScenesApp;
 use super::shared::{scene_stack, section, strip};
-use super::{GalleryContentTab, GalleryState};
+use super::{CoreTreeNodeKey, GalleryContentTab, GalleryState};
 
 pub(super) fn render(
     state: &GalleryState,
@@ -27,6 +28,7 @@ pub(super) fn render(
     scene_stack()
         .child(section(cx, "Buttons", button_sample(host)))
         .child(section(cx, "Icon Buttons", icon_button_sample(host)))
+        .child(section(cx, "Badges · Color · Chrome", chrome_sample(host)))
         .child(section(
             cx,
             "Toggle · Checkbox · Radio",
@@ -48,6 +50,11 @@ pub(super) fn render(
             cx,
             "Disclosure",
             disclosure_sample(state, disclosure_open),
+        ))
+        .child(section(
+            cx,
+            "Sectioned List & Tree View",
+            structured_collection_sample(state, host, cx),
         ))
         .child(section(cx, "List & Tree Rows", tree_sample(state, cx)))
 }
@@ -160,6 +167,78 @@ fn icon_button_sample(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
                     .size(IconSize::Small)
                     .disabled(true),
             ),
+        )
+}
+
+fn chrome_sample(host: &Entity<GalleryScenesApp>) -> impl IntoElement {
+    let accent = gpui::rgb(0x16a34a).into();
+    let h = host.clone();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_3()
+        .child(
+            strip()
+                .child(Badge::new("ACTIVE").tone(relay_uikit::Tone::Accent).soft())
+                .child(Badge::new("READONLY").tone(relay_uikit::Tone::Secondary))
+                .child(CountBadge::new(7).tone(relay_uikit::Tone::Accent))
+                .child(CountBadge::new(128).tone(relay_uikit::Tone::Warning))
+                .child(ColorSwatch::new("chrome-accent-swatch", accent))
+                .child(ColorField::new("chrome-accent-field", accent, "#16A34A")),
+        )
+        .child(
+            div()
+                .max_w(px(560.0))
+                .rounded(px(12.0))
+                .border_1()
+                .border_color(gpui::rgb(0x2a2f37))
+                .bg(gpui::rgb(0x171b20))
+                .overflow_hidden()
+                .child(
+                    PanelHeader::new("Terminal")
+                        .icon(IconName::Terminal)
+                        .trailing(
+                            ToolbarGroup::new("core-panel-toolbar")
+                                .child(
+                                    IconButton::new("core-panel-search", IconName::Search)
+                                        .size(IconSize::Small)
+                                        .aria_label("Search output")
+                                        .on_click(toast(h.clone(), "Panel search")),
+                                )
+                                .child(
+                                    IconButton::new("core-panel-split", IconName::PanelLeft)
+                                        .size(IconSize::Small)
+                                        .aria_label("Split terminal")
+                                        .on_click(toast(h.clone(), "Panel split")),
+                                )
+                                .child(
+                                    IconButton::new("core-panel-more", IconName::Ellipsis)
+                                        .size(IconSize::Small)
+                                        .aria_label("Open panel actions")
+                                        .on_click(toast(h, "Panel actions")),
+                                ),
+                        ),
+                )
+                .child(
+                    div()
+                        .p_3()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(gpui::rgb(0xd8dbe0))
+                                .child("relay_uikit now shows its chrome primitives in a real pane shell."),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(gpui::rgb(0x8b93a1))
+                                .child("PanelHeader and ToolbarGroup should feel production-ready when embedded, not only as isolated widgets."),
+                        ),
+                ),
         )
 }
 
@@ -385,6 +464,143 @@ fn disclosure_sample(state: &GalleryState, open: bool) -> impl IntoElement {
                     ),
             )
         })
+}
+
+fn structured_collection_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    cx: &App,
+) -> impl IntoElement {
+    let tree_selected = state.core_tree_selected.get(cx);
+
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_4()
+        .child(sectioned_list_sample())
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    TreeView::new("core-tree-view", core_tree_nodes(state, cx))
+                        .on_toggle({
+                            let host = host.clone();
+                            move |key, _window, cx| {
+                                host.update(cx, |this, cx| match key {
+                                    CoreTreeNodeKey::Src => {
+                                        this.state.core_tree_src_open.update(cx, |open| {
+                                            *open = !*open;
+                                            true
+                                        });
+                                    }
+                                    CoreTreeNodeKey::Components => {
+                                        this.state.core_tree_components_open.update(cx, |open| {
+                                            *open = !*open;
+                                            true
+                                        });
+                                    }
+                                    _ => {}
+                                });
+                            }
+                        })
+                        .on_select({
+                            let host = host.clone();
+                            move |key, _window, cx| {
+                                host.update(cx, |this, cx| {
+                                    this.state.core_tree_selected.set(cx, key);
+                                    this.add_feedback_toast(
+                                        cx,
+                                        format!("Tree selected: {}", core_tree_label(key)),
+                                    );
+                                });
+                            }
+                        }),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().text_muted)
+                        .child(format!("Selected file: {}", core_tree_label(tree_selected))),
+                ),
+        )
+}
+
+fn sectioned_list_sample() -> impl IntoElement {
+    let pinned = SectionedListGroup::new("Pinned")
+        .count(2)
+        .trailing(CountBadge::new(2).tone(relay_uikit::Tone::Accent))
+        .child(
+            ListItem::new("sectioned-pinned-session")
+                .start_slot(Icon::new(IconName::Terminal).size(IconSize::Small))
+                .end_slot(Badge::new("LIVE").tone(relay_uikit::Tone::Accent).soft())
+                .child("relay_v2 migration"),
+        )
+        .child(
+            ListItem::new("sectioned-pinned-review")
+                .start_slot(Icon::new(IconName::MessageSquareText).size(IconSize::Small))
+                .end_slot(Label::new("3 comments").size(LabelSize::Small))
+                .child("Product review queue"),
+        );
+    let queued = SectionedListGroup::new("Queued")
+        .count(2)
+        .child(
+            ListItem::new("sectioned-queued-docs")
+                .start_slot(Icon::new(IconName::FileText).size(IconSize::Small))
+                .child("Rewrite crate docs"),
+        )
+        .child(
+            ListItem::new("sectioned-queued-gallery")
+                .start_slot(Icon::new(IconName::LayoutGrid).size(IconSize::Small))
+                .child("Land missing gallery surfaces"),
+        );
+
+    SectionedList::new("core-sectioned-list", vec![pinned, queued])
+}
+
+fn core_tree_nodes(state: &GalleryState, cx: &App) -> Vec<TreeNode<CoreTreeNodeKey>> {
+    let src_open = state.core_tree_src_open.get(cx);
+    let components_open = state.core_tree_components_open.get(cx);
+    let selected = state.core_tree_selected.get(cx);
+    let mut nodes =
+        vec![TreeNode::new(CoreTreeNodeKey::Src, IconName::Folder, "src").expanded(src_open)];
+
+    if src_open {
+        nodes.push(
+            TreeNode::new(CoreTreeNodeKey::Components, IconName::Folder, "components")
+                .depth(1)
+                .expanded(components_open),
+        );
+    }
+
+    if src_open && components_open {
+        nodes.push(
+            TreeNode::new(CoreTreeNodeKey::ButtonRs, IconName::FileText, "button.rs")
+                .depth(2)
+                .selected(selected == CoreTreeNodeKey::ButtonRs),
+        );
+        nodes.push(
+            TreeNode::new(
+                CoreTreeNodeKey::TextInputRs,
+                IconName::FileText,
+                "text_input.rs",
+            )
+            .depth(2)
+            .selected(selected == CoreTreeNodeKey::TextInputRs),
+        );
+    }
+
+    nodes
+}
+
+fn core_tree_label(key: CoreTreeNodeKey) -> &'static str {
+    match key {
+        CoreTreeNodeKey::Src => "src",
+        CoreTreeNodeKey::Components => "components",
+        CoreTreeNodeKey::ButtonRs => "button.rs",
+        CoreTreeNodeKey::TextInputRs => "text_input.rs",
+    }
 }
 
 // ── List & Tree rows ──────────────────────────────────────────────────────

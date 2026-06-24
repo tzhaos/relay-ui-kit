@@ -7,8 +7,9 @@
 use std::hash::Hash;
 
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -134,6 +135,10 @@ where
                 CommandMenuItemKind::Agent => theme.accent,
                 CommandMenuItemKind::Action => theme.text_muted,
             };
+            let aria_label = item.detail.as_ref().map_or_else(
+                || item.label.clone(),
+                |detail| format!("{}, {}", item.label, detail),
+            );
 
             let row = div()
                 .id(("launcher-item", index))
@@ -148,6 +153,12 @@ where
                 .when(!disabled, |this| {
                     this.cursor_pointer()
                         .hover(move |style| style.bg(theme.hover))
+                        .role(Role::Button)
+                        .aria_label(aria_label)
+                        .tab_index(0)
+                        .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                            window.prevent_default();
+                        })
                 })
                 .child(
                     div()
@@ -196,9 +207,22 @@ where
                         .child(kind_label),
                 )
                 .when_some(handler.filter(|_| !disabled), |this, handler| {
+                    let handler_for_click = handler.clone();
+                    let handler_for_key = handler;
+                    let key_for_click = key.clone();
+                    let key_for_key = key;
                     this.on_click(move |_: &ClickEvent, window, cx| {
-                        handler(key.clone(), window, cx);
+                        handler_for_click(key_for_click.clone(), window, cx);
                         cx.stop_propagation();
+                    })
+                    .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                        match event.keystroke.key.as_str() {
+                            "enter" | " " => {
+                                handler_for_key(key_for_key.clone(), window, cx);
+                                cx.stop_propagation();
+                            }
+                            _ => {}
+                        }
                     })
                 });
             panel = panel.child(row);

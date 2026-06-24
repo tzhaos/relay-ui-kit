@@ -1,11 +1,12 @@
 use gpui::{
-    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
-    RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
+    prelude::FluentBuilder, px,
 };
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::ClickHandler,
+    interaction::{ClickHandler, SharedClickHandler},
     theme::{ActiveTheme, BORDER_WIDTH, DISABLED_OPACITY, Theme, radius},
 };
 
@@ -152,6 +153,9 @@ fn action_button(action: KeybindingAction, index: usize, theme: Theme) -> impl I
     } else {
         theme.text_muted
     };
+    let label = kind.label();
+    let handler: Option<SharedClickHandler> = action.handler.map(std::rc::Rc::from);
+    let interactive = !action.disabled && handler.is_some();
 
     div()
         .id(("keybinding-action", index))
@@ -162,29 +166,44 @@ fn action_button(action: KeybindingAction, index: usize, theme: Theme) -> impl I
         .text_size(px(10.0))
         .font_weight(FontWeight::MEDIUM)
         .when(action.disabled, |this| this.opacity(DISABLED_OPACITY))
-        .when(!action.disabled, |this| {
-            this.cursor_pointer().hover(move |style| {
-                if kind.danger() {
-                    style.bg(theme.danger.opacity(0.12))
-                } else {
-                    style.bg(theme.hover)
-                }
-            })
+        .when(interactive, |this| {
+            this.cursor_pointer()
+                .role(Role::Button)
+                .aria_label(label)
+                .tab_index(0)
+                .hover(move |style| {
+                    if kind.danger() {
+                        style.bg(theme.danger.opacity(0.12))
+                    } else {
+                        style.bg(theme.hover)
+                    }
+                })
+                .on_mouse_down(MouseButton::Left, |_event, window, _cx| {
+                    window.prevent_default();
+                })
         })
         .child(
             Icon::new(kind.icon())
                 .size(IconSize::XSmall)
                 .color(icon_color),
         )
-        .when_some(
-            action.handler.filter(|_| !action.disabled),
-            |this, handler| {
-                this.on_click(move |event, window, cx| {
-                    handler(event, window, cx);
-                    cx.stop_propagation();
-                })
-            },
-        )
+        .when_some(handler, |this, handler| {
+            let handler_for_click = handler.clone();
+            let handler_for_key = handler;
+            this.on_click(move |event, window, cx| {
+                handler_for_click(event, window, cx);
+                cx.stop_propagation();
+            })
+            .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                match event.keystroke.key.as_str() {
+                    "enter" | " " => {
+                        handler_for_key(&ClickEvent::default(), window, cx);
+                        cx.stop_propagation();
+                    }
+                    _ => {}
+                }
+            })
+        })
 }
 
 #[cfg(test)]

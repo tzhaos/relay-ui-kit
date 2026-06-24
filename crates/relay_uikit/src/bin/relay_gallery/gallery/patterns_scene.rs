@@ -7,18 +7,24 @@ use relay::{
     Selector, Signal, SignalVecExt, use_ordered_selection_model, view::reactive_render,
 };
 use relay_uikit::patterns::{
-    CommandPalette, CommandRow, ItemPicker, KeybindingShortcut, OutputLog, OutputSurface,
-    PaneToolbar, PickerAction, PickerOption, QuickAction, SessionRow, SourceView, TabStrip,
-    TaskRow, TaskRowData, TopToolbar, WorkspaceBreadcrumb,
+    ActionsMenu, CommandMenu, CommandMenuItem, CommandMenuItemKind, CommandPalette, CommandRow,
+    DiffView, FileKind, FileViewer, InputComposer, ItemPicker, KeybindingActionKind,
+    KeybindingActions, KeybindingRow, KeybindingShortcut, KeybindingTable, MarkdownViewer,
+    OutputLog, OutputSurface, PaneToolbar, PickerAction, PickerOption, Popover, QuickAction,
+    SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData, TopToolbar,
+    WorkspaceBreadcrumb,
     display::KeyValue,
     layout::ListSection,
     navigation::{Tab, Tabs},
     output_resource_snapshot,
-    overlay::{ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption, TooltipBody},
+    overlay::{
+        ConfirmDialog, ContextMenu, Dialog, DropdownMenu, MenuItem, Select, SelectOption,
+        TooltipBody,
+    },
 };
 use relay_uikit::{
-    ActiveTheme, Button, IconButton, IconName, Label, ListItem, ListItemSpacing, StatusDot, Theme,
-    ThemePreviewKind, Tone,
+    ActiveTheme, Button, IconButton, IconName, Label, LabelSize, ListItem, ListItemSpacing,
+    StatusDot, TextArea, Theme, ThemePreviewKind, Tone,
     interaction::{SelectionBinding, SelectionSource},
 };
 
@@ -58,16 +64,20 @@ pub(super) fn render(
     if state.pattern_dialog_open.get(cx) {
         stack = stack.child(settings_dialog(state));
     }
+    if state.pattern_confirm_open.get(cx) {
+        stack = stack.child(confirm_dialog(state));
+    }
 
     // Composite pattern demos — extract bodies first to avoid borrow conflicts
     let rows_body = row_patterns(state, cx);
     let tabs_body = tab_patterns(state, cx);
-    let composer_body = composer_sample(cx);
+    let composer_body = composer_sample(state, host, cx);
     let output_body = output_patterns(state, host, theme, cx);
     let qa_body = quick_action_sample(state);
+    let launcher_body = launcher_patterns(state);
     let command_picker_body = command_picker_patterns(state, theme, cx);
     let picker_body = picker_sample(state);
-    let viewer_body = viewer_patterns(theme);
+    let viewer_body = viewer_patterns(state, cx);
 
     stack = stack
         .child(section(cx, "Task Row & Session Row", rows_body))
@@ -75,9 +85,10 @@ pub(super) fn render(
         .child(section(cx, "Input Composer", composer_body))
         .child(section(cx, "Output Surface & Log", output_body))
         .child(section(cx, "Quick Actions", qa_body))
+        .child(section(cx, "Command Menu & Keybindings", launcher_body))
         .child(section(cx, "Command Palette & Picker", command_picker_body))
         .child(section(cx, "Item Picker", picker_body))
-        .child(section(cx, "Source Viewer", viewer_body));
+        .child(section(cx, "File Viewer · Markdown · Diff", viewer_body));
 
     stack
 }
@@ -118,10 +129,8 @@ fn tab_patterns(
     _cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
     div().flex().flex_col().gap_2().child(
-        div()
-            .flex()
-            .gap_1()
-            .child(
+        TabToolbar::new()
+            .tab(
                 TabStrip::new("pat-tab1", "Terminal")
                     .active_by(
                         state.pattern_tab_selection.clone(),
@@ -129,7 +138,7 @@ fn tab_patterns(
                     )
                     .status(Tone::Accent),
             )
-            .child(
+            .tab(
                 TabStrip::new("pat-tab2", "Preview")
                     .active_by(
                         state.pattern_tab_selection.clone(),
@@ -137,28 +146,82 @@ fn tab_patterns(
                     )
                     .status(Tone::Muted),
             )
-            .child(TabStrip::new("pat-tab3", "Review").active_by(
+            .tab(TabStrip::new("pat-tab3", "Review").active_by(
                 state.pattern_tab_selection.clone(),
                 PatternPreviewTab::Review,
-            )),
+            ))
+            .actions(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .child(IconButton::new("pat-tab-search", IconName::Search))
+                    .child(IconButton::new("pat-tab-more", IconName::Ellipsis)),
+            ),
     )
 }
 
-fn composer_sample(_cx: &mut Context<GalleryScenesApp>) -> impl IntoElement + use<> {
-    div()
-        .h(px(40.0))
-        .border_1()
-        .rounded(px(8.0))
-        .border_color(gpui::rgb(0x333333))
-        .px_2()
-        .flex()
-        .items_center()
-        .child(
-            div()
-                .text_sm()
-                .text_color(gpui::rgb(0x666666))
-                .child("Type a message..."),
+fn composer_sample(
+    state: &GalleryState,
+    host: &Entity<GalleryScenesApp>,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    InputComposer::new(
+        "patterns-composer",
+        TextArea::bound(
+            "patterns-composer-input",
+            state.composer_focus.clone(),
+            state.composer_input.clone(),
         )
+        .placeholder("Ask Codex to productize the next component batch...")
+        .min_rows(4)
+        .bordered(false),
+    )
+    .leading(
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(Label::new("Ctrl+Enter submits").size(LabelSize::Small))
+            .child(KeybindingShortcut::new(["Ctrl", "Enter"])),
+    )
+    .trailing(
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(Button::new("patterns-composer-attach", "Context").ghost())
+            .child(
+                Button::new("patterns-composer-send", "Send")
+                    .primary()
+                    .icon(IconName::ArrowRight)
+                    .on_click({
+                        let host = host.clone();
+                        let composer_input = state.composer_input.clone();
+                        move |_event, _window, cx| {
+                            let summary = composer_input.get(cx).value().trim().to_string();
+                            if !summary.is_empty() {
+                                host.update(cx, |this, cx| {
+                                    this.add_feedback_toast(
+                                        cx,
+                                        format!("Composer submitted: {}", summary),
+                                    );
+                                });
+                            }
+                            composer_input.update(cx, |state| {
+                                state.clear();
+                                true
+                            });
+                        }
+                    }),
+            ),
+    )
+    .footer(
+        div().text_xs().text_color(cx.theme().text_muted).child(
+            "InputComposer now wraps the real multiline editor instead of a placeholder shell.",
+        ),
+    )
+    .floating(true)
 }
 
 fn output_patterns(
@@ -242,6 +305,104 @@ fn quick_action_sample(state: &GalleryState) -> impl IntoElement {
                     log.set(cx, "QuickAction: Build".into());
                 }
             }),
+        )
+}
+
+fn launcher_patterns(state: &GalleryState) -> impl IntoElement {
+    div()
+        .grid()
+        .grid_cols(2)
+        .gap_4()
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(
+                    CommandMenu::new(
+                        "patterns-command-menu",
+                        vec![
+                            CommandMenuItem::new(
+                                PatternCommand::NewTerminal,
+                                "New terminal",
+                                IconName::Terminal,
+                            )
+                            .detail("Open a shell in the current worktree")
+                            .kind(CommandMenuItemKind::Terminal),
+                            CommandMenuItem::new(
+                                PatternCommand::LaunchAgent,
+                                "Launch agent",
+                                IconName::Bot,
+                            )
+                            .detail("Run Codex against the selected relay surface")
+                            .kind(CommandMenuItemKind::Agent),
+                            CommandMenuItem::new(
+                                PatternCommand::OpenReview,
+                                "Open review",
+                                IconName::MessageSquareText,
+                            )
+                            .detail("Jump to the review context panel")
+                            .kind(CommandMenuItemKind::Action),
+                        ],
+                    )
+                    .on_select(pattern_command_event(state)),
+                )
+                .child(
+                    div()
+                        .w(px(232.0))
+                        .child(ActionsMenu::new("patterns-actions-menu").on_select({
+                            let log = state.overlay_event.clone();
+                            move |action, _window, cx| {
+                                log.set(cx, format!("Branch actions menu: {}", action.label()));
+                            }
+                        })),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(KeybindingTable::new(vec![
+                    KeybindingRow::new("Open command palette")
+                        .description("Focus the launcher without leaving the current pane")
+                        .shortcut(KeybindingShortcut::new(["Ctrl", "K"]))
+                        .action(
+                            KeybindingActions::new("patterns-keybinding-palette")
+                                .on_edit(pattern_keybinding_action(
+                                    state,
+                                    KeybindingActionKind::Edit,
+                                    "Open command palette",
+                                ))
+                                .on_reset(pattern_keybinding_action(
+                                    state,
+                                    KeybindingActionKind::Reset,
+                                    "Open command palette",
+                                )),
+                        ),
+                    KeybindingRow::new("Open review")
+                        .description("Jump into the review queue surface")
+                        .shortcut(KeybindingShortcut::new(["Ctrl", "R"]))
+                        .action(
+                            KeybindingActions::new("patterns-keybinding-review")
+                                .on_edit(pattern_keybinding_action(
+                                    state,
+                                    KeybindingActionKind::Edit,
+                                    "Open review",
+                                ))
+                                .on_clear(pattern_keybinding_action(
+                                    state,
+                                    KeybindingActionKind::Clear,
+                                    "Open review",
+                                )),
+                        ),
+                ]))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(gpui::rgb(0x7a8291))
+                        .child("KeybindingActions now expose keyboard focus and activation semantics alongside pointer clicks."),
+                ),
         )
 }
 
@@ -670,19 +831,50 @@ impl Render for PatternProjectRow {
     }
 }
 
-fn viewer_patterns(theme: Theme) -> impl IntoElement {
-    div().flex().flex_col().gap_2().child(
-        div()
-            .h(px(120.0))
-            .border_1()
-            .border_color(theme.border)
-            .rounded(px(8.0))
-            .overflow_hidden()
-            .child(SourceView::new(VIEWER_SAMPLE).language("rust")),
-    )
+fn viewer_patterns(
+    state: &GalleryState,
+    cx: &mut Context<GalleryScenesApp>,
+) -> impl IntoElement + use<> {
+    let active_tab = state.content_tab.get(cx);
+    let active_label = active_tab.label().to_string();
+    let theme = *cx.theme();
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(div().text_xs().text_color(theme.text_muted).child(format!(
+            "Shared with the navigation tabs above: {active_label}"
+        )))
+        .child(
+            div().h(px(280.0)).child(match active_tab {
+                GalleryContentTab::Files => FileViewer::new(
+                    "crates/relay_uikit/src/patterns/source_view.rs",
+                    FileKind::Code,
+                    SourceView::new(VIEWER_SAMPLE).language("rust"),
+                )
+                .detail("Source preview"),
+                GalleryContentTab::Diff => FileViewer::new(
+                    "crates/relay_uikit/src/patterns/diff_view.rs",
+                    FileKind::Diff,
+                    DiffView::from_text_diff(VIEWER_DIFF_BEFORE, VIEWER_DIFF_AFTER),
+                )
+                .detail("Unified diff"),
+                GalleryContentTab::Review => FileViewer::new(
+                    "docs/relay-uikit-guidelines.md",
+                    FileKind::Markdown,
+                    MarkdownViewer::new(VIEWER_REVIEW_MARKDOWN),
+                )
+                .detail("Review context"),
+            }),
+        )
 }
 
 const VIEWER_SAMPLE: &str = "pub struct OutputLine {\n    text: String,\n    style: OutputLineStyle,\n}\n\nimpl OutputLine {\n    pub fn new(text: impl Into<String>) -> Self {\n        Self { text: text.into(), style: OutputLineStyle::Output }\n    }\n}";
+const VIEWER_DIFF_BEFORE: &str =
+    "pub fn launch_agent() {\n    enqueue(\"relay\");\n    log(\"pending\");\n}\n";
+const VIEWER_DIFF_AFTER: &str = "pub fn launch_agent() {\n    enqueue(\"relay_v2\");\n    log(\"ready\");\n    notify(\"agent started\");\n}\n";
+const VIEWER_REVIEW_MARKDOWN: &str = "# Relay UIKit Review\n\n- Productize every exported component.\n- Keep focus, keyboard, and pointer behavior aligned.\n- Remove compatibility aliases instead of preserving them.\n\n> Gallery scenes should behave like real desktop surfaces.";
 
 fn layout_patterns(state: &GalleryState, theme: Theme) -> impl IntoElement {
     div()
@@ -864,6 +1056,16 @@ fn overlay_patterns(
                 }),
         )
         .child(
+            Button::new("patterns-confirm-open", "Open Confirm")
+                .icon(IconName::Archive)
+                .on_click({
+                    let confirm_open = state.pattern_confirm_open.clone();
+                    move |_event, _window, cx| {
+                        confirm_open.set(cx, true);
+                    }
+                }),
+        )
+        .child(
             div()
                 .relative()
                 .w(px(240.0))
@@ -900,6 +1102,18 @@ fn overlay_patterns(
                     .offset(24.0, 64.0)
                     .min_width(190.0),
                 ),
+        )
+        .child(
+            Popover::new("patterns-inline-popover")
+                .title("Popover")
+                .icon(IconName::MessageSquareText)
+                .width(260.0)
+                .child(div().text_sm().text_color(theme.text_secondary).child(
+                    "Use this for compact inline detail, not for full-screen workflow pivots.",
+                ))
+                .footer(div().text_xs().text_color(theme.text_muted).child(
+                    "Popover remains lightweight and anchored to the current task context.",
+                )),
         )
         .child(
             div()
@@ -942,6 +1156,22 @@ fn settings_dialog(state: &GalleryState) -> impl IntoElement {
         .on_dismiss(close_dialog(state, "Dialog dismissed"))
 }
 
+fn confirm_dialog(state: &GalleryState) -> impl IntoElement {
+    ConfirmDialog::new(
+        "patterns-confirm-dialog",
+        "Archive generated worktree",
+        "This removes the active preview worktree from the gallery workspace.",
+    )
+    .confirm_label("Archive")
+    .danger(true)
+    .on_confirm(close_confirm_dialog(
+        state,
+        "Confirm dialog saved and archived the worktree",
+    ))
+    .on_dismiss(close_confirm_dialog(state, "Confirm dialog dismissed"))
+    .on_cancel(close_confirm_dialog(state, "Confirm dialog cancelled"))
+}
+
 fn menu_action(state: &GalleryState, label: &'static str, icon: IconName) -> MenuItem {
     MenuItem::new(label)
         .icon(icon)
@@ -958,6 +1188,17 @@ fn pattern_event(
     }
 }
 
+fn pattern_keybinding_action(
+    state: &GalleryState,
+    action: KeybindingActionKind,
+    command: &'static str,
+) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
+    let overlay_event = state.overlay_event.clone();
+    move |_event, _window, cx| {
+        overlay_event.set(cx, format!("Keybinding {}: {command}", action.label()));
+    }
+}
+
 fn close_dialog(
     state: &GalleryState,
     message: &'static str,
@@ -966,6 +1207,18 @@ fn close_dialog(
     let overlay_event = state.overlay_event.clone();
     move |_event, _window, cx| {
         dialog_open.set(cx, false);
+        overlay_event.set(cx, message.to_string());
+    }
+}
+
+fn close_confirm_dialog(
+    state: &GalleryState,
+    message: &'static str,
+) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
+    let confirm_open = state.pattern_confirm_open.clone();
+    let overlay_event = state.overlay_event.clone();
+    move |_event, _window, cx| {
+        confirm_open.set(cx, false);
         overlay_event.set(cx, message.to_string());
     }
 }

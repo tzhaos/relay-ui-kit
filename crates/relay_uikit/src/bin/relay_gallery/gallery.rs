@@ -76,6 +76,14 @@ impl fmt::Display for GalleryContentTab {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CoreTreeNodeKey {
+    Src,
+    Components,
+    ButtonRs,
+    TextInputRs,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PatternRowKind {
     Task,
     Session,
@@ -172,6 +180,8 @@ pub struct GalleryState {
     pub name_focus: FocusHandle,
     pub search_input: Binding<TextInputState>,
     pub search_focus: FocusHandle,
+    pub composer_input: Binding<TextInputState>,
+    pub composer_focus: FocusHandle,
     pub ui_font_size_input: Binding<TextInputState>,
     pub ui_font_size_focus: FocusHandle,
     pub notifications: Binding<bool>,
@@ -185,6 +195,7 @@ pub struct GalleryState {
     pub command_popover_open: Binding<bool>,
     pub command_context_open: Binding<bool>,
     pub pattern_dialog_open: Binding<bool>,
+    pub pattern_confirm_open: Binding<bool>,
     pub pattern_row_selection: Selector<PatternRowKind>,
     pub pattern_tab_selection: Selector<PatternPreviewTab>,
     pub pattern_command_selection: OrderedSelectionModel<PatternCommand>,
@@ -198,6 +209,9 @@ pub struct GalleryState {
     pub accent_choice: Signal<GalleryAccent>,
     pub overlay_event: Signal<String>,
     pub core_disclosure_open: Binding<bool>,
+    pub core_tree_src_open: Binding<bool>,
+    pub core_tree_components_open: Binding<bool>,
+    pub core_tree_selected: Binding<CoreTreeNodeKey>,
     pub settings_dirty: Memo<bool>,
 }
 
@@ -247,19 +261,24 @@ impl GalleryState {
             name_focus: cx.focus_handle(),
             search_input: cx.binding(TextInputState::new()),
             search_focus: cx.focus_handle(),
+            composer_input: cx.binding(TextInputState::with_text(
+                "Summarize the remaining product gaps in relay_uikit and propose the next migration slice.",
+            )),
+            composer_focus: cx.focus_handle(),
             ui_font_size_input: cx.binding(TextInputState::with_text("14")),
             ui_font_size_focus: cx.focus_handle(),
             notifications,
             auto_archive,
             theme_choice,
             radio_choice: cx.binding(ThemePreviewKind::System),
-            content_tab: cx.binding(GalleryContentTab::Diff),
+            content_tab: cx.binding(GalleryContentTab::Files),
             settings_select_open: cx.binding(false),
             ui_font_size,
             contrast: cx.binding(60.0),
             command_popover_open: cx.binding(false),
             command_context_open: cx.binding(false),
             pattern_dialog_open: cx.binding(false),
+            pattern_confirm_open: cx.binding(false),
             pattern_row_selection: cx.selector(Some(PatternRowKind::Task)),
             pattern_tab_selection: cx.selector(Some(PatternPreviewTab::Terminal)),
             pattern_command_selection,
@@ -273,6 +292,9 @@ impl GalleryState {
             accent_choice: cx.signal(GalleryAccent::Green),
             overlay_event: cx.signal("No overlay action yet".into()),
             core_disclosure_open: cx.binding(true),
+            core_tree_src_open: cx.binding(true),
+            core_tree_components_open: cx.binding(true),
+            core_tree_selected: cx.binding(CoreTreeNodeKey::ButtonRs),
             settings_dirty,
         }
     }

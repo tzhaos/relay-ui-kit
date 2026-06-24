@@ -54,8 +54,9 @@ impl ColorField {
 impl RenderOnce for ColorField {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let id = self.id;
         div()
-            .id(self.id)
+            .id(id.clone())
             .h(px(30.0))
             .min_w(px(148.0))
             .px_2()
@@ -66,7 +67,7 @@ impl RenderOnce for ColorField {
             .bg(theme.panel)
             .border_1()
             .border_color(theme.border)
-            .child(ColorSwatch::new("color-field-swatch", self.color))
+            .child(ColorSwatch::new((id, "swatch"), self.color))
             .child(div().text_sm().text_color(theme.text).child(self.value))
     }
 }

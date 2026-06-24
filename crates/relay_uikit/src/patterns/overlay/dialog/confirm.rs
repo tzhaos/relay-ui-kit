@@ -24,6 +24,7 @@ pub struct ConfirmDialog {
     danger: bool,
     on_confirm: Option<SharedClickHandler>,
     on_cancel: Option<SharedClickHandler>,
+    on_dismiss: Option<SharedClickHandler>,
 }
 
 impl ConfirmDialog {
@@ -41,6 +42,7 @@ impl ConfirmDialog {
             danger: false,
             on_confirm: None,
             on_cancel: None,
+            on_dismiss: None,
         }
     }
 
@@ -74,6 +76,14 @@ impl ConfirmDialog {
         self.on_cancel = Some(Rc::new(handler));
         self
     }
+
+    pub fn on_dismiss(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_dismiss = Some(Rc::new(handler));
+        self
+    }
 }
 
 impl RenderOnce for ConfirmDialog {
@@ -81,6 +91,7 @@ impl RenderOnce for ConfirmDialog {
         let theme = *cx.theme();
         let on_cancel = self.on_cancel;
         let on_confirm = self.on_confirm;
+        let on_dismiss = self.on_dismiss.or_else(|| on_cancel.clone());
         let cancel = Button::new("confirm-cancel", self.cancel_label).on_click({
             let on_cancel = on_cancel.clone();
             move |event, window, cx| {
@@ -101,7 +112,7 @@ impl RenderOnce for ConfirmDialog {
                 }
             });
 
-        Dialog::new(self.id, self.title)
+        let mut dialog = Dialog::new(self.id, self.title)
             .description(self.description)
             .icon(if self.danger {
                 IconName::Archive
@@ -128,7 +139,15 @@ impl RenderOnce for ConfirmDialog {
                             .child(cancel)
                             .child(confirm),
                     ),
-            )
+            );
+
+        if let Some(on_dismiss) = on_dismiss {
+            dialog = dialog.on_dismiss(move |event, window, cx| {
+                on_dismiss(event, window, cx);
+            });
+        }
+
+        dialog
     }
 }
 
@@ -141,5 +160,13 @@ mod tests {
         let dialog = ConfirmDialog::new("confirm", "Close terminal", "Close this session?");
 
         assert!(!dialog.danger);
+    }
+
+    #[test]
+    fn confirm_dialog_can_store_explicit_dismiss_handler() {
+        let dialog = ConfirmDialog::new("confirm", "Close terminal", "Close this session?")
+            .on_dismiss(|_event, _window, _cx| {});
+
+        assert!(dialog.on_dismiss.is_some());
     }
 }
