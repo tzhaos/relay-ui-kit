@@ -4,6 +4,7 @@ use gpui::{
     App, Context, Entity, IntoElement, ParentElement, Role, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
+use relay_uikit::interaction::{OpenState, SelectionBinding};
 use relay_uikit::{
     ActiveTheme, Badge, Button, ButtonVariant, Checkbox, ColorField, ColorSwatch, CountBadge,
     Disclosure, Divider, FieldDescription, FieldLabel, FilterBar, FilterChip, ForEach, Icon,
@@ -827,16 +828,22 @@ fn tree_sample(state: &GalleryState, cx: &App) -> impl IntoElement {
                 .end_slot(Label::new("Readonly").size(LabelSize::Small))
                 .child("src/components/button.rs"),
         )
-        .child(TreeRow::new("demo-tree", IconName::Folder, "src/components").expandable(true))
         .child(
-            TreeRow::bound(
-                "demo-tree-file",
-                IconName::FileText,
-                "button.rs",
-                state.core_disclosure_open.clone(),
-            )
-            .depth(1)
-            .expanded_bound(state.core_disclosure_open.clone()),
+            TreeRow::new("demo-tree", IconName::Folder, "src/components")
+                .selection_binding(SelectionBinding::binding(
+                    state.core_tree_selected.clone(),
+                    CoreTreeNodeKey::Components,
+                ))
+                .open_state(OpenState::binding(state.core_disclosure_open.clone()))
+                .expandable(state.core_disclosure_open.get(cx)),
+        )
+        .child(
+            TreeRow::new("demo-tree-file", IconName::FileText, "button.rs")
+                .selection_binding(SelectionBinding::binding(
+                    state.core_tree_selected.clone(),
+                    CoreTreeNodeKey::ButtonRs,
+                ))
+                .depth(1),
         )
         .when(state.core_disclosure_open.get(cx), |this| {
             this.child(TreeRow::new("demo-tree-nested", IconName::FileText, "mod.rs").depth(2))

@@ -2,11 +2,10 @@ use gpui::{
     App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
-    interaction::ClickHandler,
+    interaction::{ClickHandler, OpenState, SelectionBinding},
     list::ListItem,
     theme::{ActiveTheme, space},
 };
@@ -21,8 +20,8 @@ pub struct TreeRow {
     expandable: bool,
     expanded: bool,
     selected: bool,
-    selected_binding: Option<Binding<bool>>,
-    expanded_binding: Option<Binding<bool>>,
+    selection: Option<SelectionBinding>,
+    open_state: Option<OpenState>,
     on_click: Option<ClickHandler>,
 }
 
@@ -36,34 +35,21 @@ impl TreeRow {
             expandable: false,
             expanded: false,
             selected: false,
-            selected_binding: None,
-            expanded_binding: None,
+            selection: None,
+            open_state: None,
             on_click: None,
         }
     }
 
-    pub fn bound(
-        id: impl Into<ElementId>,
-        icon: IconName,
-        label: impl Into<String>,
-        selected: Binding<bool>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            icon,
-            label: label.into(),
-            depth: 0,
-            expandable: false,
-            expanded: false,
-            selected: false,
-            selected_binding: Some(selected),
-            expanded_binding: None,
-            on_click: None,
-        }
+    /// Drive the selected state from a Relay-aware keyed selection controller.
+    pub fn selection_binding(mut self, selection: SelectionBinding) -> Self {
+        self.selection = Some(selection);
+        self
     }
 
-    pub fn expanded_bound(mut self, binding: Binding<bool>) -> Self {
-        self.expanded_binding = Some(binding);
+    /// Drive the expanded state from a shared open-state controller.
+    pub fn open_state(mut self, open_state: OpenState) -> Self {
+        self.open_state = Some(open_state);
         self
     }
 
@@ -95,14 +81,14 @@ impl TreeRow {
 impl RenderOnce for TreeRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let selected_binding = self.selected_binding;
-        let expanded_binding = self.expanded_binding;
-        let selected = selected_binding
+        let selection = self.selection;
+        let open_state = self.open_state;
+        let selected = selection
             .as_ref()
-            .map_or(self.selected, |b| b.get(cx));
-        let expanded = expanded_binding
+            .map_or(self.selected, |selection| selection.is_selected(cx));
+        let expanded = open_state
             .as_ref()
-            .map_or(self.expanded, |b| b.get(cx));
+            .map_or(self.expanded, |open_state| open_state.get(cx));
         let fg = if selected {
             theme.text
         } else {
@@ -157,22 +143,15 @@ impl RenderOnce for TreeRow {
                     .child(self.label),
             );
 
-        let has_click =
-            selected_binding.is_some() || expanded_binding.is_some() || self.on_click.is_some();
+        let has_click = selection.is_some() || open_state.is_some() || self.on_click.is_some();
         if has_click {
             let handler = self.on_click;
             row = row.on_click(move |event, window, cx| {
-                if let Some(binding) = &selected_binding {
-                    binding.update(cx, |selected| {
-                        *selected = !*selected;
-                        true
-                    });
+                if let Some(selection) = &selection {
+                    selection.select(cx);
                 }
-                if let Some(binding) = &expanded_binding {
-                    binding.update(cx, |expanded| {
-                        *expanded = !*expanded;
-                        true
-                    });
+                if let Some(open_state) = &open_state {
+                    open_state.toggle(cx);
                 }
                 if let Some(handler) = &handler {
                     handler(event, window, cx);
@@ -181,5 +160,35 @@ impl RenderOnce for TreeRow {
         }
 
         row
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestApp;
+    use relay::ReactiveAppExt;
+
+    use super::*;
+
+    #[test]
+    fn tree_row_selection_binding_builder_stores_controller() {
+        let mut app = TestApp::new();
+        let row = app.update(|cx| {
+            TreeRow::new("tree", IconName::Folder, "src")
+                .selection_binding(SelectionBinding::binding(cx.binding(true), true))
+        });
+
+        assert!(row.selection.is_some());
+    }
+
+    #[test]
+    fn tree_row_open_state_builder_stores_controller() {
+        let mut app = TestApp::new();
+        let row = app.update(|cx| {
+            TreeRow::new("tree", IconName::Folder, "src")
+                .open_state(OpenState::binding(cx.binding(false)))
+        });
+
+        assert!(row.open_state.is_some());
     }
 }

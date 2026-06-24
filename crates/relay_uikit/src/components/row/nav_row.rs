@@ -2,7 +2,6 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, IntoElement, ParentElement, RenderOnce, Styled, Window,
     div, px,
 };
-use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -19,7 +18,6 @@ pub struct NavRow {
     label: String,
     count: Option<usize>,
     selected: bool,
-    binding: Option<Binding<bool>>,
     on_click: Option<ClickHandler>,
 }
 
@@ -31,24 +29,6 @@ impl NavRow {
             label: label.into(),
             count: None,
             selected: false,
-            binding: None,
-            on_click: None,
-        }
-    }
-
-    pub fn bound(
-        id: impl Into<ElementId>,
-        icon: IconName,
-        label: impl Into<String>,
-        binding: Binding<bool>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            icon,
-            label: label.into(),
-            count: None,
-            selected: false,
-            binding: Some(binding),
             on_click: None,
         }
     }
@@ -75,8 +55,7 @@ impl NavRow {
 impl RenderOnce for NavRow {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
-        let binding = self.binding;
-        let selected = binding.as_ref().map_or(self.selected, |b| b.get(cx));
+        let selected = self.selected;
         let (fg, icon_color) = if selected {
             (theme.text, theme.accent)
         } else {
@@ -121,15 +100,8 @@ impl RenderOnce for NavRow {
             );
         }
 
-        let has_click = binding.is_some() || handler.is_some();
-        if has_click {
+        if handler.is_some() {
             row = row.on_click(move |event, window, cx| {
-                if let Some(binding) = &binding {
-                    binding.update(cx, |selected| {
-                        *selected = !*selected;
-                        true
-                    });
-                }
                 if let Some(handler) = &handler {
                     handler(event, window, cx);
                 }
