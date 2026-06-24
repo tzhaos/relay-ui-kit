@@ -41,6 +41,7 @@ pub struct Button {
 }
 
 impl Button {
+    /// Create a button with a stable id and visible text label.
     pub fn new(id: impl Into<ElementId>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -54,6 +55,7 @@ impl Button {
         }
     }
 
+    /// Set the visual emphasis for this action.
     pub fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = variant;
         self
@@ -76,26 +78,31 @@ impl Button {
         self
     }
 
+    /// Add a leading icon while keeping the text label as the accessible name.
     pub fn icon(mut self, icon: IconName) -> Self {
         self.icon = Some(icon);
         self
     }
 
+    /// Disable pointer and keyboard activation.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    /// Track focus on the rendered button with a host-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self
     }
 
+    /// Mark the button as the trigger for an expandable surface.
     pub fn aria_expanded(mut self, expanded: bool) -> Self {
         self.aria_expanded = Some(expanded);
         self
     }
 
+    /// Run the action for both pointer clicks and keyboard activation.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -174,6 +181,10 @@ impl RenderOnce for Button {
 }
 
 /// A square, borderless icon button — toolbar actions, row affordances.
+///
+/// Prefer [`Button`] when a textual label fits naturally in the layout. Use
+/// [`IconButton`] when the surrounding chrome already establishes the action's
+/// context and the compact footprint matters.
 #[derive(IntoElement)]
 pub struct IconButton {
     id: ElementId,
@@ -188,6 +199,7 @@ pub struct IconButton {
 }
 
 impl IconButton {
+    /// Create an icon button with a stable id and icon glyph.
     pub fn new(id: impl Into<ElementId>, icon: IconName) -> Self {
         Self {
             id: id.into(),
@@ -202,6 +214,7 @@ impl IconButton {
         }
     }
 
+    /// Override the glyph size while keeping the same button chrome.
     pub fn size(mut self, size: IconSize) -> Self {
         self.size = size;
         self
@@ -218,21 +231,28 @@ impl IconButton {
         self
     }
 
+    /// Override the accessible label.
+    ///
+    /// This is recommended whenever the same icon can mean different things in
+    /// different product surfaces.
     pub fn aria_label(mut self, label: impl Into<String>) -> Self {
         self.aria_label = Some(label.into());
         self
     }
 
+    /// Track focus on the rendered button with a host-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self
     }
 
+    /// Mark the button as the trigger for an expandable surface.
     pub fn aria_expanded(mut self, expanded: bool) -> Self {
         self.aria_expanded = Some(expanded);
         self
     }
 
+    /// Run the action for both pointer clicks and keyboard activation.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

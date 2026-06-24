@@ -18,6 +18,21 @@ use super::GalleryScenesApp;
 use super::shared::{scene_stack, section, strip};
 use super::{CoreTreeNodeKey, GalleryContentTab, GalleryState};
 
+pub(super) const COVERAGE_TITLES: [&str; 12] = [
+    "Buttons",
+    "Icon Buttons",
+    "Badges · Color · Chrome",
+    "Toggle · Checkbox · Radio",
+    "Text Input",
+    "Field Anatomy & Reactive Lists",
+    "Search & Filter",
+    "Number & Slider & Stepper",
+    "Segmented Control",
+    "Disclosure",
+    "Sectioned List & Tree View",
+    "List & Tree Rows",
+];
+
 pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
@@ -29,42 +44,34 @@ pub(super) fn render(
     let name_focused = state.name_focus.is_focused(window);
 
     scene_stack()
-        .child(section(cx, "Buttons", button_sample(host)))
-        .child(section(cx, "Icon Buttons", icon_button_sample(host)))
-        .child(section(cx, "Badges · Color · Chrome", chrome_sample(host)))
+        .child(section(cx, COVERAGE_TITLES[0], button_sample(host)))
+        .child(section(cx, COVERAGE_TITLES[1], icon_button_sample(host)))
+        .child(section(cx, COVERAGE_TITLES[2], chrome_sample(host)))
+        .child(section(cx, COVERAGE_TITLES[3], choice_sample(state, host)))
         .child(section(
             cx,
-            "Toggle · Checkbox · Radio",
-            choice_sample(state, host),
-        ))
-        .child(section(
-            cx,
-            "Text Input",
+            COVERAGE_TITLES[4],
             text_input_sample(state, name_focused),
         ))
         .child(section(
             cx,
-            "Field Anatomy & Reactive Lists",
+            COVERAGE_TITLES[5],
             field_primitives_sample(state, host, window, cx),
         ))
-        .child(section(cx, "Search & Filter", search_sample(state, host)))
+        .child(section(cx, COVERAGE_TITLES[6], search_sample(state, host)))
+        .child(section(cx, COVERAGE_TITLES[7], number_sample(state, host)))
+        .child(section(cx, COVERAGE_TITLES[8], segmented_sample(state)))
         .child(section(
             cx,
-            "Number & Slider & Stepper",
-            number_sample(state, host),
-        ))
-        .child(section(cx, "Segmented Control", segmented_sample(state)))
-        .child(section(
-            cx,
-            "Disclosure",
+            COVERAGE_TITLES[9],
             disclosure_sample(state, disclosure_open),
         ))
         .child(section(
             cx,
-            "Sectioned List & Tree View",
+            COVERAGE_TITLES[10],
             structured_collection_sample(state, host, cx),
         ))
-        .child(section(cx, "List & Tree Rows", tree_sample(state, cx)))
+        .child(section(cx, COVERAGE_TITLES[11], tree_sample(state, cx)))
 }
 
 fn toast(

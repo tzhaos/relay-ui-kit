@@ -16,6 +16,9 @@ use super::{
     shared::{TextInputFieldProps, scene_stack, section, strip, text_input_field},
 };
 
+pub(super) const COVERAGE_TITLES: [&str; 4] =
+    ["Agent profile", "Appearance", "Behavior", "Feedback"];
+
 pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
@@ -43,7 +46,7 @@ pub(super) fn render(
             )
         })
         .child(
-            SettingsSection::new("Agent profile")
+            SettingsSection::new(COVERAGE_TITLES[0])
                 .row(
                     SettingsRow::new("Agent name")
                         .description("Used as the default terminal session label")
@@ -70,7 +73,7 @@ pub(super) fn render(
                 ),
         )
         .child(
-            SettingsSection::new("Appearance")
+            SettingsSection::new(COVERAGE_TITLES[1])
                 .row(
                     SettingsRow::new("Theme")
                         .description("Preview cards and select share the same host state")
@@ -93,7 +96,7 @@ pub(super) fn render(
                 ),
         )
         .child(
-            SettingsSection::new("Behavior")
+            SettingsSection::new(COVERAGE_TITLES[2])
                 .row(
                     SettingsRow::new("Notifications")
                         .description("Show task and terminal lifecycle notices")
@@ -107,7 +110,7 @@ pub(super) fn render(
         )
         .child(section(
             cx,
-            "Feedback",
+            COVERAGE_TITLES[3],
             div()
                 .relative()
                 .w_full()

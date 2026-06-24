@@ -21,6 +21,10 @@ use super::{
 };
 
 /// A multi-line text area that can be host-owned or Relay-bound.
+///
+/// Use [`TextArea::bound`] when the field should keep a live Relay editing
+/// session, selection, and IME state. Use [`TextArea::new`] when a parent view
+/// already owns a derived snapshot of [`TextInputState`].
 #[derive(IntoElement)]
 pub struct TextArea {
     id: ElementId,
@@ -97,6 +101,7 @@ impl TextArea {
         self
     }
 
+    /// Guarantee a minimum visible line count for the editor.
     pub fn min_rows(mut self, rows: usize) -> Self {
         self.min_rows = rows.max(2);
         self
@@ -109,6 +114,9 @@ impl TextArea {
     }
 
     /// Override the GPUI key-dispatch context used while this text area is focused.
+    ///
+    /// This accepts owned strings so app surfaces can scope multiline shortcuts
+    /// with runtime-derived context keys.
     pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
         self.key_context = key_context.into();
         self

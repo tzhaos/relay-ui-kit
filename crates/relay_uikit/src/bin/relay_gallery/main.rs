@@ -90,12 +90,12 @@ impl GalleryApp {
         }
     }
 
-    fn page_count(page: Page) -> Option<usize> {
+    fn coverage_count(page: Page) -> usize {
         match page {
-            Page::Core => Some(6),
-            Page::Patterns => Some(5),
-            Page::Stress => Some(9),
-            Page::Workbench => Some(3),
+            Page::Core => gallery::coverage_count(gallery::GallerySurface::Core),
+            Page::Patterns => gallery::coverage_count(gallery::GallerySurface::Patterns),
+            Page::Stress => gallery::coverage_count(gallery::GallerySurface::Stress),
+            Page::Workbench => workbench_demo::COVERAGE_TITLES.len(),
         }
     }
 
@@ -151,7 +151,7 @@ impl GalleryApp {
     }
 
     fn catalog_row(&self, page: Page, current: Page, cx: &mut Context<Self>) -> impl IntoElement {
-        let mut row = NavRow::new(
+        NavRow::new(
             Self::page_key(page),
             Self::page_icon(page),
             self.label_for(page),
@@ -159,11 +159,8 @@ impl GalleryApp {
         .selected(current == page)
         .on_click(cx.listener(move |this, _, _, cx| {
             this.set_page(page, cx);
-        }));
-        if let Some(count) = Self::page_count(page) {
-            row = row.count(count);
-        }
-        row
+        }))
+        .count(Self::coverage_count(page))
     }
 
     fn page_key(page: Page) -> &'static str {
@@ -249,4 +246,29 @@ fn main() {
         };
         cx.activate(true);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catalog_counts_follow_surface_metadata() {
+        assert_eq!(
+            GalleryApp::coverage_count(Page::Core),
+            gallery::coverage_count(gallery::GallerySurface::Core)
+        );
+        assert_eq!(
+            GalleryApp::coverage_count(Page::Patterns),
+            gallery::coverage_count(gallery::GallerySurface::Patterns)
+        );
+        assert_eq!(
+            GalleryApp::coverage_count(Page::Stress),
+            gallery::coverage_count(gallery::GallerySurface::Stress)
+        );
+        assert_eq!(
+            GalleryApp::coverage_count(Page::Workbench),
+            workbench_demo::COVERAGE_TITLES.len()
+        );
+    }
 }

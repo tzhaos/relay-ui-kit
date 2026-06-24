@@ -29,6 +29,10 @@ use super::{
 };
 
 /// A single-line text input that can be host-owned or Relay-bound.
+///
+/// Use [`TextInput::bound`] when the field should own an active editing session
+/// through Relay state. Use [`TextInput::new`] when the host already derives and
+/// reconciles its own snapshot of [`TextInputState`].
 #[derive(IntoElement)]
 pub struct TextInput {
     id: ElementId,
@@ -109,6 +113,9 @@ impl TextInput {
     }
 
     /// Override the GPUI key-dispatch context used while this input is focused.
+    ///
+    /// This accepts owned strings so higher-level product surfaces can derive
+    /// contexts from runtime ids instead of baking in static labels.
     pub fn key_context(mut self, key_context: impl Into<String>) -> Self {
         self.key_context = key_context.into();
         self

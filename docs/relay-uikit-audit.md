@@ -18,11 +18,17 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 220 tests passed.
+  Result: 242 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
+- `cargo build -p relay_uikit --bin relay_gallery`
+  Result: gallery binary build passed.
+- `cargo clippy -p relay_uikit --all-targets --all-features -- -D warnings`
+  Result: passed.
 - Root export coverage audit over `crates/relay_uikit/src/lib.rs` versus `crates/relay_uikit/src/bin/relay_gallery/**`
   Result: `ALL_ROOT_EXPORTS_REFERENCED_IN_GALLERY_BIN`.
+- Gallery coverage metadata derived from live scene modules instead of hardcoded sidebar values
+  Result: `Core Kit` 16 groups, `Patterns Kit` 13 groups, `Stress Lab` 7 groups, `Workbench` 4 regions.
 
 Recent relevant commits:
 
@@ -48,7 +54,8 @@ The real risk is whether a component keeps behaving under retained state, focus 
 ## Documentation Coverage Snapshot
 
 Public API documentation is still the weakest area of the crate.
-The current quick audit counted `20` documented public items and `121` undocumented public items out of `141` total.
+The current numeric snapshot predates the latest rustdoc rewrite batch and should
+be treated as a lower bound, not the final post-batch count.
 
 Breakdown by family:
 
@@ -108,8 +115,8 @@ What is already good:
 
 Remaining concerns:
 
-- public docs do not yet explain when to choose `Button` versus `IconButton`;
-- icon-only labeling rules should be documented as a hard requirement, not implied behavior.
+- broader family docs still need richer examples and composition guidance;
+- icon-only labeling rules should remain a documented hard requirement across every icon-only surface, not only button primitives.
 
 ### Text and Numeric Inputs
 
@@ -125,7 +132,7 @@ What is already good:
 
 Remaining concerns:
 
-- rustdoc still does not clearly teach host-owned versus relay-bound editing;
+- rustdoc has improved for `TextInput` and `TextArea`, but the wider input family still needs more end-to-end usage guidance;
 - more gallery scenarios should explicitly stress long-value horizontal scrolling and multiline growth under mixed ASCII/CJK content.
 
 ### Choices and Selectors
@@ -155,7 +162,7 @@ What is already good:
 
 Remaining concerns:
 
-- the public row/list APIs are nearly undocumented;
+- `ListItem` is better documented now, but the family still needs broader row/tree examples and guidance;
 - navigation semantics and focus expectations need explicit rustdoc examples.
 
 ### Overlays, Menus, and Dialogs
@@ -169,7 +176,7 @@ What is already good:
 
 Remaining concerns:
 
-- overlay lifecycle rules are still more obvious from code than from docs;
+- `Dialog` and `ConfirmDialog` are better documented now, but overlay lifecycle rules are still more obvious from code than from docs;
 - we should keep adding regression scenarios around focus entry/exit and repeated open-close churn.
 
 ### Picker, Command, and Output Surfaces
@@ -204,12 +211,15 @@ Remaining concerns:
 
 ## What Was Fixed In The Latest Batch
 
-The latest UIKit cleanup batch focused on removing unnecessary static public contracts and deleting dead interaction aliases.
+The latest UIKit cleanup batch focused on removing unnecessary static public contracts, deleting dead interaction aliases, and making the gallery/documentation story more truthful.
 
 Landed changes:
 
 - `TextInput`, `SearchField`, `TextArea`, and editable `NumberInput` now accept owned `String` key contexts instead of forcing `&'static str`.
 - `SplitPane` and `OutputSurface` now accept general `ElementId` inputs instead of forcing static string ids.
+- gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
+- rustdoc was strengthened for high-frequency public surfaces:
+  `Button`, `IconButton`, `TextInput`, `TextArea`, `ListItem`, `Dialog`, and `ConfirmDialog`.
 - dead interaction aliases were removed:
   `SubmitHandler`, `SharedSubmitHandler`, `CancelHandler`, `SharedCancelHandler`, and `ChangeHandler`.
 - regression tests were added for the relaxed contracts.

@@ -16,6 +16,9 @@ use crate::{
 use super::Dialog;
 
 /// A common two-action confirmation dialog.
+///
+/// This wraps [`Dialog`] with opinionated confirm/cancel actions and safer focus
+/// defaults for destructive workflows.
 #[derive(IntoElement)]
 pub struct ConfirmDialog {
     id: ElementId,
@@ -40,6 +43,7 @@ enum ConfirmDialogInitialFocus {
 }
 
 impl ConfirmDialog {
+    /// Create a confirm dialog with a stable id, title, and body copy.
     pub fn new(
         id: impl Into<ElementId>,
         title: impl Into<String>,
@@ -62,46 +66,55 @@ impl ConfirmDialog {
         }
     }
 
+    /// Override the primary action label.
     pub fn confirm_label(mut self, label: impl Into<String>) -> Self {
         self.confirm_label = label.into();
         self
     }
 
+    /// Override the cancel action label.
     pub fn cancel_label(mut self, label: impl Into<String>) -> Self {
         self.cancel_label = label.into();
         self
     }
 
+    /// Render the dialog open or closed from a host-owned snapshot.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
+    /// Bind the dialog to shared Relay/host open state.
     pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
         self.open_state = Some(OpenState::binding(binding));
         self
     }
 
+    /// Supply an explicit shared open-state adapter.
     pub fn open_with(mut self, open_state: OpenState) -> Self {
         self.open_state = Some(open_state);
         self
     }
 
+    /// Track focus on the dialog container with a host-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self
     }
 
+    /// Redirect initial focus when the dialog opens.
     pub fn initial_focus(mut self, focus_handle: FocusHandle) -> Self {
         self.initial_focus = Some(focus_handle);
         self
     }
 
+    /// Mark the action as destructive and prefer cancel as the safe default focus.
     pub fn danger(mut self, danger: bool) -> Self {
         self.danger = danger;
         self
     }
 
+    /// Run when the confirm action is activated.
     pub fn on_confirm(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -110,6 +123,7 @@ impl ConfirmDialog {
         self
     }
 
+    /// Run when the cancel action is activated.
     pub fn on_cancel(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
@@ -118,6 +132,7 @@ impl ConfirmDialog {
         self
     }
 
+    /// Run when the dialog is dismissed through backdrop, `Escape`, or shared cleanup.
     pub fn on_dismiss(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

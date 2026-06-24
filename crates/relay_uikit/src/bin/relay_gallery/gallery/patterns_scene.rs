@@ -36,6 +36,22 @@ use super::{
     shared::{scene_stack, section, strip},
 };
 
+pub(super) const COVERAGE_TITLES: [&str; 13] = [
+    "Layout patterns",
+    "Display patterns",
+    "Navigation patterns",
+    "Overlay patterns",
+    "Task Row & Session Row",
+    "Tab Strip & Toolbar",
+    "Input Composer",
+    "Output Surface & Log",
+    "Quick Actions",
+    "Command Menu & Keybindings",
+    "Command Palette & Picker",
+    "Item Picker",
+    "File Viewer · Markdown · Diff",
+];
+
 pub(super) fn render(
     state: &GalleryState,
     host: &Entity<GalleryScenesApp>,
@@ -58,22 +74,22 @@ pub(super) fn render(
     let viewer_body = viewer_patterns(state, cx);
 
     let mut stack = scene_stack()
-        .child(section(cx, "Layout patterns", layout_body))
-        .child(section(cx, "Display patterns", display_body))
-        .child(section(cx, "Navigation patterns", navigation_body))
-        .child(section(cx, "Overlay patterns", overlay_body))
+        .child(section(cx, COVERAGE_TITLES[0], layout_body))
+        .child(section(cx, COVERAGE_TITLES[1], display_body))
+        .child(section(cx, COVERAGE_TITLES[2], navigation_body))
+        .child(section(cx, COVERAGE_TITLES[3], overlay_body))
         .child(settings_dialog(state))
         .child(confirm_dialog(state));
     stack = stack
-        .child(section(cx, "Task Row & Session Row", rows_body))
-        .child(section(cx, "Tab Strip & Toolbar", tabs_body))
-        .child(section(cx, "Input Composer", composer_body))
-        .child(section(cx, "Output Surface & Log", output_body))
-        .child(section(cx, "Quick Actions", qa_body))
-        .child(section(cx, "Command Menu & Keybindings", launcher_body))
-        .child(section(cx, "Command Palette & Picker", command_picker_body))
-        .child(section(cx, "Item Picker", picker_body))
-        .child(section(cx, "File Viewer · Markdown · Diff", viewer_body));
+        .child(section(cx, COVERAGE_TITLES[4], rows_body))
+        .child(section(cx, COVERAGE_TITLES[5], tabs_body))
+        .child(section(cx, COVERAGE_TITLES[6], composer_body))
+        .child(section(cx, COVERAGE_TITLES[7], output_body))
+        .child(section(cx, COVERAGE_TITLES[8], qa_body))
+        .child(section(cx, COVERAGE_TITLES[9], launcher_body))
+        .child(section(cx, COVERAGE_TITLES[10], command_picker_body))
+        .child(section(cx, COVERAGE_TITLES[11], picker_body))
+        .child(section(cx, COVERAGE_TITLES[12], viewer_body));
 
     stack
 }

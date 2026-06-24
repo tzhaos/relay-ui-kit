@@ -43,6 +43,16 @@ pub enum GallerySurface {
     Stress,
 }
 
+pub(super) fn coverage_count(surface: GallerySurface) -> usize {
+    match surface {
+        GallerySurface::Core => {
+            core_scene::COVERAGE_TITLES.len() + settings_scene::COVERAGE_TITLES.len()
+        }
+        GallerySurface::Patterns => patterns_scene::COVERAGE_TITLES.len(),
+        GallerySurface::Stress => stress_scene::COVERAGE_TITLES.len(),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GalleryAccent {
     Green,
@@ -511,4 +521,38 @@ fn render_surface(
             .reserve_gutter(true),
         )
         .into_any_element()
+}
+
+#[cfg(test)]
+mod coverage_tests {
+    use super::*;
+
+    #[test]
+    fn coverage_counts_follow_scene_metadata() {
+        assert_eq!(
+            coverage_count(GallerySurface::Core),
+            core_scene::COVERAGE_TITLES.len() + settings_scene::COVERAGE_TITLES.len()
+        );
+        assert_eq!(
+            coverage_count(GallerySurface::Patterns),
+            patterns_scene::COVERAGE_TITLES.len()
+        );
+        assert_eq!(
+            coverage_count(GallerySurface::Stress),
+            stress_scene::COVERAGE_TITLES.len()
+        );
+    }
+
+    #[test]
+    fn coverage_titles_are_non_empty() {
+        for titles in [
+            &core_scene::COVERAGE_TITLES[..],
+            &settings_scene::COVERAGE_TITLES[..],
+            &patterns_scene::COVERAGE_TITLES[..],
+            &stress_scene::COVERAGE_TITLES[..],
+        ] {
+            assert!(!titles.is_empty());
+            assert!(titles.iter().all(|title| !title.trim().is_empty()));
+        }
+    }
 }

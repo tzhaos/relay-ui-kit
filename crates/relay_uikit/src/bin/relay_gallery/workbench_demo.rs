@@ -31,6 +31,9 @@ use data::{
 };
 use rail::left_rail;
 
+pub(super) const COVERAGE_TITLES: [&str; 4] =
+    ["Left rail", "Center pane", "Context pane", "Status bar"];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WorkbenchContextTab {
     Files,

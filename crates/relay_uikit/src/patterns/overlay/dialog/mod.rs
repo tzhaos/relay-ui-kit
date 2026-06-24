@@ -45,6 +45,7 @@ struct DialogLifecycleState {
 }
 
 impl Dialog {
+    /// Create a dialog with a stable id and visible title.
     pub fn new(id: impl Into<ElementId>, title: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -63,56 +64,67 @@ impl Dialog {
         }
     }
 
+    /// Add supporting copy under the title.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Add a title icon to reinforce the dialog intent.
     pub fn icon(mut self, icon: IconName) -> Self {
         self.icon = Some(icon);
         self
     }
 
+    /// Override the dialog panel width in pixels.
     pub fn width(mut self, width: f32) -> Self {
         self.width = width;
         self
     }
 
+    /// Render the dialog open or closed from a host-owned snapshot.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
+    /// Bind the dialog to shared Relay/host open state.
     pub fn open_bound(mut self, binding: Binding<bool>) -> Self {
         self.open_state = Some(OpenState::binding(binding));
         self
     }
 
+    /// Supply an explicit shared open-state adapter.
     pub fn open_with(mut self, open_state: OpenState) -> Self {
         self.open_state = Some(open_state);
         self
     }
 
+    /// Track focus on the dialog container with a host-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self
     }
 
+    /// Redirect initial focus when the dialog opens.
     pub fn initial_focus(mut self, focus_handle: FocusHandle) -> Self {
         self.initial_focus = Some(focus_handle);
         self
     }
 
+    /// Render a footer row, typically actions or status text.
     pub fn footer(mut self, footer: impl IntoElement) -> Self {
         self.footer = Some(footer.into_any_element());
         self
     }
 
+    /// Control whether backdrop click and `Escape` dismiss the dialog.
     pub fn closable(mut self, closable: bool) -> Self {
         self.closable = closable;
         self
     }
 
+    /// Observe dismiss requests after shared open-state cleanup runs.
     pub fn on_dismiss(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,

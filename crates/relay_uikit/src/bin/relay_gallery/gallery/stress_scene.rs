@@ -18,6 +18,16 @@ use super::{
     shared::{scene_stack, section, strip},
 };
 
+pub(super) const COVERAGE_TITLES: [&str; 7] = [
+    "Input overflow",
+    "Long text",
+    "Disabled and quiet states",
+    "Disabled icon buttons",
+    "Dense rows",
+    "Keyed session list",
+    "Scroll surface",
+];
+
 pub(super) fn render(
     state: &GalleryState,
     _host: &Entity<GalleryScenesApp>,
@@ -25,10 +35,10 @@ pub(super) fn render(
     cx: &mut Context<GalleryScenesApp>,
 ) -> impl IntoElement {
     scene_stack()
-        .child(section(cx, "Input overflow", constrained_inputs(state)))
+        .child(section(cx, COVERAGE_TITLES[0], constrained_inputs(state)))
         .child(section(
             cx,
-            "Long text",
+            COVERAGE_TITLES[1],
             div()
                 .flex()
                 .items_start()
@@ -39,7 +49,7 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
-            "Disabled and quiet states",
+            COVERAGE_TITLES[2],
             strip()
                 .child(
                     Button::new("stress-disabled-primary", "Primary Action")
@@ -62,7 +72,7 @@ pub(super) fn render(
         ))
         .child(section(
             cx,
-            "Disabled icon buttons",
+            COVERAGE_TITLES[3],
             strip()
                 .child(
                     IconButton::new("stress-ib-disabled", IconName::Plus)
@@ -84,13 +94,17 @@ pub(super) fn render(
                         .aria_label("Open settings"),
                 ),
         ))
-        .child(section(cx, "Dense rows", long_list(theme)))
+        .child(section(cx, COVERAGE_TITLES[4], long_list(theme)))
         .child(section(
             cx,
-            "Keyed session list",
+            COVERAGE_TITLES[5],
             cached_session_list(state.stress_session_list.clone()),
         ))
-        .child(section(cx, "Scroll surface", scroll_surface_sample(theme)))
+        .child(section(
+            cx,
+            COVERAGE_TITLES[6],
+            scroll_surface_sample(theme),
+        ))
 }
 
 fn constrained_inputs(state: &GalleryState) -> impl IntoElement {

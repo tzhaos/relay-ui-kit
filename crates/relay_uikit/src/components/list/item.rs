@@ -7,8 +7,11 @@ use crate::theme::DISABLED_OPACITY;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListItemSpacing {
+    /// Short row for compact metadata and secondary navigation.
     Compact,
+    /// Default row height for most selectable lists.
     Dense,
+    /// Taller row for richer task/session content.
     Relaxed,
 }
 
@@ -44,6 +47,10 @@ pub struct ListItem {
 }
 
 impl ListItem {
+    /// Create a row container with a stable id.
+    ///
+    /// [`ListItem`] is the primitive for product rows that need selection,
+    /// keyboard activation, start/end slots, and host-owned focus behavior.
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
@@ -66,72 +73,86 @@ impl ListItem {
         }
     }
 
+    /// Render the row in the selected state.
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
         self
     }
 
+    /// Disable activation and dim the row.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    /// Control whether hover affordances imply row selection.
     pub fn selectable(mut self, selectable: bool) -> Self {
         self.selectable = selectable;
         self
     }
 
+    /// Choose the default row height preset.
     pub fn spacing(mut self, spacing: ListItemSpacing) -> Self {
         self.spacing = spacing;
         self
     }
 
+    /// Override the row height directly.
     pub fn height(mut self, height: impl Into<DefiniteLength>) -> Self {
         self.height = Some(height.into());
         self
     }
 
+    /// Indent the row for hierarchical or grouped layouts.
     pub fn indent(mut self, depth: usize, step: f32) -> Self {
         self.indent_depth = depth;
         self.indent_step = step;
         self
     }
 
+    /// Render content before the main row body.
     pub fn start_slot(mut self, slot: impl IntoElement) -> Self {
         self.start_slot = Some(slot.into_any_element());
         self
     }
 
+    /// Render content after the main row body.
     pub fn end_slot(mut self, slot: impl IntoElement) -> Self {
         self.end_slot = Some(slot.into_any_element());
         self
     }
 
+    /// Override the accessibility role for the row.
     pub fn role(mut self, role: Role) -> Self {
         self.role = Some(role);
         self
     }
 
+    /// Override the accessible label when the visible child content is not enough.
     pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
         self.aria_label = Some(label.into());
         self
     }
 
+    /// Expose a toggled accessibility state for switch-like rows.
     pub fn toggled(mut self, toggled: bool) -> Self {
         self.toggled = Some(toggled);
         self
     }
 
+    /// Track row focus with a host-owned focus handle.
     pub fn focus_handle(mut self, focus_handle: FocusHandle) -> Self {
         self.focus_handle = Some(focus_handle);
         self
     }
 
+    /// Override keyboard tab order when the host needs custom sequencing.
     pub fn tab_index(mut self, tab_index: isize) -> Self {
         self.tab_index = Some(tab_index);
         self
     }
 
+    /// Run the action for both pointer clicks and Enter/Space activation.
     pub fn on_click(
         mut self,
         handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
