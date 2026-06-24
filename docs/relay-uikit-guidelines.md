@@ -27,6 +27,7 @@ Depending on its role, it must support the right combination of:
 - host-owned snapshot + callback usage;
 - relay-bound usage via `Binding<T>` / `SelectionSource<T>` / `OpenState>`;
 - stable behavior when the host updates state externally;
+- no render-time synthesis of hidden bindings from snapshot props;
 - no hidden second state system that drifts from Relay or GPUI focus state.
 
 ### 2. Interaction Gate
@@ -219,6 +220,7 @@ Good directions:
 Bad directions:
 
 - a second hidden state layer that competes with Relay;
+- `window.use_binding(...)` or equivalent render-time fallback state that silently takes ownership away from the host;
 - component APIs coupled to app-specific domain entities;
 - visual widgets that bury controller logic the host needs to reason about.
 

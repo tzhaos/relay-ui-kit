@@ -62,6 +62,24 @@ pub enum GalleryAccent {
     Red,
 }
 
+impl GalleryAccent {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Green => "Green",
+            Self::Blue => "Blue",
+            Self::Violet => "Violet",
+            Self::Amber => "Amber",
+            Self::Red => "Red",
+        }
+    }
+}
+
+impl fmt::Display for GalleryAccent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GalleryContentTab {
     Files,
@@ -253,7 +271,7 @@ pub struct GalleryState {
     stress_session_list: Entity<stress_scene::StressSessionList>,
     pub feedback_toasts: Signal<Vec<FeedbackToast>>,
     pub feedback_toast_serial: u64,
-    pub accent_choice: Signal<GalleryAccent>,
+    pub accent_choice: Binding<GalleryAccent>,
     pub overlay_event: Signal<String>,
     pub core_disclosure_open: Binding<bool>,
     pub core_tree_src_open: Binding<bool>,
@@ -284,12 +302,14 @@ impl GalleryState {
         let auto_archive: Binding<bool> = cx.binding(false);
         let ui_font_size: Binding<i32> = cx.binding(14);
         let theme_choice: Binding<ThemePreviewKind> = cx.binding(ThemePreviewKind::System);
+        let accent_choice: Binding<GalleryAccent> = cx.binding(GalleryAccent::Green);
         let settings_dirty = scope
             .form()
             .field("notifications", notifications.clone(), cx)
             .field("auto_archive", auto_archive.clone(), cx)
             .field("ui_font_size", ui_font_size.clone(), cx)
             .field("theme_choice", theme_choice.clone(), cx)
+            .field("accent_choice", accent_choice.clone(), cx)
             .build_is_dirty(cx);
         let pattern_command_selection = use_ordered_selection_model(
             cx,
@@ -371,7 +391,7 @@ impl GalleryState {
             stress_session_list: cx.new(stress_scene::StressSessionList::new),
             feedback_toasts: cx.signal(Vec::new()),
             feedback_toast_serial: 0,
-            accent_choice: cx.signal(GalleryAccent::Green),
+            accent_choice,
             overlay_event: cx.signal("No overlay action yet".into()),
             core_disclosure_open: cx.binding(true),
             core_tree_src_open: cx.binding(true),

@@ -81,8 +81,8 @@ pub(super) fn render(
                 )
                 .row(
                     SettingsRow::new("Accent color")
-                        .description("Preset picker emits the selected key and color")
-                        .control(accent_picker(state, cx)),
+                        .description("Preset picker binds selection and still emits side effects")
+                        .control(accent_picker(state, host)),
                 )
                 .row(
                     SettingsRow::new("UI font size")
@@ -309,18 +309,19 @@ fn theme_controls(state: &GalleryState, cx: &mut Context<GalleryScenesApp>) -> i
 
 fn accent_picker(
     state: &GalleryState,
-    cx: &mut Context<GalleryScenesApp>,
+    host: &Entity<GalleryScenesApp>,
 ) -> impl IntoElement + use<> {
-    let accent_choice = state.accent_choice.clone();
-    ColorPicker::new(
+    ColorPicker::bound(
         "settings-accent-picker",
-        accent_choice.get(cx),
+        state.accent_choice.clone(),
         accent_presets(),
     )
     .on_select({
-        let accent_choice = accent_choice.clone();
+        let host = host.clone();
         move |key, _hsla, _window, cx| {
-            accent_choice.set(cx, key);
+            host.update(cx, |this, cx| {
+                this.add_feedback_toast(cx, format!("Accent: {key}"));
+            });
         }
     })
 }

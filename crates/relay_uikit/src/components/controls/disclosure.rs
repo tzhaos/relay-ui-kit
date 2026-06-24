@@ -3,7 +3,7 @@ use gpui::{
     MouseButton, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::{Binding, WindowSignalExt};
+use relay::Binding;
 
 use crate::{
     components::display::CountBadge,
@@ -15,13 +15,9 @@ use crate::{
 
 /// A disclosure row for collapsible groups.
 ///
-/// Three construction modes:
-/// - `new` — host-owned: caller passes `open: bool` and handles toggling.
-/// - `bound` — relay-bound: caller passes `Binding<bool>`, two-way binding.
-/// - `stateful` — component-internal hooks: the component owns its open state
-///   via `window.use_signal`, eliminating the need for the caller to manage
-///   state. This is the React `useState` / Solid `createSignal` equivalent
-///   for `RenderOnce` components.
+/// Two explicit construction modes are supported:
+/// - `new` for host-owned `open: bool` plus optional `on_toggle` handling.
+/// - `bound` for Relay-owned `Binding<bool>` open state.
 #[derive(IntoElement)]
 pub struct Disclosure {
     id: ElementId,
@@ -55,33 +51,6 @@ impl Disclosure {
     ) -> Self {
         Self {
             id: id.into(),
-            label: label.into(),
-            open: false,
-            detail: None,
-            count: None,
-            disabled: false,
-            binding: Some(binding),
-            on_toggle: None,
-        }
-    }
-
-    /// Create a disclosure that owns its open state internally via
-    /// `window.use_signal`. The state persists across renders as long as the
-    /// component keeps rendering in the same position (keyed by `id`).
-    ///
-    /// This is the component-internal hooks pattern — no `Binding` or host
-    /// callback needed. The caller can optionally pass `on_toggle` to observe
-    /// state changes.
-    pub fn stateful(
-        id: impl Into<ElementId>,
-        label: impl Into<String>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Self {
-        let id = id.into();
-        let binding = window.use_binding(id.clone(), cx, || false);
-        Self {
-            id,
             label: label.into(),
             open: false,
             detail: None,
@@ -234,55 +203,5 @@ mod tests {
         let disclosure = app.update(|cx| Disclosure::bound("group", "Sessions", cx.binding(false)));
 
         assert!(disclosure.binding.is_some());
-    }
-
-    #[test]
-    fn stateful_disclosure_uses_window_signal() {
-        use gpui::{IntoElement, ParentElement, Render};
-        use std::sync::{
-            Arc,
-            atomic::{AtomicBool, Ordering},
-        };
-
-        // We render a Disclosure::stateful inside a view's render method.
-        // The use_signal call happens during layout (inside render), which is
-        // the only place use_keyed_state is valid.
-        let binding_created = Arc::new(AtomicBool::new(false));
-
-        struct HostView {
-            binding_created: Arc<AtomicBool>,
-        }
-        impl HostView {
-            fn new(cx: &mut gpui::Context<Self>, binding_created: Arc<AtomicBool>) -> Self {
-                relay::init(cx);
-                crate::styles::theme::init(cx);
-                Self { binding_created }
-            }
-        }
-        impl Render for HostView {
-            fn render(
-                &mut self,
-                window: &mut Window,
-                cx: &mut gpui::Context<Self>,
-            ) -> impl IntoElement {
-                // Create a stateful disclosure during render — use_signal
-                // is called here, inside the layout phase. Context<Self>
-                // derefs to &mut App.
-                let disclosure = Disclosure::stateful("test-group", "Test", window, cx);
-                self.binding_created
-                    .store(disclosure.binding.is_some(), Ordering::Relaxed);
-                div().child(disclosure)
-            }
-        }
-
-        let mut app = TestApp::new();
-        let binding_created_clone = binding_created.clone();
-        let mut window = app.open_window(|_, cx| HostView::new(cx, binding_created_clone));
-        window.draw();
-
-        assert!(
-            binding_created.load(Ordering::Relaxed),
-            "stateful disclosure should have an internal binding after render"
-        );
     }
 }

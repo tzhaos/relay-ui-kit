@@ -5,7 +5,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, hsla, linear_color_stop, linear_gradient,
     prelude::FluentBuilder, px,
 };
-use relay::{Binding, WindowSignalExt};
+use relay::Binding;
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -108,7 +108,7 @@ impl<K> RenderOnce for ColorPicker<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let Self {
             id,
@@ -117,15 +117,6 @@ where
             selection,
             on_select,
         } = self;
-        let selection = selection.or_else(|| {
-            selected_key.clone().map(|selected_key| {
-                SelectionSource::binding(window.use_binding(
-                    (id.clone(), "selected-preset"),
-                    cx,
-                    || selected_key,
-                ))
-            })
-        });
         let selected_key = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))

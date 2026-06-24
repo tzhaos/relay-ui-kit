@@ -18,7 +18,7 @@ It exists to answer four concrete questions with evidence:
 The following checks were run against the `relay_v2` branch on 2026-06-24:
 
 - `cargo test -p relay_uikit`
-  Result: 269 library tests passed, 15 `relay_gallery` binary tests passed.
+  Result: 268 library tests passed, 15 `relay_gallery` binary tests passed.
 - `$env:CARGO_TARGET_DIR='target/build-check'; cargo build --workspace`
   Result: workspace build passed.
 - `cargo build -p relay_uikit --bin relay_gallery`
@@ -147,10 +147,13 @@ What is already good:
 - checkboxes, radios, toggles, segmented controls, filter chips, and selects all have binding-oriented APIs;
 - select/open semantics are wired through shared `OpenState` and `SelectionSource` adapters;
 - `Select` and `ItemPicker` now require explicit open controllers instead of silently creating internal fallback bindings, so open-state ownership is visible at the API boundary;
+- `SegmentedControl`, `ColorPicker`, and `Tabs` no longer synthesize hidden selection bindings from snapshot props during render, which keeps controlled snapshots and Relay-bound state on one explicit ownership path;
+- `Disclosure` no longer exposes a component-owned `stateful(...)` path, so disclosure expansion now stays either host-controlled or Relay-bound at the API boundary;
 - `ItemPicker` now defaults to no secondary actions, so generic picker triggers no longer inherit branch-specific behavior unless the host opts in;
 - `ItemPicker` now auto-dismisses after selection or action handling by default, so hosts no longer need to manually close common picker flows;
 - `ItemPicker` presentation is now host-configurable, so panel title and trigger/row iconography do not hardcode branch semantics into the base picker primitive;
 - gallery `Select` and `DropdownMenu` scenes now rely on binding-backed open controllers instead of manual open-state synchronization callbacks;
+- gallery settings now drives `ColorPicker` through a real `Binding<GalleryAccent>` and still exercises `on_select` side effects, so the sample no longer masks selection ownership with host glue;
 - patterns scenes exercise select, item picker, command picker, and actions menu compositions.
 
 Remaining concerns:
@@ -221,9 +224,12 @@ Remaining concerns:
 - layout family rustdoc is still sparse despite being core migration infrastructure;
 - more docs are needed for resize ownership, persisted `SplitPaneState`, and host responsibilities.
 
-## What Was Fixed In The Latest Batch
+## What Was Fixed In The Latest Batches
 
-The latest UIKit cleanup batch focused on input-family productization: removing preview-only constructors, tightening editing ownership around live Relay bindings, and closing real interaction gaps that the gallery had been masking with host glue.
+The latest UIKit cleanup batches focused on two related themes:
+
+- input-family productization: removing preview-only constructors, tightening editing ownership around live Relay bindings, and closing real interaction gaps that the gallery had been masking with host glue;
+- explicit controller cleanup: deleting hidden fallback selection/open state so controlled snapshots and Relay bindings no longer compete with component-created state.
 
 Landed changes:
 
@@ -243,6 +249,9 @@ Landed changes:
 - `ContextMenu` now supports `open` / `open_bound` control and the gallery demonstrates a real open-dismiss-action loop instead of a permanently visible mock overlay.
 - `Select` and `ItemPicker` no longer synthesize hidden open-state fallback bindings during render, which tightens the controller contract around host-owned overlay state.
 - `DropdownMenu` now stores shared open control through `OpenState` and the gallery uses the same `new(...).open_bound(...)` pattern as the other overlay wrappers.
+- `SegmentedControl`, `ColorPicker`, and `Tabs` no longer synthesize hidden fallback selection bindings during render, so there is no longer a second state system sitting behind their snapshot props.
+- `Disclosure` dropped its `stateful(...)` constructor; expansion is now always either host-controlled via `new(..., open)` plus callbacks or Relay-controlled via `bound(...)`.
+- gallery settings now uses a binding-backed accent picker, and the settings dirty-state form tracks accent changes alongside theme, notifications, and font size.
 - `MenuItem::checked(false)` now still marks the row as checkable, so select-style menus expose consistent accessibility semantics across both selected and unselected options.
 - gallery catalog coverage badges now derive from live scene metadata instead of stale hardcoded counts.
 - rustdoc was strengthened for high-frequency public surfaces:

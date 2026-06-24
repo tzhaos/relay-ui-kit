@@ -5,7 +5,7 @@ use gpui::{
     ParentElement, RenderOnce, Role, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use relay::{Binding, Selector, WindowSignalExt};
+use relay::{Binding, Selector};
 
 use crate::{
     interaction::{ActionHandler, SelectionSource},
@@ -96,7 +96,7 @@ impl<K> RenderOnce for SegmentedControl<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let Self {
             id,
@@ -106,15 +106,6 @@ where
             selection,
             on_select,
         } = self;
-        let selection = selection.or_else(|| {
-            active.clone().map(|active| {
-                SelectionSource::binding(window.use_binding(
-                    (id.clone(), "active-segment"),
-                    cx,
-                    || active,
-                ))
-            })
-        });
         let handler = on_select.map(std::rc::Rc::new);
         let active = selection
             .as_ref()

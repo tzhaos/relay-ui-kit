@@ -4,7 +4,7 @@ use gpui::{
     App, ClickEvent, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
     RenderOnce, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
-use relay::{Binding, Selector, WindowSignalExt};
+use relay::{Binding, Selector};
 
 use crate::{
     icon::{Icon, IconName, IconSize},
@@ -103,7 +103,7 @@ impl<K> RenderOnce for Tabs<K>
 where
     K: Clone + Eq + Hash + PartialEq + 'static,
 {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
         let Self {
             id,
@@ -112,13 +112,6 @@ where
             selection,
             on_select,
         } = self;
-        let selection = selection.or_else(|| {
-            active.clone().map(|active| {
-                SelectionSource::binding(
-                    window.use_binding((id.clone(), "active-tab"), cx, || active),
-                )
-            })
-        });
         let active = selection
             .as_ref()
             .and_then(|selection| selection.get(cx))
