@@ -24,8 +24,9 @@ use relay_uikit::patterns::{
 };
 use relay_uikit::{
     ActiveTheme, Button, Divider, IconButton, IconName, Label, LabelSize, ListItem,
-    ListItemSpacing, Pane, PaneSurface, PaneWidth, PanelHeader, SplitAxis, SplitPane, StatusBar,
-    StatusDot, StatusItem, TextArea, Theme, ThemePreviewKind, Tone, WindowControls,
+    ListItemSpacing, Pane, PaneSurface, PaneWidth, PanelHeader, PickerActionKind, SplitAxis,
+    SplitPane, StatusBar, StatusDot, StatusItem, TextArea, Theme, ThemePreviewKind, Tone,
+    WindowControls,
     interaction::{SelectionBinding, SelectionSource},
 };
 
@@ -337,14 +338,20 @@ fn launcher_patterns(state: &GalleryState) -> impl IntoElement {
                     .on_select(pattern_command_event(state)),
                 )
                 .child(
-                    div()
-                        .w(px(232.0))
-                        .child(ActionsMenu::new("patterns-actions-menu").on_select({
-                            let log = state.overlay_event.clone();
-                            move |action, _window, cx| {
-                                log.set(cx, format!("Branch actions menu: {}", action.label()));
-                            }
-                        })),
+                    div().w(px(232.0)).child(
+                        ActionsMenu::new("patterns-actions-menu")
+                            .actions(vec![
+                                PickerActionKind::Checkout,
+                                PickerActionKind::Rename,
+                                PickerActionKind::Delete,
+                            ])
+                            .on_select({
+                                let log = state.overlay_event.clone();
+                                move |action, _window, cx| {
+                                    log.set(cx, format!("Branch actions menu: {}", action.label()));
+                                }
+                            }),
+                    ),
                 ),
         )
         .child(

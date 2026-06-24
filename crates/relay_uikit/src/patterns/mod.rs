@@ -60,7 +60,7 @@ pub use output_log::OutputLog;
 pub use output_resource::{OutputResourceSnapshot, output_resource_snapshot};
 pub use output_surface::OutputSurface;
 pub use picker::actions_menu::ActionsMenu;
-pub use picker::{ItemPicker, PickerAction, PickerOption};
+pub use picker::{ItemPicker, PickerAction, PickerActionKind, PickerOption};
 pub use quick_action::QuickAction;
 pub use session_row::SessionRow;
 pub use source_view::SourceView;

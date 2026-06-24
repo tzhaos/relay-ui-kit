@@ -68,8 +68,8 @@ pub use patterns::overlay::{
 pub use patterns::{
     ActionsMenu, CommandMenu, CommandMenuItem, CommandMenuItemKind, DiffHunk, DiffLine,
     DiffLineKind, DiffView, FileKind, FileViewer, InputComposer, ItemPicker, MarkdownViewer,
-    OutputLine, OutputLineStyle, OutputLog, OutputSurface, PickerAction, PickerOption, QuickAction,
-    SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
+    OutputLine, OutputLineStyle, OutputLog, OutputSurface, PickerAction, PickerActionKind,
+    PickerOption, QuickAction, SessionRow, SourceView, TabStrip, TabToolbar, TaskRow, TaskRowData,
 };
 pub use row::{NavRow, TreeRow};
 pub use scroll_surface::ScrollSurface;
