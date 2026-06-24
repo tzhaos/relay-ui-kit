@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, ElementId, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Role, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    AnyElement, ElementId, FocusHandle, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Role, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 
 use crate::{
@@ -16,6 +16,7 @@ pub(super) struct DialogPanel {
     pub description: Option<String>,
     pub icon: Option<IconName>,
     pub width: f32,
+    pub focus_handle: FocusHandle,
     pub children: Vec<AnyElement>,
     pub footer: Option<AnyElement>,
 }
@@ -29,6 +30,8 @@ impl DialogPanel {
             .max_w_full()
             .role(Role::Dialog)
             .aria_label(self.title.clone())
+            .tab_index(0)
+            .track_focus(&self.focus_handle)
             .rounded(px(radius::LG))
             .bg(theme.panel)
             .border_1()

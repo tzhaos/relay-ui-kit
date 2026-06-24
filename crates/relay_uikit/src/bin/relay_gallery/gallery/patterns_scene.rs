@@ -60,15 +60,10 @@ pub(super) fn render(
     let mut stack = scene_stack()
         .child(section(cx, "Layout patterns", layout_body))
         .child(section(cx, "Display patterns", display_body))
-        .child(section(cx, "Navigation patterns", navigation_body));
-    stack = stack.child(section(cx, "Overlay patterns", overlay_body));
-
-    if state.pattern_dialog_open.get(cx) {
-        stack = stack.child(settings_dialog(state));
-    }
-    if state.pattern_confirm_open.get(cx) {
-        stack = stack.child(confirm_dialog(state));
-    }
+        .child(section(cx, "Navigation patterns", navigation_body))
+        .child(section(cx, "Overlay patterns", overlay_body))
+        .child(settings_dialog(state))
+        .child(confirm_dialog(state));
     stack = stack
         .child(section(cx, "Task Row & Session Row", rows_body))
         .child(section(cx, "Tab Strip & Toolbar", tabs_body))
@@ -1492,16 +1487,21 @@ fn overlay_patterns(
 
 fn settings_dialog(state: &GalleryState) -> impl IntoElement {
     Dialog::new("patterns-settings-dialog", "Pattern settings")
-        .description("Dialog uses the overlay layer and host-owned dismiss state.")
+        .description(
+            "Controlled by host-owned open state. Dismiss with backdrop, Escape, or action, and focus returns to the opener.",
+        )
         .icon(IconName::Settings)
         .width(420.0)
+        .open_bound(state.pattern_dialog_open.clone())
         .child(
             div()
                 .flex()
                 .flex_col()
                 .gap_2()
                 .child(KeyValue::new("Layer", "patterns/overlay"))
-                .child(KeyValue::new("Dismiss", "backdrop or button"))
+                .child(KeyValue::new("Open state", "host binding"))
+                .child(KeyValue::new("Dismiss", "backdrop, Escape, or button"))
+                .child(KeyValue::new("Focus", "returns to opener"))
                 .child(KeyValue::new("Motion", "fade-slide")),
         )
         .footer(
@@ -1527,8 +1527,9 @@ fn confirm_dialog(state: &GalleryState) -> impl IntoElement {
     ConfirmDialog::new(
         "patterns-confirm-dialog",
         "Archive generated worktree",
-        "This removes the active preview worktree from the gallery workspace.",
+        "This removes the active preview worktree from the gallery workspace. Dangerous confirms default focus to Cancel, and dismiss returns focus to the opener.",
     )
+    .open_bound(state.pattern_confirm_open.clone())
     .confirm_label("Archive")
     .danger(true)
     .on_confirm(close_confirm_dialog(
